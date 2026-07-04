@@ -13,6 +13,7 @@ async function migrate() {
     CREATE TABLE IF NOT EXISTS users (
       id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       full_name     TEXT NOT NULL,
+      email         TEXT,
       phone         TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       kyc_tier      INT  NOT NULL DEFAULT 1,
@@ -63,6 +64,10 @@ async function migrate() {
 
     CREATE INDEX IF NOT EXISTS idx_ledger_tx_user ON ledger_transactions(user_id, posted_at DESC);
     CREATE INDEX IF NOT EXISTS idx_entries_tx ON ledger_entries(transaction_id);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower
+      ON users (LOWER(email))
+      WHERE email IS NOT NULL;
   `);
   console.log('[db] schema ready');
 }

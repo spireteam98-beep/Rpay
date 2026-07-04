@@ -40,6 +40,7 @@ class ApiService {
   /// or null if the backend is unreachable (caller falls back to sandbox).
   static Future<String?> signup({
     required String fullName,
+    required String email,
     required String phone,
     required String password,
   }) async {
@@ -50,6 +51,7 @@ class ApiService {
             headers: _headers(),
             body: jsonEncode({
               'fullName': fullName,
+              'email': email,
               'phone': phone,
               'password': password,
             }),
@@ -70,7 +72,7 @@ class ApiService {
 
   /// Logs in on the backend; true on success, null if unreachable.
   static Future<bool?> login({
-    required String phone,
+    required String email,
     required String password,
   }) async {
     try {
@@ -78,7 +80,7 @@ class ApiService {
           .post(
             Uri.parse('$baseUrl/auth/login'),
             headers: _headers(),
-            body: jsonEncode({'phone': phone, 'password': password}),
+            body: jsonEncode({'email': email, 'password': password}),
           )
           .timeout(_timeout);
       if (res.statusCode == 200) {

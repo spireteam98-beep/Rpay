@@ -17,12 +17,14 @@ class SignupScreen extends StatefulWidget {
 
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
+    _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -36,11 +38,17 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _handleContinue() async {
     final fullName = _nameController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
     final phone = _phoneController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (fullName.isEmpty || phone.isEmpty || password.isEmpty) {
-      _showMessage('Fill in name, phone number, and password.');
+    if (fullName.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
+      _showMessage('Fill in name, email, phone number, and password.');
+      return;
+    }
+
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      _showMessage('Enter a valid email address.');
       return;
     }
 
@@ -56,6 +64,7 @@ class _SignupScreenState extends State<SignupScreen> {
     try {
       ethAddress = await ApiService.signup(
         fullName: fullName,
+        email: email,
         phone: phone,
         password: password,
       );
@@ -66,6 +75,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
     await AuthService.registerUser(
       fullName: fullName,
+      email: email,
       phoneNumber: phone,
       password: password,
     );
@@ -124,6 +134,14 @@ class _SignupScreenState extends State<SignupScreen> {
                 icon: Icons.phone_iphone_rounded,
                 keyboardType: TextInputType.phone,
                 controller: _phoneController,
+              ),
+              const SizedBox(height: 18),
+              KashTextField(
+                label: 'Email address',
+                hint: 'you@example.com',
+                icon: Icons.alternate_email_rounded,
+                keyboardType: TextInputType.emailAddress,
+                controller: _emailController,
               ),
               const SizedBox(height: 18),
               KashTextField(

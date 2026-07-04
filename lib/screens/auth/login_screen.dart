@@ -5,7 +5,7 @@ import '../../services/auth_service.dart';
 import '../../widgets/kash_widgets.dart';
 import '../main_navigation.dart';
 
-/// Returning users: phone + password (biometrics later).
+/// Returning users: email + password (biometrics later).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -15,14 +15,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   // Sandbox: demo credentials are pre-filled so login is one tap.
-  final TextEditingController _phoneController =
-      TextEditingController(text: AuthService.demoPhone);
+  final TextEditingController _emailController =
+      TextEditingController(text: AuthService.demoEmail);
   final TextEditingController _passwordController =
       TextEditingController(text: AuthService.demoPassword);
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -34,16 +34,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    final phone = _phoneController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
 
-    if (phone.isEmpty || password.isEmpty) {
-      _showMessage('Enter your phone number and password.');
+    if (email.isEmpty || password.isEmpty) {
+      _showMessage('Enter your email and password.');
       return;
     }
 
     // Sandbox convenience: demo credentials always work.
-    if (phone == AuthService.demoPhone && password == AuthService.demoPassword) {
+    if (email == AuthService.demoEmail && password == AuthService.demoPassword) {
       await _handleDemoLogin();
       return;
     }
@@ -51,20 +51,20 @@ class _LoginScreenState extends State<LoginScreen> {
     // Real backend first (backend/ — Node + Postgres). Falls back to the
     // local sandbox automatically when the API isn't running.
     final backendResult =
-        await ApiService.login(phone: phone, password: password);
+        await ApiService.login(email: email, password: password);
     if (backendResult == true) {
       await AuthService.signInSavedUser();
       _enterApp();
       return;
     }
     if (backendResult == false) {
-      _showMessage('Incorrect phone or password. Check your details and try again.');
+      _showMessage('Incorrect email or password. Check your details and try again.');
       return;
     }
 
-    final success = await AuthService.signIn(phoneNumber: phone, password: password);
+    final success = await AuthService.signIn(email: email, password: password);
     if (!success) {
-      _showMessage('Incorrect phone or password. Check your details and try again.');
+      _showMessage('Incorrect email or password. Check your details and try again.');
       return;
     }
 
@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleDemoLogin() async {
-    _phoneController.text = AuthService.demoPhone;
+    _emailController.text = AuthService.demoEmail;
     _passwordController.text = AuthService.demoPassword;
     await AuthService.signInDemo();
     _enterApp();
@@ -114,11 +114,11 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 28),
               KashTextField(
-                label: 'Phone number',
-                hint: '+252 61 000 0000',
-                icon: Icons.phone_iphone_rounded,
-                keyboardType: TextInputType.phone,
-                controller: _phoneController,
+                label: 'Email address',
+                hint: 'you@example.com',
+                icon: Icons.alternate_email_rounded,
+                keyboardType: TextInputType.emailAddress,
+                controller: _emailController,
               ),
               const SizedBox(height: 18),
               KashTextField(
@@ -163,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Phone: ${AuthService.demoPhone}\nPassword: ${AuthService.demoPassword}',
+                      'Email: ${AuthService.demoEmail}\nPassword: ${AuthService.demoPassword}',
                       style: const TextStyle(
                         color: AppTheme.textLightGrey,
                         fontSize: 13,
