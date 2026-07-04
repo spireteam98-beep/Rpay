@@ -238,7 +238,7 @@ class KashAppState extends ChangeNotifier {
 
   double transferFee(String rail) {
     switch (rail) {
-      case 'Kashflip user':
+      case 'RoyalPay user':
         return 0;
       case 'Crypto address':
         return 1.25;

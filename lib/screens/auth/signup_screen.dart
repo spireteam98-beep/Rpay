@@ -76,7 +76,7 @@ class _SignupScreenState extends State<SignupScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Join Kashflip',
+                'Join RoyalPay',
                 style: TextStyle(
                   color: AppTheme.textWhite,
                   fontSize: 26,

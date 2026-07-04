@@ -16,7 +16,7 @@ class SendMoneyScreen extends StatefulWidget {
 
 class _SendMoneyScreenState extends State<SendMoneyScreen> {
   late KashAccountType _sourceType;
-  String _rail = 'Kashflip user';
+  String _rail = 'RoyalPay user';
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _amountController = TextEditingController(
     text: '50',
@@ -183,7 +183,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
 
   Widget _railSelector() {
     final rails = [
-      'Kashflip user',
+      'RoyalPay user',
       'Mobile money',
       'Crypto address',
       'Bank account',

@@ -68,7 +68,7 @@ const List<KashAccount> kashAccounts = [
   KashAccount(
     type: KashAccountType.crypto,
     title: 'Crypto custody',
-    subtitle: 'BTC, ETH and USDT held by Kashflip',
+    subtitle: 'BTC, ETH and USDT held by RoyalPay',
     balanceUsd: 12840.20,
     currency: 'USDT value',
     status: 'MPC custody sandbox',
@@ -103,7 +103,7 @@ const List<KashAccount> kashAccounts = [
     transactions: [
       KashTransaction(
         title: 'Amina Hassan',
-        subtitle: 'Kashflip wallet transfer',
+        subtitle: 'RoyalPay wallet transfer',
         amount: '-85.00 USD',
         icon: Icons.north_east_rounded,
       ),

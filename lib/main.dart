@@ -38,7 +38,7 @@ class CryptoExchangeApp extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return MaterialApp(
-            title: 'Kashflip',
+            title: 'RoyalPay',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
             home: const Scaffold(
@@ -56,7 +56,7 @@ class CryptoExchangeApp extends StatelessWidget {
             phoneNumber: AuthService.storedPhone,
           ),
           child: MaterialApp(
-            title: 'Kashflip',
+            title: 'RoyalPay',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
             home: AuthService.isSignedIn ? const MainNavigation() : const WelcomeScreen(),

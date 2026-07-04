@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants/app_theme.dart';
 import 'touch_scale.dart';
 
-/// Shared building blocks for the Kashflip neon-glass design system.
+/// Shared building blocks for the RoyalPay neon-glass design system.
 
 class PrimaryButton extends StatelessWidget {
   final String label;
