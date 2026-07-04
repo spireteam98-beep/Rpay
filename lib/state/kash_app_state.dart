@@ -26,7 +26,13 @@ class KashAppState extends ChangeNotifier {
   int _ledgerSequence = 1004;
   final List<LedgerTransaction> _ledgerTransactions = [];
 
-  KashAppState() {
+  KashAppState({String? profileName, String? phoneNumber}) {
+    if (profileName != null && profileName.isNotEmpty) {
+      _profileName = profileName;
+    }
+    if (phoneNumber != null && phoneNumber.isNotEmpty) {
+      _phoneNumber = phoneNumber;
+    }
     _seedLedger();
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_theme.dart';
+import '../../services/auth_service.dart';
 import '../../state/kash_app_state.dart';
 import '../../widgets/kash_widgets.dart';
 import 'otp_screen.dart';
@@ -16,12 +17,50 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _handleContinue() async {
+    final fullName = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (fullName.isEmpty || phone.isEmpty || password.isEmpty) {
+      _showMessage('Fill in name, phone number, and password.');
+      return;
+    }
+
+    if (password.length < 8) {
+      _showMessage('Password must be at least 8 characters.');
+      return;
+    }
+
+    await AuthService.registerUser(
+      fullName: fullName,
+      phoneNumber: phone,
+      password: password,
+    );
+
+    context.read<KashAppState>().completeSignup(
+          fullName: fullName,
+          phoneNumber: phone,
+        );
+
+    if (!mounted) return;
+    Navigator.of(context).push(kashRoute(const OtpScreen()));
   }
 
   @override
@@ -66,22 +105,17 @@ class _SignupScreenState extends State<SignupScreen> {
                 controller: _phoneController,
               ),
               const SizedBox(height: 18),
-              const KashTextField(
+              KashTextField(
                 label: 'Password',
                 hint: 'At least 8 characters',
                 icon: Icons.lock_outline_rounded,
                 obscure: true,
+                controller: _passwordController,
               ),
               const SizedBox(height: 28),
               PrimaryButton(
                 label: 'Continue',
-                onTap: () {
-                  context.read<KashAppState>().completeSignup(
-                    fullName: _nameController.text,
-                    phoneNumber: _phoneController.text,
-                  );
-                  Navigator.of(context).push(kashRoute(const OtpScreen()));
-                },
+                onTap: _handleContinue,
               ),
               const SizedBox(height: 16),
               Center(

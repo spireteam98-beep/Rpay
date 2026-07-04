@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_theme.dart';
+import '../../services/auth_service.dart';
 import '../../state/kash_app_state.dart';
 import '../../widgets/kash_widgets.dart';
 import 'kyc_screen.dart';
@@ -102,15 +103,24 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 12),
               PrimaryButton(
                 label: 'Verify',
-                onTap:
-                    _filled == 6
-                        ? () {
-                          context.read<KashAppState>().verifyPhone();
-                          Navigator.of(
-                            context,
-                          ).push(kashRoute(const KycScreen()));
+                onTap: _filled == 6
+                    ? () async {
+                        final signedIn = await AuthService.signInSavedUser();
+                        if (!signedIn) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Unable to sign in. Please try again.'),
+                            ),
+                          );
+                          return;
                         }
-                        : () {},
+
+                        context.read<KashAppState>().verifyPhone();
+                        if (!mounted) return;
+                        Navigator.of(context).push(kashRoute(const KycScreen()));
+                      }
+                    : () {},
               ),
               const SizedBox(height: 20),
             ],

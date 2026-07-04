@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'constants/app_theme.dart';
 import 'screens/auth/welcome_screen.dart';
+import 'screens/main_navigation.dart';
+import 'services/auth_service.dart';
 import 'state/kash_app_state.dart';
 
 void main() {
@@ -29,14 +33,36 @@ class CryptoExchangeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => KashAppState(),
-      child: MaterialApp(
-        title: 'Kashflip',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const WelcomeScreen(),
-      ),
+    return FutureBuilder<void>(
+      future: AuthService.init(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return MaterialApp(
+            title: 'Kashflip',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.darkTheme,
+            home: const Scaffold(
+              backgroundColor: AppTheme.darkBackground,
+              body: Center(
+                child: CircularProgressIndicator(color: AppTheme.primaryColor),
+              ),
+            ),
+          );
+        }
+
+        return ChangeNotifierProvider(
+          create: (_) => KashAppState(
+            profileName: AuthService.storedFullName,
+            phoneNumber: AuthService.storedPhone,
+          ),
+          child: MaterialApp(
+            title: 'Kashflip',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.darkTheme,
+            home: AuthService.isSignedIn ? const MainNavigation() : const WelcomeScreen(),
+          ),
+        );
+      },
     );
   }
 }

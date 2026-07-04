@@ -8,6 +8,7 @@ import '../widgets/touch_scale.dart';
 import 'account_detail_screen.dart';
 import 'cash_in_screen.dart';
 import 'ledger_screen.dart';
+import 'profile_screen.dart';
 import 'send_money_screen.dart';
 import 'swap_screen.dart';
 
@@ -77,7 +78,7 @@ class HomeScreen extends StatelessWidget {
                 Icons.person_outline_rounded,
                 () => Navigator.of(
                   context,
-                ).push(kashRoute(const ProfileScreen())),
+                ).push(kashRoute(ProfileScreen())),
               ),
             ],
           ),
