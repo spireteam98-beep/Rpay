@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_theme.dart';
+import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/kash_widgets.dart';
 import '../main_navigation.dart';
@@ -44,6 +45,20 @@ class _LoginScreenState extends State<LoginScreen> {
     // Sandbox convenience: demo credentials always work.
     if (phone == AuthService.demoPhone && password == AuthService.demoPassword) {
       await _handleDemoLogin();
+      return;
+    }
+
+    // Real backend first (backend/ — Node + Postgres). Falls back to the
+    // local sandbox automatically when the API isn't running.
+    final backendResult =
+        await ApiService.login(phone: phone, password: password);
+    if (backendResult == true) {
+      await AuthService.signInSavedUser();
+      _enterApp();
+      return;
+    }
+    if (backendResult == false) {
+      _showMessage('Incorrect phone or password. Check your details and try again.');
       return;
     }
 

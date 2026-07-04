@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_theme.dart';
+import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../state/kash_app_state.dart';
 import '../../widgets/kash_widgets.dart';
@@ -48,18 +49,38 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    // Register on the real backend when it's running — this provisions
+    // the user's on-chain custody wallet at signup. Falls back to the
+    // local sandbox when the API is offline.
+    String? ethAddress;
+    try {
+      ethAddress = await ApiService.signup(
+        fullName: fullName,
+        phone: phone,
+        password: password,
+      );
+    } on ApiException catch (err) {
+      _showMessage(err.message);
+      return;
+    }
+
     await AuthService.registerUser(
       fullName: fullName,
       phoneNumber: phone,
       password: password,
     );
 
+    if (!mounted) return;
     context.read<KashAppState>().completeSignup(
           fullName: fullName,
           phoneNumber: phone,
         );
 
-    if (!mounted) return;
+    if (ethAddress != null) {
+      _showMessage('Custody wallet created: '
+          '${ethAddress.substring(0, 10)}…');
+    }
+
     Navigator.of(context).push(kashRoute(const OtpScreen()));
   }
 

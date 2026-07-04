@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_theme.dart';
 import '../models/cryptocurrency.dart';
 import '../models/kash_account.dart';
+import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
@@ -42,6 +44,7 @@ class WalletScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _balanceCard(context, appState),
+            _onChainCustodyCard(),
             _accountTabs(context, appState.accounts),
             _sectionTitle('Custodied crypto assets'),
             _assetsList(),
@@ -158,6 +161,129 @@ class WalletScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Live on-chain custody card — appears when the RoyalPay backend is
+  /// running and the user has a real API session. Renders nothing in
+  /// pure-sandbox mode, so the demo never breaks.
+  Widget _onChainCustodyCard() {
+    if (!ApiService.hasSession) return const SizedBox.shrink();
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: ApiService.walletSummary(),
+      builder: (context, snapshot) {
+        final data = snapshot.data;
+        if (data == null) return const SizedBox.shrink();
+        final address = data['depositAddress'] as String? ?? '';
+        final eth = data['eth'] as Map<String, dynamic>? ?? {};
+        final network = data['network'] as String? ?? 'Sepolia testnet';
+        final balance = (eth['balance'] as String?) ?? '0';
+        final usd = (eth['usd'] as num?)?.toDouble() ?? 0;
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: AppTheme.glowCard,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const CircleIcon(Icons.link_rounded, size: 40),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'On-chain custody',
+                            style: TextStyle(
+                              color: AppTheme.textWhite,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            network,
+                            style: const TextStyle(
+                              color: AppTheme.primaryColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${double.parse(balance).toStringAsFixed(5)} ETH',
+                          style: const TextStyle(
+                            color: AppTheme.textWhite,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '\$${usd.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: AppTheme.textGrey,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                TouchScale(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: address));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Deposit address copied'),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardLightBackground,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.glassStroke),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            address,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppTheme.textLightGrey,
+                              fontSize: 12,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.copy_rounded,
+                            color: AppTheme.primaryColor, size: 16),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

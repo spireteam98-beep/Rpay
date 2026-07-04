@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_theme.dart';
+import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../state/kash_app_state.dart';
 import '../../widgets/kash_widgets.dart';
@@ -105,6 +106,9 @@ class _OtpScreenState extends State<OtpScreen> {
                 label: 'Verify',
                 onTap: _filled == 6
                     ? () async {
+                        // Real backend verification when a session exists.
+                        await ApiService.verifyPhone(_digits.join());
+
                         final signedIn = await AuthService.signInSavedUser();
                         if (!signedIn) {
                           if (!mounted) return;
@@ -116,8 +120,8 @@ class _OtpScreenState extends State<OtpScreen> {
                           return;
                         }
 
-                        context.read<KashAppState>().verifyPhone();
                         if (!mounted) return;
+                        context.read<KashAppState>().verifyPhone();
                         Navigator.of(context).push(kashRoute(const KycScreen()));
                       }
                     : () {},

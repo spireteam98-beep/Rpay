@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../constants/app_theme.dart';
+import '../../services/api_service.dart';
 import '../../state/kash_app_state.dart';
 import '../../widgets/kash_widgets.dart';
 import '../main_navigation.dart';
@@ -113,6 +114,8 @@ class _KycScreenState extends State<KycScreen> {
   }
 
   void _finish(BuildContext context) {
+    // Raise the tier on the real backend too (fail-soft when offline).
+    if (_idDone && _selfieDone) ApiService.submitKyc();
     context.read<KashAppState>().submitKyc(
       fullVerification: _idDone && _selfieDone,
     );
