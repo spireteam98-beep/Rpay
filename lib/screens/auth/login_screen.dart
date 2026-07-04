@@ -13,8 +13,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  // Sandbox: demo credentials are pre-filled so login is one tap.
+  final TextEditingController _phoneController =
+      TextEditingController(text: AuthService.demoPhone);
+  final TextEditingController _passwordController =
+      TextEditingController(text: AuthService.demoPassword);
 
   @override
   void dispose() {
@@ -38,12 +41,29 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    // Sandbox convenience: demo credentials always work.
+    if (phone == AuthService.demoPhone && password == AuthService.demoPassword) {
+      await _handleDemoLogin();
+      return;
+    }
+
     final success = await AuthService.signIn(phoneNumber: phone, password: password);
     if (!success) {
       _showMessage('Incorrect phone or password. Check your details and try again.');
       return;
     }
 
+    _enterApp();
+  }
+
+  Future<void> _handleDemoLogin() async {
+    _phoneController.text = AuthService.demoPhone;
+    _passwordController.text = AuthService.demoPassword;
+    await AuthService.signInDemo();
+    _enterApp();
+  }
+
+  void _enterApp() {
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       kashRoute(const MainNavigation()),
@@ -105,6 +125,38 @@ class _LoginScreenState extends State<LoginScreen> {
               PrimaryButton(
                 label: 'Log in',
                 onTap: _handleLogin,
+              ),
+              const SizedBox(height: 14),
+              PrimaryButton(
+                label: 'Use demo account',
+                outlined: true,
+                onTap: _handleDemoLogin,
+              ),
+              const SizedBox(height: 18),
+              GlassTile(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Sandbox credentials',
+                      style: TextStyle(
+                        color: AppTheme.primaryColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Phone: ${AuthService.demoPhone}\nPassword: ${AuthService.demoPassword}',
+                      style: const TextStyle(
+                        color: AppTheme.textLightGrey,
+                        fontSize: 13,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

@@ -31,7 +31,7 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF0E0E10),
+          color: Color(0xFF070708),
           border: Border(top: BorderSide(color: AppTheme.glassStroke)),
         ),
         child: BottomNavigationBar(

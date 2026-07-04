@@ -62,7 +62,46 @@ class KashTransaction {
     required this.amount,
     required this.icon,
   });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'subtitle': subtitle,
+        'amount': amount,
+        'icon': kashIconKey(icon),
+      };
+
+  factory KashTransaction.fromJson(Map<String, dynamic> json) =>
+      KashTransaction(
+        title: json['title'] as String,
+        subtitle: json['subtitle'] as String,
+        amount: json['amount'] as String,
+        icon: kashIconFor(json['icon'] as String?),
+      );
 }
+
+/// Named icon registry so transactions can be persisted without breaking
+/// Flutter web's icon tree-shaking (icons stay const).
+const Map<String, IconData> kashIconRegistry = {
+  'south': Icons.south_rounded,
+  'north_east': Icons.north_east_rounded,
+  'swap': Icons.sync_alt_rounded,
+  'add_card': Icons.add_card_rounded,
+  'wallet': Icons.account_balance_wallet_outlined,
+  'doc': Icons.description_outlined,
+  'bitcoin': Icons.currency_bitcoin_rounded,
+  'phone': Icons.phone_iphone_rounded,
+  'bank': Icons.account_balance_rounded,
+};
+
+String kashIconKey(IconData icon) {
+  for (final entry in kashIconRegistry.entries) {
+    if (entry.value.codePoint == icon.codePoint) return entry.key;
+  }
+  return 'wallet';
+}
+
+IconData kashIconFor(String? key) =>
+    kashIconRegistry[key] ?? Icons.account_balance_wallet_outlined;
 
 const List<KashAccount> kashAccounts = [
   KashAccount(
@@ -73,7 +112,7 @@ const List<KashAccount> kashAccounts = [
     currency: 'USDT value',
     status: 'MPC custody sandbox',
     icon: Icons.currency_bitcoin_rounded,
-    accent: Color(0xFFD7F53C),
+    accent: Color(0xFFDDF716),
     rails: ['BTC', 'ETH', 'USDT', 'Address screening'],
     transactions: [
       KashTransaction(
@@ -98,7 +137,7 @@ const List<KashAccount> kashAccounts = [
     currency: 'USD / SOS',
     status: 'Tier 1 limit active',
     icon: Icons.phone_iphone_rounded,
-    accent: Color(0xFF35D07F),
+    accent: Color(0xFF2ED17C),
     rails: ['EVC Plus', 'Zaad', 'Sahal', 'M-Pesa'],
     transactions: [
       KashTransaction(

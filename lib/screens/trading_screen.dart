@@ -246,7 +246,9 @@ class _TradingScreenState extends State<TradingScreen>
   Widget _buildPriceChart() {
     return Container(
       height: 250,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.all(16),
+      decoration: AppTheme.glowCard,
       child: LineChart(
         LineChartData(
           gridData: const FlGridData(

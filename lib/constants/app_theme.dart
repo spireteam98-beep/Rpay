@@ -6,19 +6,20 @@ import 'package:google_fonts/google_fonts.dart';
 /// pill geometry and calm typography. Inspired by Revolut <18.
 class AppTheme {
   // ── Core palette ────────────────────────────────────────────────
-  /// Neon lime — the signature accent.
-  static const Color primaryColor = Color(0xFFD7F53C);
-  static const Color secondaryColor = Color(0xFF17181B);
-  static const Color accentColor = Color(0xFFD7F53C);
+  /// Neon yellow-lime — the signature accent (balanced yellow-green).
+  static const Color primaryColor = Color(0xFFDDF716);
+  static const Color secondaryColor = Color(0xFF141518);
+  static const Color accentColor = Color(0xFFDDF716);
 
-  /// Softer lime tint used for gradients / glows.
-  static const Color limeSoft = Color(0xFFE9FF7A);
-  static const Color limeDeep = Color(0xFFB8D62B);
+  /// Yellow-green blend companions for gradients / glows.
+  static const Color limeSoft = Color(0xFFEBFF66);
+  static const Color limeDeep = Color(0xFFA9CE13);
+  static const Color greenTech = Color(0xFF2ED17C); // teal-green mix tone
 
-  // ── Backgrounds ────────────────────────────────────────────────
-  static const Color darkBackground = Color(0xFF0A0A0C);
-  static const Color cardDarkBackground = Color(0xFF141417);
-  static const Color cardLightBackground = Color(0xFF1E1F24);
+  // ── Backgrounds — pure-black base like the reference ───────────
+  static const Color darkBackground = Color(0xFF050506);
+  static const Color cardDarkBackground = Color(0xFF101012);
+  static const Color cardLightBackground = Color(0xFF1A1B1E);
   static const Color glassStroke = Color(0x14FFFFFF); // 8% white hairline
 
   // ── Text ───────────────────────────────────────────────────────
@@ -33,10 +34,10 @@ class AppTheme {
   static const Color priceUp = Color(0xFF35D07F);
   static const Color priceDown = Color(0xFFFF5C5C);
 
-  // ── Charts ─────────────────────────────────────────────────────
-  static const Color chartLine = Color(0xFFD7F53C);
-  static const Color chartGradientStart = Color(0x55D7F53C);
-  static const Color chartGradientEnd = Color(0x00D7F53C);
+  // ── Charts — lime line over a teal-green fade (mixed tones) ────
+  static const Color chartLine = Color(0xFFDDF716);
+  static const Color chartGradientStart = Color(0x552ED17C);
+  static const Color chartGradientEnd = Color(0x002ED17C);
 
   // ── Geometry ───────────────────────────────────────────────────
   static const double rCard = 24;
@@ -63,9 +64,24 @@ class AppTheme {
 
   /// Soft glass tile used for lists, sheets and secondary cards.
   static BoxDecoration glassCard = BoxDecoration(
-    color: const Color(0xFF141417),
+    color: const Color(0xFF101012),
     borderRadius: BorderRadius.circular(rCard),
     border: Border.all(color: glassStroke),
+  );
+
+  /// Dark card with a thin lime outline and soft glow — the
+  /// "Account Balance" card treatment from the reference design.
+  static BoxDecoration glowCard = BoxDecoration(
+    color: const Color(0xFF0C0D0E),
+    borderRadius: BorderRadius.circular(rCard),
+    border: Border.all(color: primaryColor.withOpacity(0.55), width: 1),
+    boxShadow: [
+      BoxShadow(
+        color: primaryColor.withOpacity(0.10),
+        blurRadius: 26,
+        offset: const Offset(0, 6),
+      ),
+    ],
   );
 
   // ── Theme ──────────────────────────────────────────────────────
@@ -88,16 +104,16 @@ class AppTheme {
         // Large numerals — tight, confident, slightly compressed.
         displayLarge: GoogleFonts.spaceGrotesk(
           color: textWhite,
-          fontSize: 40,
+          fontSize: 44,
           fontWeight: FontWeight.w700,
-          letterSpacing: -1.2,
-          height: 1.05,
+          letterSpacing: -1.4,
+          height: 1.04,
         ),
         displayMedium: GoogleFonts.spaceGrotesk(
           color: textWhite,
-          fontSize: 28,
+          fontSize: 30,
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.8,
+          letterSpacing: -0.9,
         ),
         displaySmall: GoogleFonts.spaceGrotesk(
           color: textWhite,
@@ -180,7 +196,7 @@ class AppTheme {
       ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-      backgroundColor: Color(0xF20E0E10),
+      backgroundColor: Color(0xF7070708),
       selectedItemColor: primaryColor,
       unselectedItemColor: textGrey,
       type: BottomNavigationBarType.fixed,

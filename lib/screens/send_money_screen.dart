@@ -262,6 +262,11 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
           ),
           const SizedBox(height: 12),
           _row('Available', source.balance),
+          const SizedBox(height: 12),
+          _row(
+            'Limits (${appState.kycTier})',
+            '\$${appState.remainingDailyLimit.toStringAsFixed(0)} left today',
+          ),
         ],
       ),
     );

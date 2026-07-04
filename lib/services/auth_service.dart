@@ -14,6 +14,27 @@ class AuthService {
     _prefs = await SharedPreferences.getInstance();
   }
 
+  /// Shared storage handle for other services (state persistence).
+  static SharedPreferences get prefs => _prefs;
+
+  // ── Demo account (sandbox) ─────────────────────────────────────
+  static const String demoName = 'Mohamed Ali';
+  static const String demoPhone = '+252 61 123 4567';
+  static const String demoPassword = 'demo1234';
+
+  /// One-tap sandbox login. Uses the saved account if one exists;
+  /// otherwise creates the demo profile, then signs in.
+  static Future<void> signInDemo() async {
+    if (!hasAccount) {
+      await registerUser(
+        fullName: demoName,
+        phoneNumber: demoPhone,
+        password: demoPassword,
+      );
+    }
+    await _prefs.setBool(_signedInKey, true);
+  }
+
   static bool get isSignedIn => _prefs.getBool(_signedInKey) ?? false;
 
   static String? get storedFullName => _prefs.getString(_fullNameKey);

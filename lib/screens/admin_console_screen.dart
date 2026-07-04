@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../constants/app_theme.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/kash_widgets.dart';
+import 'aml_queue_screen.dart';
 import 'ledger_screen.dart';
 
 class AdminConsoleScreen extends StatelessWidget {
@@ -69,9 +70,18 @@ class AdminConsoleScreen extends StatelessWidget {
               children: [
                 Expanded(child: _metric('Phone', appState.phoneVerified ? 'Verified' : 'Pending')),
                 const SizedBox(width: 10),
-                Expanded(child: _metric('AML', 'Rules active')),
+                Expanded(
+                  child: _metric(
+                    'AML cases',
+                    appState.openAmlCases == 0
+                        ? 'None open'
+                        : '${appState.openAmlCases} open',
+                  ),
+                ),
               ],
             ),
+            const SizedBox(height: 10),
+            _metric('Limits (${appState.kycTier})', appState.kycLimitSummary),
             const SizedBox(height: 18),
             _opsTile(
               context,
@@ -84,8 +94,10 @@ class AdminConsoleScreen extends StatelessWidget {
               context,
               Icons.manage_search_outlined,
               'Monitoring queue',
-              '0 sanctions hits, 0 high-risk cases',
-              () {},
+              appState.openAmlCases == 0
+                  ? 'No open sanctions, velocity or limit cases'
+                  : '${appState.openAmlCases} case(s) awaiting review',
+              () => Navigator.of(context).push(kashRoute(const AmlQueueScreen())),
             ),
             _opsTile(
               context,
@@ -93,6 +105,18 @@ class AdminConsoleScreen extends StatelessWidget {
               'Regulatory pack',
               'MTB and mobile money evidence checklist',
               () {},
+            ),
+            _opsTile(
+              context,
+              Icons.restart_alt_rounded,
+              'Reset sandbox',
+              'Restore opening balances and clear cases',
+              () {
+                appState.resetSandbox();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Sandbox reset to opening state.')),
+                );
+              },
             ),
           ],
         ),
