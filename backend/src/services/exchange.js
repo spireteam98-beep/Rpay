@@ -50,24 +50,39 @@ function symbolFor(asset) {
   return `${upper}USDT`;
 }
 
-/** Live prices + 24h stats for all supported assets (real exchange data). */
+// Binance's public market-data API returns 451 (blocked) for requests from
+// the US, which is where this backend is hosted (Render free tier) — so
+// market data comes from CoinGecko instead, which has no such restriction.
+// Actual order placement below still targets Binance (testnet or, later,
+// licensed mainnet), since that's unaffected while BINANCE_API_KEY is unset.
+const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
+const COINGECKO_IDS = {
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  BNB: 'binancecoin',
+  SOL: 'solana',
+  ADA: 'cardano',
+};
+
+/** Live prices + 24h stats for all supported assets (CoinGecko). */
 async function market() {
-  const symbols = SUPPORTED.filter((s) => s !== 'USDT').map(symbolFor);
-  const url = `${MAINNET_BASE}/api/v3/ticker/24hr?symbols=${encodeURIComponent(
-    JSON.stringify(symbols),
-  )}`;
-  const res = await fetch(url);
+  const ids = Object.values(COINGECKO_IDS).join(',');
+  const res = await fetch(`${COINGECKO_BASE}/coins/markets?vs_currency=usd&ids=${ids}`);
   if (!res.ok) throw new Error(`Market data unavailable (${res.status})`);
   const rows = await res.json();
+  const idToAsset = Object.fromEntries(
+    Object.entries(COINGECKO_IDS).map(([asset, id]) => [id, asset]),
+  );
   const out = {};
   for (const row of rows) {
-    const asset = row.symbol.replace('USDT', '');
+    const asset = idToAsset[row.id];
+    if (!asset) continue;
     out[asset] = {
-      price: Number(row.lastPrice),
-      change24h: Number(Number(row.priceChangePercent).toFixed(2)),
-      high24h: Number(row.highPrice),
-      low24h: Number(row.lowPrice),
-      volume24h: Number(row.quoteVolume),
+      price: Number(row.current_price),
+      change24h: Number(Number(row.price_change_percentage_24h || 0).toFixed(2)),
+      high24h: Number(row.high_24h),
+      low24h: Number(row.low_24h),
+      volume24h: Number(row.total_volume),
     };
   }
   out.USDT = { price: 1, change24h: 0, high24h: 1, low24h: 1, volume24h: 0 };
@@ -76,9 +91,15 @@ async function market() {
 
 /** Live last price for one asset. */
 async function lastPrice(asset) {
-  const res = await fetch(`${MAINNET_BASE}/api/v3/ticker/price?symbol=${symbolFor(asset)}`);
-  if (!res.ok) throw new Error(`Price unavailable (${res.status})`);
-  return Number((await res.json()).price);
+  const upper = String(asset || '').toUpperCase();
+  if (upper === 'USDT') return 1;
+  if (!SUPPORTED.includes(upper)) {
+    throw new Error(`Unsupported asset ${upper}. Supported: ${SUPPORTED.join(', ')}`);
+  }
+  const data = await market();
+  const entry = data[upper];
+  if (!entry) throw new Error(`Price unavailable for ${upper}`);
+  return entry.price;
 }
 
 async function publicPing() {
