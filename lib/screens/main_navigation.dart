@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../constants/app_theme.dart';
+import '../state/kash_app_state.dart';
 import 'admin_console_screen.dart';
 import 'home_screen.dart';
 import 'market_screen.dart';
@@ -24,6 +26,16 @@ class _MainNavigationState extends State<MainNavigation> {
     const WalletScreen(),
     const AdminConsoleScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Replace the local placeholder balances with the real Postgres-backed
+    // numbers as soon as the app shell is up.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<KashAppState>().syncFromBackend();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

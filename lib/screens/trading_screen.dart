@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/app_theme.dart';
 import '../models/cryptocurrency.dart';
+import '../services/api_service.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class TradingScreen extends StatefulWidget {
@@ -16,6 +17,8 @@ class _TradingScreenState extends State<TradingScreen>
   final List<String> _timeIntervals = ['1H', '4H', '1D', '1W', '1M', '1Y'];
   String _selectedTimeInterval = '1D';
   bool _isBuying = true;
+  bool _placingOrder = false;
+  final TextEditingController _usdAmountController = TextEditingController();
 
   // Simulate selected crypto - in real app this would be passed in or managed with state management
   final Cryptocurrency _selectedCrypto = Cryptocurrency.mockData[0];
@@ -34,6 +37,7 @@ class _TradingScreenState extends State<TradingScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _usdAmountController.dispose();
     super.dispose();
   }
 
@@ -420,9 +424,8 @@ class _TradingScreenState extends State<TradingScreen>
         children: [
           _buildBuySellToggle(),
           const SizedBox(height: 20),
-          _buildAmountInput('Amount', 'BTC'),
-          const SizedBox(height: 16),
-          _buildAmountInput('Price', 'USDT'),
+          _buildAmountInput('Amount to ${_isBuying ? 'buy' : 'sell'} (USD)', 'USD',
+              controller: _usdAmountController),
           const SizedBox(height: 16),
           _buildTotalSection(),
           const SizedBox(height: 24),
@@ -501,7 +504,8 @@ class _TradingScreenState extends State<TradingScreen>
     );
   }
 
-  Widget _buildAmountInput(String label, String currency) {
+  Widget _buildAmountInput(String label, String currency,
+      {TextEditingController? controller}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -511,6 +515,7 @@ class _TradingScreenState extends State<TradingScreen>
         ),
         const SizedBox(height: 8),
         TextField(
+          controller: controller,
           style: const TextStyle(color: AppTheme.textWhite),
           decoration: InputDecoration(
             hintText: '0.00',
@@ -584,6 +589,7 @@ class _TradingScreenState extends State<TradingScreen>
   }
 
   Widget _buildTradeButton() {
+    final symbol = _selectedCrypto.symbol.toUpperCase();
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         backgroundColor: _isBuying ? AppTheme.primaryColor : AppTheme.priceDown,
@@ -592,14 +598,58 @@ class _TradingScreenState extends State<TradingScreen>
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
       ),
-      onPressed: () {
-        // Handle trade action
-      },
+      onPressed: _placingOrder ? null : _placeOrder,
       child: Text(
-        _isBuying ? 'Buy BTC' : 'Sell BTC',
+        _placingOrder
+            ? 'Placing order…'
+            : (_isBuying ? 'Buy $symbol' : 'Sell $symbol'),
         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
+  }
+
+  Future<void> _placeOrder() async {
+    final usd = double.tryParse(_usdAmountController.text.trim()) ?? 0;
+    if (usd <= 0) {
+      _showSnack('Enter a USD amount first.');
+      return;
+    }
+    if (!ApiService.hasSession) {
+      _showSnack(
+        'Live trading needs the backend: run run_backend.bat, then sign up or log in.',
+      );
+      return;
+    }
+
+    setState(() => _placingOrder = true);
+    try {
+      final fill = await ApiService.trade(
+        side: _isBuying ? 'buy' : 'sell',
+        asset: _selectedCrypto.symbol.toUpperCase(),
+        usdAmount: usd,
+      );
+      final qty = (fill['qty'] as num).toDouble();
+      final price = (fill['price'] as num).toDouble();
+      final mode = fill['executionMode'] == 'external-market'
+          ? 'Binance testnet'
+          : 'internal fill @ live price';
+      _usdAmountController.clear();
+      _showSnack(
+        '${_isBuying ? 'Bought' : 'Sold'} ${qty.toStringAsFixed(6)} '
+        '${fill['asset']} @ \$${price.toStringAsFixed(2)} — $mode',
+      );
+    } on ApiException catch (err) {
+      _showSnack(err.message);
+    } catch (_) {
+      _showSnack('Order failed — is the backend running?');
+    } finally {
+      if (mounted) setState(() => _placingOrder = false);
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   // Placeholder widgets for other trading types

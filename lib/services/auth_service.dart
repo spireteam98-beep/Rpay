@@ -19,24 +19,7 @@ class AuthService {
   static SharedPreferences get prefs => _prefs;
 
   // ── Demo account (sandbox) ─────────────────────────────────────
-  static const String demoName = 'Mohamed Ali';
-  static const String demoEmail = 'demo@kashflip.app';
-  static const String demoPhone = '+252 61 123 4567';
-  static const String demoPassword = 'demo1234';
-
-  /// One-tap sandbox login. Uses the saved account if one exists;
-  /// otherwise creates the demo profile, then signs in.
-  static Future<void> signInDemo() async {
-    if (!hasAccount) {
-      await registerUser(
-        fullName: demoName,
-        email: demoEmail,
-        phoneNumber: demoPhone,
-        password: demoPassword,
-      );
-    }
-    await _prefs.setBool(_signedInKey, true);
-  }
+  // Demo helpers removed — app requires a real backend session or stored account.
 
   static bool get isSignedIn => _prefs.getBool(_signedInKey) ?? false;
 
@@ -75,6 +58,11 @@ class AuthService {
     if (!hasAccount) return false;
     await _prefs.setBool(_signedInKey, true);
     return true;
+  }
+
+  static Future<void> signInBackendUser({required String email}) async {
+    await _prefs.setString(_emailKey, email.trim().toLowerCase());
+    await _prefs.setBool(_signedInKey, true);
   }
 
   static Future<void> signOut() async {

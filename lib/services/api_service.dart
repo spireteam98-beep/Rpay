@@ -5,12 +5,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_service.dart';
 
 /// Bridge to the RoyalPay backend (backend/ folder — Node + Postgres).
-/// Every call fails soft: if the API is down the app keeps working on
-/// the local sandbox, so the demo never breaks.
+/// This app requires a live backend session and does not use local sandbox-only mode.
 class ApiService {
-  /// Where the backend runs. `flutter run -d chrome` and the API share
-  /// localhost, so this works out of the box with run_backend.bat.
-  static const String baseUrl = 'http://localhost:8080';
+  /// Backend URL, overridable at build time with `--dart-define=API_BASE_URL=`.
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://localhost:8080',
+  );
+
+  /// Stripe publishable key (safe to ship client-side by design).
+  /// Overridable with `--dart-define=STRIPE_PUBLISHABLE_KEY=`.
+  static const String stripePublishableKey = String.fromEnvironment(
+    'STRIPE_PUBLISHABLE_KEY',
+    defaultValue:
+        'pk_live_51RdTmVP6aNiJxRzPl7AiE5MTIrm2pGCIuMfQ0pYIbCrT62GZjtMiOA6APngCOVPmtQwfY1dRgNJKr5fgqIBuUsbg00zyyRnl1M',
+  );
   static const _tokenKey = 'api_jwt';
   static const Duration _timeout = Duration(seconds: 6);
 
@@ -36,8 +45,8 @@ class ApiService {
     }
   }
 
-  /// Registers on the backend; returns the on-chain deposit address,
-  /// or null if the backend is unreachable (caller falls back to sandbox).
+  /// Registers on the backend; returns the on-chain deposit address.
+  /// If the backend is unreachable, signup fails with an error.
   static Future<String?> signup({
     required String fullName,
     required String email,
@@ -66,7 +75,7 @@ class ApiService {
     } on ApiException {
       rethrow;
     } catch (_) {
-      return null; // backend offline — sandbox mode
+      return null;
     }
   }
 
@@ -90,7 +99,7 @@ class ApiService {
       }
       return false;
     } catch (_) {
-      return null; // backend offline
+      return null;
     }
   }
 
@@ -106,6 +115,128 @@ class ApiService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Combined mobile-money + trading-cash + crypto wallet summary.
+  static Future<Map<String, dynamic>?> hybridWallet() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/wallet/hybrid'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Real virtual bank account (account number/name/status); auto-created
+  /// on the backend the first time it's requested.
+  static Future<Map<String, dynamic>?> bankAccount() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/banking/account'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Submit a mobile-money deposit reference for admin approval.
+  static Future<Map<String, dynamic>?> submitMobileMoneyDeposit({
+    required String rail,
+    required double amountKes,
+    required String reference,
+    String? phone,
+  }) async {
+    if (!hasSession) return null;
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/mobile-money/deposits'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'rail': rail,
+            'amountKes': amountKes,
+            'reference': reference,
+            if (phone != null) 'phone': phone,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 202) return body;
+    throw ApiException(body['error'] as String? ?? 'Deposit request failed');
+  }
+
+  /// Starts a payment gateway top-up and credits the wallet after verification.
+  /// In backend sandbox mode, this returns an already-credited top-up.
+  static Future<Map<String, dynamic>?> createTopUp({
+    required String gateway,
+    required String currency,
+    required double amount,
+    String? phone,
+  }) async {
+    if (!hasSession) return null;
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/payments/topups'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'gateway': gateway,
+            'currency': currency,
+            'amount': amount,
+            if (AuthService.storedEmail != null) 'email': AuthService.storedEmail,
+            if (phone != null && phone.isNotEmpty) 'phone': phone,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Top-up failed');
+  }
+
+  /// Verify a payment gateway top-up after an external checkout completes.
+  static Future<Map<String, dynamic>?> verifyTopUp({
+    required String gateway,
+    required String reference,
+  }) async {
+    if (!hasSession) return null;
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/payments/topups/verify'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'gateway': gateway, 'reference': reference}),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Top-up verification failed');
+  }
+
+  /// Queue a mobile-money payout; backend immediately holds the KES balance.
+  static Future<Map<String, dynamic>?> submitMobileMoneyWithdrawal({
+    required String rail,
+    required double amountKes,
+    required String phone,
+  }) async {
+    if (!hasSession) return null;
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/mobile-money/withdrawals'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'rail': rail,
+            'amountKes': amountKes,
+            'phone': phone,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 202) return body;
+    throw ApiException(body['error'] as String? ?? 'Withdrawal request failed');
   }
 
   /// On-chain withdrawal. Returns tx hash.
@@ -126,7 +257,6 @@ class ApiService {
   }
 
   /// Verifies the OTP on the backend (marks phone_verified in Postgres).
-  /// Fail-soft: returns quietly when the backend is offline.
   static Future<void> verifyPhone(String code) async {
     if (!hasSession) return;
     try {
@@ -140,7 +270,38 @@ class ApiService {
     } catch (_) {/* offline — sandbox mode */}
   }
 
-  /// Sandbox KYC approval on the backend (raises tier to Full KYC).
+  /// Sends a 6-digit verification code to the user's email.
+  static Future<bool> requestEmailOtp() async {
+    if (!hasSession) return false;
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/request-email-otp'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body['sent'] == true;
+    throw ApiException(body['warning'] as String? ??
+        body['error'] as String? ??
+        'Email code request failed');
+  }
+
+  /// Verifies the 6-digit email OTP.
+  static Future<bool> verifyEmail(String code) async {
+    if (!hasSession) return false;
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/verify-email'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'code': code}),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body['verified'] == true;
+    throw ApiException(body['error'] as String? ?? 'Email verification failed');
+  }
+
+  /// KYC approval on the backend (raises tier to Full KYC).
   static Future<void> submitKyc() async {
     if (!hasSession) return;
     try {
@@ -150,7 +311,66 @@ class ApiService {
     } catch (_) {/* offline — sandbox mode */}
   }
 
-  static Future<void> clearSession() => Future.value(_prefs.remove(_tokenKey));
+  // ── Trading (real market data; testnet/internal execution) ─────
+
+  /// Live market prices from the exchange. Null when backend offline.
+  static Future<Map<String, dynamic>?> market() async {
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/trade/market'))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// USD funding balance + custody holdings valued at live prices.
+  static Future<Map<String, dynamic>?> tradeBalances() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/trade/balances'),
+              headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Market order. side: 'buy' | 'sell'. Returns fill details.
+  static Future<Map<String, dynamic>> trade({
+    required String side,
+    required String asset,
+    required double usdAmount,
+    String quoteCurrency = 'USD',
+  }) async {
+    final normalizedQuoteCurrency = quoteCurrency.toUpperCase();
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/trade/$side'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'asset': asset,
+            'quoteCurrency': normalizedQuoteCurrency,
+            if (normalizedQuoteCurrency == 'KES')
+              'kesAmount': usdAmount
+            else
+              'usdAmount': usdAmount,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Order failed');
+  }
+
+  static Future<void> clearSession() async {
+    await _prefs.remove(_tokenKey);
+  }
 }
 
 class ApiException implements Exception {

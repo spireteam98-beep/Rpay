@@ -57,9 +57,8 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    // Register on the real backend when it's running — this provisions
-    // the user's on-chain custody wallet at signup. Falls back to the
-    // local sandbox when the API is offline.
+    // Register on the real backend — this provisions the user's
+    // on-chain custody wallet at signup.
     String? ethAddress;
     try {
       ethAddress = await ApiService.signup(
@@ -70,6 +69,10 @@ class _SignupScreenState extends State<SignupScreen> {
       );
     } on ApiException catch (err) {
       _showMessage(err.message);
+      return;
+    }
+    if (ethAddress == null) {
+      _showMessage('Backend is not reachable. Start the RoyalPay API and try again.');
       return;
     }
 
@@ -86,7 +89,7 @@ class _SignupScreenState extends State<SignupScreen> {
           phoneNumber: phone,
         );
 
-    if (ethAddress != null) {
+    if (ethAddress.isNotEmpty) {
       _showMessage('Custody wallet created: '
           '${ethAddress.substring(0, 10)}…');
     }
@@ -161,7 +164,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Text(
                   'By continuing you agree to our Terms & Privacy Policy.',
                   style: TextStyle(
-                    color: AppTheme.textGrey.withOpacity(0.8),
+                    color: AppTheme.textGrey.withAlpha(204),
                     fontSize: 12,
                   ),
                 ),

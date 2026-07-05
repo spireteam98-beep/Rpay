@@ -6,6 +6,7 @@ import '../state/kash_app_state.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
 import 'account_detail_screen.dart';
+import 'buy_screen.dart';
 import 'cash_in_screen.dart';
 import 'ledger_screen.dart';
 import 'profile_screen.dart';
@@ -180,6 +181,12 @@ class HomeScreen extends StatelessWidget {
             const SendMoneyScreen(),
           ),
           _actionButton(context, Icons.add_rounded, 'Add', const CashInScreen()),
+          _actionButton(
+            context,
+            Icons.currency_bitcoin_rounded,
+            'Buy',
+            const BuyScreen(),
+          ),
           _actionButton(
             context,
             Icons.sync_alt_rounded,

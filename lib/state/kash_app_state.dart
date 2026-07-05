@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../models/aml_case.dart';
 import '../models/kash_account.dart';
 import '../models/ledger_entry.dart';
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
 
 class TransferResult {
@@ -42,7 +43,11 @@ class KashAppState extends ChangeNotifier {
   ];
 
   final NumberFormat _money = NumberFormat.currency(symbol: '\$');
-  List<KashAccount> _accounts = List<KashAccount>.from(kashAccounts);
+  // Static metadata (title/icon/rails) from kashAccounts, zeroed out —
+  // real balances arrive via syncFromBackend() once there's a session.
+  List<KashAccount> _accounts = kashAccounts
+      .map((account) => account.copyWith(balanceUsd: 0, transactions: const []))
+      .toList();
   String _profileName = 'Mohamed Ali';
   String _phoneNumber = '+252 61 000 0000';
   bool _phoneVerified = false;
@@ -61,10 +66,57 @@ class KashAppState extends ChangeNotifier {
     if (phoneNumber != null && phoneNumber.isNotEmpty) {
       _phoneNumber = phoneNumber;
     }
-    if (!_restore()) {
-      _seedLedger();
-      _persist();
-    }
+    _restore();
+  }
+
+  /// Overwrites the three account balances with the real Postgres-backed
+  /// numbers from the backend (crypto custody, domestic wallet, virtual
+  /// bank account) — called once the app has a live session. Leaves local
+  /// transaction history / transfers alone; this only fixes the balances.
+  Future<void> syncFromBackend() async {
+    if (!ApiService.hasSession) return;
+    final hybrid = await ApiService.hybridWallet();
+    final bank = await ApiService.bankAccount();
+    if (hybrid == null && bank == null) return;
+
+    _accounts = _accounts.map((account) {
+      switch (account.type) {
+        case KashAccountType.crypto:
+          if (hybrid == null) return account;
+          final crypto = hybrid['crypto'] as Map<String, dynamic>?;
+          final totalUsd = (crypto?['totalUsd'] as num?)?.toDouble() ?? 0;
+          final depositAddress = crypto?['depositAddress'] as String?;
+          return account.copyWith(
+            balanceUsd: totalUsd,
+            status: (depositAddress == null || depositAddress.isEmpty)
+                ? account.status
+                : 'Deposit address $depositAddress',
+          );
+        case KashAccountType.mobileMoney:
+          if (hybrid == null) return account;
+          final fiat = hybrid['fiat'] as Map<String, dynamic>?;
+          final usd = (fiat?['USD'] as num?)?.toDouble() ?? 0;
+          final kes = (fiat?['KES'] as num?)?.toDouble() ?? 0;
+          final kesPerUsd = (fiat?['kesPerUsd'] as num?)?.toDouble() ?? 0;
+          final kesAsUsd = kesPerUsd > 0 ? kes / kesPerUsd : 0;
+          return account.copyWith(balanceUsd: usd + kesAsUsd);
+        case KashAccountType.bank:
+          if (bank == null) return account;
+          final accountInfo = bank['account'] as Map<String, dynamic>?;
+          final accountNumber = accountInfo?['account_number'] as String?;
+          // No banking balance concept yet (Phase 5 per the roadmap) — a
+          // real account number with a $0 balance is accurate, not a bug.
+          return account.copyWith(
+            balanceUsd: 0,
+            status: (accountNumber == null || accountNumber.isEmpty)
+                ? account.status
+                : 'Account $accountNumber · IBAN pending EMI phase',
+          );
+      }
+    }).toList();
+
+    _persist();
+    notifyListeners();
   }
 
   // ── Getters ─────────────────────────────────────────────────────
@@ -435,10 +487,11 @@ class KashAppState extends ChangeNotifier {
               (stored) => stored['type'] == template.type.index,
               orElse: () => const {},
             );
-        if (match.isEmpty) return template;
+        if (match.isEmpty) {
+          return template.copyWith(balanceUsd: 0, transactions: const []);
+        }
         return template.copyWith(
-          balanceUsd:
-              (match['balanceUsd'] as num?)?.toDouble() ?? template.balanceUsd,
+          balanceUsd: (match['balanceUsd'] as num?)?.toDouble() ?? 0,
           status: match['status'] as String? ?? template.status,
           transactions: ((match['transactions'] as List?) ?? [])
               .map((transaction) => KashTransaction.fromJson(
@@ -467,83 +520,21 @@ class KashAppState extends ChangeNotifier {
   /// Wipes persisted money state (used by Ops console for pilot resets).
   void resetSandbox() {
     AuthService.prefs.remove(_stateKey);
-    _accounts = List<KashAccount>.from(kashAccounts);
+    _accounts = List<KashAccount>.from(kashAccounts).map((account) {
+      return account.copyWith(balanceUsd: 0, transactions: const []);
+    }).toList();
     _ledgerTransactions.clear();
     _amlCases.clear();
     _spentToday = 0;
     _spentDate = '';
     _ledgerSequence = 1004;
-    _seedLedger();
     _persist();
     notifyListeners();
+    syncFromBackend();
   }
 
   String _nextTransactionId() {
     _ledgerSequence++;
     return 'KFL-${_ledgerSequence.toString().padLeft(6, '0')}';
-  }
-
-  void _seedLedger() {
-    final postedAt = DateTime.now().subtract(const Duration(hours: 2));
-    _ledgerTransactions.addAll([
-      LedgerTransaction(
-        id: 'KFL-001001',
-        postedAt: postedAt,
-        title: 'Opening balances',
-        rail: 'Core ledger',
-        status: 'Posted',
-        entries: [
-          LedgerEntry(
-            id: 'KFL-001001-1',
-            transactionId: 'KFL-001001',
-            postedAt: postedAt,
-            accountType: KashAccountType.crypto,
-            direction: LedgerDirection.credit,
-            amountUsd: 12840.20,
-            accountName: 'Crypto custody',
-            memo: 'Customer crypto liability',
-          ),
-          LedgerEntry(
-            id: 'KFL-001001-2',
-            transactionId: 'KFL-001001',
-            postedAt: postedAt,
-            accountType: KashAccountType.crypto,
-            direction: LedgerDirection.debit,
-            amountUsd: 12840.20,
-            accountName: 'Custody reserve',
-            memo: 'Sandbox reserve asset',
-          ),
-        ],
-      ),
-      LedgerTransaction(
-        id: 'KFL-001002',
-        postedAt: postedAt.add(const Duration(minutes: 7)),
-        title: 'Mobile wallet opening balance',
-        rail: 'Domestic wallet',
-        status: 'Posted',
-        entries: [
-          LedgerEntry(
-            id: 'KFL-001002-1',
-            transactionId: 'KFL-001002',
-            postedAt: postedAt.add(const Duration(minutes: 7)),
-            accountType: KashAccountType.mobileMoney,
-            direction: LedgerDirection.credit,
-            amountUsd: 8430.12,
-            accountName: 'Mobile money wallet',
-            memo: 'Customer wallet liability',
-          ),
-          LedgerEntry(
-            id: 'KFL-001002-2',
-            transactionId: 'KFL-001002',
-            postedAt: postedAt.add(const Duration(minutes: 7)),
-            accountType: KashAccountType.mobileMoney,
-            direction: LedgerDirection.debit,
-            amountUsd: 8430.12,
-            accountName: 'Safeguarding reserve',
-            memo: 'Sandbox fiat reserve',
-          ),
-        ],
-      ),
-    ]);
   }
 }

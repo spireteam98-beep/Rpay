@@ -1,0 +1,77 @@
+services:
+  - type: web
+    name: kashflip-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      # ── Secrets — paste the exact values from your local backend/.env.
+      # DATABASE_URL, JWT_SECRET and MASTER_MNEMONIC especially must match
+      # what's already there: changing JWT_SECRET logs everyone out, and
+      # changing MASTER_MNEMONIC orphans every customer's derived wallet
+      # address, since Render's filesystem is ephemeral and won't persist
+      # an auto-generated value across restarts the way local dev does.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MASTER_MNEMONIC
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: WAAFI_ENDPOINT
+        sync: false
+      - key: WAAFI_MERCHANT_UID
+        sync: false
+      - key: WAAFI_API_USER_ID
+        sync: false
+      - key: WAAFI_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: BINANCE_API_KEY
+        sync: false
+      - key: BINANCE_SECRET
+        sync: false
+      - key: BINANCE_PRIVATE_KEY
+        sync: false
+
+      # ── Non-secret config — safe defaults, matching backend/.env.example.
+      - key: ETH_RPC_URL
+        value: https://ethereum-sepolia-rpc.publicnode.com
+      - key: NETWORK
+        value: testnet
+      - key: KES_PER_USD
+        value: "130"
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: EMAIL_FROM
+        value: Kashflip <noreply@kashflip.app>
+      - key: EMAIL_OTP_TTL_MINUTES
+        value: "10"
+      - key: RESEND_API_URL
+        value: https://api.resend.com/emails
+      - key: PAYMENT_SANDBOX
+        value: "false"
+      - key: APP_PAYMENT_RETURN_URL
+        value: https://kashflip.app/payment-return
+      - key: NEXT_PUBLIC_PAYMENT_BACKEND_URL
+        value: https://backend-aroy.onrender.com
+      - key: NEXT_PUBLIC_WAAFI_BACKEND_URL
+        value: https://backend-aroy.onrender.com
+      - key: BINANCE_ENV
+        value: testnet
+      - key: BINANCE_ENABLE_TRADING
+        value: "false"
+      - key: BINANCE_RECV_WINDOW
+        value: "10000"
+      - key: BINANCE_KEY_TYPE
+        value: rsa
+      - key: BINANCE_PRIVATE_KEY_PATH
+        value: secrets/binance-rsa-private.pem

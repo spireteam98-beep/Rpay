@@ -46,7 +46,7 @@ class WelcomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 28),
               const Text(
-                'ROYALPAY',
+                'RoyalPay',
                 style: TextStyle(
                   color: AppTheme.textWhite,
                   fontSize: 34,

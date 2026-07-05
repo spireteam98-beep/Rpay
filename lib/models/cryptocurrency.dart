@@ -11,18 +11,18 @@ class Cryptocurrency {
   final double volume24h;
   final List<double> sparklineData;
 
-  Cryptocurrency({
+  const Cryptocurrency({
     required this.id,
     required this.name,
     required this.symbol,
     required this.image,
-    required this.currentPrice,
-    required this.priceChangePercentage24h,
-    required this.high24h,
-    required this.low24h,
-    required this.marketCap,
-    required this.volume24h,
-    required this.sparklineData,
+    this.currentPrice = 0,
+    this.priceChangePercentage24h = 0,
+    this.high24h = 0,
+    this.low24h = 0,
+    this.marketCap = 0,
+    this.volume24h = 0,
+    this.sparklineData = const [],
   });
 
   bool get isPriceUp => priceChangePercentage24h >= 0;
@@ -35,7 +35,48 @@ class Cryptocurrency {
     return '$sign${priceChangePercentage24h.toStringAsFixed(2)}%';
   }
 
-  // Sample data for UI mockup
+  /// Static coin metadata for the assets the backend actually trades
+  /// (`backend/src/services/exchange.js` SUPPORTED list, minus USDT since
+  /// it's the quote asset, not something users buy/sell). `id`/`symbol`
+  /// match the asset code the `/trade` endpoints expect.
+  static const List<Cryptocurrency> assets = [
+    Cryptocurrency(id: 'BTC', name: 'Bitcoin', symbol: 'BTC', image: 'assets/icons/btc.png'),
+    Cryptocurrency(id: 'ETH', name: 'Ethereum', symbol: 'ETH', image: 'assets/icons/eth.png'),
+    Cryptocurrency(id: 'BNB', name: 'BNB', symbol: 'BNB', image: 'assets/icons/bnb.png'),
+    Cryptocurrency(id: 'SOL', name: 'Solana', symbol: 'SOL', image: 'assets/icons/sol.png'),
+    Cryptocurrency(id: 'ADA', name: 'Cardano', symbol: 'ADA', image: 'assets/icons/ada.png'),
+  ];
+
+  /// Merges live prices (the `assets` map from `ApiService.market()`, keyed
+  /// by symbol) onto the static metadata above. Coins missing live data
+  /// keep their zeroed defaults rather than showing a fabricated number.
+  static List<Cryptocurrency> withLiveData(Map<String, dynamic>? marketAssets) {
+    if (marketAssets == null) return assets;
+    return assets.map((coin) {
+      final live = marketAssets[coin.symbol] as Map<String, dynamic>?;
+      if (live == null) return coin;
+      final price = (live['price'] as num?)?.toDouble() ?? 0;
+      final low = (live['low24h'] as num?)?.toDouble() ?? price;
+      final high = (live['high24h'] as num?)?.toDouble() ?? price;
+      return Cryptocurrency(
+        id: coin.id,
+        name: coin.name,
+        symbol: coin.symbol,
+        image: coin.image,
+        currentPrice: price,
+        priceChangePercentage24h: (live['change24h'] as num?)?.toDouble() ?? 0,
+        high24h: high,
+        low24h: low,
+        volume24h: (live['volume24h'] as num?)?.toDouble() ?? 0,
+        // Grounded in the real low/current/high rather than fabricated —
+        // just enough points for the existing mini trend chart to draw.
+        sparklineData: [low, price, high],
+      );
+    }).toList();
+  }
+
+  // Sample data for the trading detail screen, which manages its own
+  // (currently mock) chart/selection state — left untouched here.
   static List<Cryptocurrency> mockData = [
     Cryptocurrency(
       id: 'bitcoin',

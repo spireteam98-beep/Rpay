@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../constants/app_theme.dart';
 import '../models/cryptocurrency.dart';
+import '../services/api_service.dart';
 import '../widgets/crypto_list_item.dart';
+import '../widgets/kash_widgets.dart';
+import 'buy_screen.dart';
 
 class MarketScreen extends StatefulWidget {
   const MarketScreen({Key? key}) : super(key: key);
@@ -14,11 +17,23 @@ class _MarketScreenState extends State<MarketScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  List<Cryptocurrency> _coins = Cryptocurrency.assets;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _loadMarket();
+  }
+
+  Future<void> _loadMarket() async {
+    final response = await ApiService.market();
+    if (!mounted || response == null) return;
+    setState(() {
+      _coins = Cryptocurrency.withLiveData(
+        response['assets'] as Map<String, dynamic>?,
+      );
+    });
   }
 
   @override
@@ -163,14 +178,14 @@ class _MarketScreenState extends State<MarketScreen>
       children: [
         _buildTableHeader(),
         const SizedBox(height: 8),
-        ...Cryptocurrency.mockData.map((crypto) {
+        ..._coins.map((crypto) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: CryptoListItem(
               crypto: crypto,
-              onTap: () {
-                // Navigate to detail page
-              },
+              onTap: () => Navigator.of(context).push(
+                kashRoute(BuyScreen(selectedCrypto: crypto)),
+              ),
             ),
           );
         }).toList(),

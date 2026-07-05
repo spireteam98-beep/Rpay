@@ -5,7 +5,7 @@ const { pool } = require('../db');
  * entries: [{ accountName, direction: 'debit'|'credit', amountUsd, memo }]
  * Throws if debits !== credits (to the cent).
  */
-async function post(userId, { title, rail, status = 'Posted' }, entries) {
+function assertBalanced(entries) {
   const debits = entries
     .filter((e) => e.direction === 'debit')
     .reduce((sum, e) => sum + Number(e.amountUsd), 0);
@@ -15,25 +15,36 @@ async function post(userId, { title, rail, status = 'Posted' }, entries) {
   if (Math.abs(debits - credits) > 0.005) {
     throw new Error(`Unbalanced ledger transaction: D ${debits} vs C ${credits}`);
   }
+}
+
+async function postWithClient(client, userId, { title, rail, status = 'Posted' }, entries) {
+  assertBalanced(entries);
+
+  const tx = await client.query(
+    `INSERT INTO ledger_transactions (user_id, title, rail, status)
+     VALUES ($1,$2,$3,$4) RETURNING id, posted_at`,
+    [userId, title, rail, status],
+  );
+  const txId = tx.rows[0].id;
+  for (const entry of entries) {
+    await client.query(
+      `INSERT INTO ledger_entries (transaction_id, account_name, direction, amount_usd, memo)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [txId, entry.accountName, entry.direction, entry.amountUsd, entry.memo || ''],
+    );
+  }
+  return { id: txId, postedAt: tx.rows[0].posted_at };
+}
+
+async function post(userId, meta, entries) {
+  assertBalanced(entries);
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const tx = await client.query(
-      `INSERT INTO ledger_transactions (user_id, title, rail, status)
-       VALUES ($1,$2,$3,$4) RETURNING id, posted_at`,
-      [userId, title, rail, status],
-    );
-    const txId = tx.rows[0].id;
-    for (const entry of entries) {
-      await client.query(
-        `INSERT INTO ledger_entries (transaction_id, account_name, direction, amount_usd, memo)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [txId, entry.accountName, entry.direction, entry.amountUsd, entry.memo || ''],
-      );
-    }
+    const posted = await postWithClient(client, userId, meta, entries);
     await client.query('COMMIT');
-    return { id: txId, postedAt: tx.rows[0].posted_at };
+    return posted;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -64,4 +75,4 @@ async function listForUser(userId, limit = 50) {
   }));
 }
 
-module.exports = { post, listForUser };
+module.exports = { post, postWithClient, listForUser };

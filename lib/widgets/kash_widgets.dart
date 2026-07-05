@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../constants/app_theme.dart';
 import 'touch_scale.dart';
 
@@ -52,6 +53,9 @@ class KashTextField extends StatelessWidget {
   final bool obscure;
   final TextInputType? keyboardType;
   final TextEditingController? controller;
+  final String? errorText;
+  final List<TextInputFormatter>? inputFormatters;
+  final ValueChanged<String>? onChanged;
   const KashTextField({
     super.key,
     required this.label,
@@ -60,6 +64,9 @@ class KashTextField extends StatelessWidget {
     this.obscure = false,
     this.keyboardType,
     this.controller,
+    this.errorText,
+    this.inputFormatters,
+    this.onChanged,
   });
 
   @override
@@ -80,9 +87,12 @@ class KashTextField extends StatelessWidget {
           controller: controller,
           obscureText: obscure,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          onChanged: onChanged,
           style: const TextStyle(color: AppTheme.textWhite),
           decoration: InputDecoration(
             hintText: hint,
+            errorText: errorText,
             prefixIcon: Icon(icon, color: AppTheme.textGrey, size: 20),
           ),
         ),

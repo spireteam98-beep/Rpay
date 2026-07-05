@@ -1,26 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_theme.dart';
 import '../models/kash_account.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/kash_widgets.dart';
+import '../widgets/payment_method_form.dart';
 
-class CashInScreen extends StatefulWidget {
+class CashInScreen extends StatelessWidget {
   const CashInScreen({super.key});
-
-  @override
-  State<CashInScreen> createState() => _CashInScreenState();
-}
-
-class _CashInScreenState extends State<CashInScreen> {
-  String _rail = 'EVC Plus';
-  final TextEditingController _amountController = TextEditingController(text: '100');
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +26,7 @@ class _CashInScreenState extends State<CashInScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Fund domestic wallet',
+                'Top up your account',
                 style: TextStyle(
                   color: AppTheme.textWhite,
                   fontSize: 25,
@@ -47,7 +36,7 @@ class _CashInScreenState extends State<CashInScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Sandbox cash-in through Somali mobile money rails.',
+                'Add money with Card, M-Pesa or Waafi, then use it for transfers, merchants and crypto.',
                 style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
               ),
               const SizedBox(height: 24),
@@ -88,29 +77,26 @@ class _CashInScreenState extends State<CashInScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              _railSelector(),
-              const SizedBox(height: 20),
-              KashTextField(
-                label: 'Amount',
-                hint: '0.00',
-                icon: Icons.payments_outlined,
-                keyboardType: TextInputType.number,
-                controller: _amountController,
+              PaymentMethodForm(
+                initialAmountText: '1000',
+                submitLabel: 'Add money',
+                onCredited: (amount, currency, gateway, gatewayLabel) async {
+                  final amountUsd = currency == 'KES' ? amount / 130 : amount;
+                  appState.submitCashIn(
+                    destinationType: KashAccountType.mobileMoney,
+                    rail: gatewayLabel,
+                    amount: amountUsd,
+                  );
+                  // Reconcile with the real backend balance (the line above
+                  // is just an optimistic local update for instant feedback).
+                  unawaited(appState.syncFromBackend());
+                  await _showDone(
+                    context,
+                    'Money added',
+                    '${amountUsd.toStringAsFixed(2)} USD credited to your account.',
+                  );
+                },
               ),
-              const SizedBox(height: 22),
-              GlassTile(
-                child: Column(
-                  children: [
-                    _row('Rail', _rail),
-                    const SizedBox(height: 12),
-                    _row('Posting', 'Instant sandbox ledger'),
-                    const SizedBox(height: 12),
-                    _row('Fee', 'Free in pilot'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              PrimaryButton(label: 'Add money', onTap: () => _submit(appState)),
             ],
           ),
         ),
@@ -118,77 +104,10 @@ class _CashInScreenState extends State<CashInScreen> {
     );
   }
 
-  Widget _railSelector() {
-    final rails = ['EVC Plus', 'Zaad', 'Sahal', 'M-Pesa'];
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: rails.map((rail) {
-        final selected = rail == _rail;
-        return GestureDetector(
-          onTap: () => setState(() => _rail = rail),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-            decoration: BoxDecoration(
-              color: selected ? AppTheme.primaryColor : AppTheme.cardDarkBackground,
-              borderRadius: BorderRadius.circular(100),
-              border: Border.all(
-                color: selected ? AppTheme.primaryColor : AppTheme.glassStroke,
-              ),
-            ),
-            child: Text(
-              rail,
-              style: TextStyle(
-                color: selected ? AppTheme.onLime : AppTheme.textLightGrey,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _row(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: AppTheme.textGrey, fontSize: 13)),
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppTheme.textWhite,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _submit(KashAppState appState) {
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
-    final result = appState.submitCashIn(
-      destinationType: KashAccountType.mobileMoney,
-      rail: _rail,
-      amount: amount,
-    );
-
-    if (!result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message),
-          backgroundColor: AppTheme.cardLightBackground,
-        ),
-      );
-      return;
-    }
-
-    showDialog(
+  Future<void> _showDone(BuildContext context, String title, String message) {
+    return showDialog<void>(
       context: context,
-      builder: (_) => Dialog(
+      builder: (dialogContext) => Dialog(
         backgroundColor: AppTheme.cardDarkBackground,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppTheme.rCard),
@@ -208,9 +127,9 @@ class _CashInScreenState extends State<CashInScreen> {
                 child: const Icon(Icons.check_rounded, color: AppTheme.onLime, size: 38),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'Money added',
-                style: TextStyle(
+              Text(
+                title,
+                style: const TextStyle(
                   color: AppTheme.textWhite,
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
@@ -218,7 +137,7 @@ class _CashInScreenState extends State<CashInScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                result.message,
+                message,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
               ),
@@ -226,7 +145,7 @@ class _CashInScreenState extends State<CashInScreen> {
               PrimaryButton(
                 label: 'Done',
                 onTap: () {
-                  Navigator.of(context).pop();
+                  Navigator.of(dialogContext).pop();
                   Navigator.of(context).pop();
                 },
               ),

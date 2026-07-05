@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
 import 'constants/app_theme.dart';
 import 'screens/auth/welcome_screen.dart';
 import 'screens/main_navigation.dart';
+import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'state/kash_app_state.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  Stripe.publishableKey = ApiService.stripePublishableKey;
   // Set preferred orientations to portrait mode
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -57,7 +60,10 @@ class CryptoExchangeApp extends StatelessWidget {
             title: 'RoyalPay',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
-            home: AuthService.isSignedIn ? const MainNavigation() : const WelcomeScreen(),
+            home:
+                AuthService.isSignedIn
+                    ? const MainNavigation()
+                    : const WelcomeScreen(),
           ),
         );
       },

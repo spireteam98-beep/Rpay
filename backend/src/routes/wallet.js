@@ -4,6 +4,8 @@ const { requireAuth } = require('../middleware/auth');
 const custody = require('../services/custody');
 const ledger = require('../services/ledger');
 const { getPrices } = require('../services/prices');
+const exchange = require('../services/exchange');
+const config = require('../config');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -12,6 +14,65 @@ const TIER_LIMITS = {
   1: { perTxUsd: 500, label: 'Tier 1' },
   2: { perTxUsd: 10000, label: 'Full KYC' },
 };
+
+router.get('/hybrid', async (req, res, next) => {
+  try {
+    const user = (
+      await pool.query(
+        `SELECT usd_balance, kes_balance, wallet_index, eth_address, kyc_tier
+           FROM users WHERE id = $1`,
+        [req.userId],
+      )
+    ).rows[0];
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const [assets, marketData, pending] = await Promise.all([
+      pool.query(
+        'SELECT asset, amount FROM crypto_balances WHERE user_id = $1 AND amount > 0 ORDER BY asset',
+        [req.userId],
+      ),
+      exchange.market(),
+      pool.query(
+        `SELECT id, type, rail, amount_kes, reference, status, created_at
+           FROM mobile_money_movements
+          WHERE user_id = $1 AND status IN ('PENDING_ADMIN','PENDING_PAYOUT')
+          ORDER BY created_at DESC`,
+        [req.userId],
+      ),
+    ]);
+
+    const holdings = assets.rows.map((row) => {
+      const live = marketData[row.asset] || { price: 0 };
+      const amount = Number(row.amount);
+      return {
+        asset: row.asset,
+        amount,
+        priceUsd: live.price,
+        valueUsd: Number((amount * live.price).toFixed(2)),
+      };
+    });
+    const cryptoUsd = holdings.reduce((sum, holding) => sum + holding.valueUsd, 0);
+    const kesUsd = Number(user.kes_balance) / config.kesPerUsd;
+
+    res.json({
+      fiat: {
+        KES: Number(user.kes_balance),
+        USD: Number(user.usd_balance),
+        kesPerUsd: config.kesPerUsd,
+      },
+      crypto: {
+        depositAddress: user.eth_address,
+        holdings,
+        totalUsd: Number(cryptoUsd.toFixed(2)),
+      },
+      totalUsd: Number((Number(user.usd_balance) + kesUsd + cryptoUsd).toFixed(2)),
+      pendingMobileMoney: pending.rows,
+      tier: TIER_LIMITS[user.kyc_tier] || TIER_LIMITS[1],
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 /** GET /wallet/summary — custody address, on-chain balance, live prices. */
 router.get('/summary', async (req, res, next) => {

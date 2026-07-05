@@ -60,6 +60,46 @@ const config = {
   ethRpcUrl: (process.env.ETH_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com').trim(),
   network: (process.env.NETWORK || 'testnet').trim(),
   port: parseInt(process.env.PORT || '8080', 10),
+  kesPerUsd: Number(process.env.KES_PER_USD || '130'),
+  emailProvider: (process.env.EMAIL_PROVIDER || 'resend').trim(),
+  resendApiUrl: (process.env.RESEND_API_URL || 'https://api.resend.com/emails').trim(),
+  resendApiKey: (process.env.RESEND_API_KEY || '').trim(),
+  emailFrom: (process.env.EMAIL_FROM || 'Kashflip <noreply@kashflip.app>').trim(),
+  emailOtpTtlMinutes: Number(process.env.EMAIL_OTP_TTL_MINUTES || '10'),
+  paymentSandbox: (process.env.PAYMENT_SANDBOX || 'false').toLowerCase() === 'true',
+  appPaymentReturnUrl: (
+    process.env.APP_PAYMENT_RETURN_URL ||
+    'https://www.mohamedroyal.com/payment-success'
+  ).trim(),
+  stripeSecretKey: (process.env.STRIPE_SECRET_KEY || '').trim(),
+  paystackSecretKey: (process.env.PAYSTACK_SECRET_KEY || '').trim(),
+  paymentBackendUrl: (
+    process.env.PAYMENT_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_PAYMENT_BACKEND_URL ||
+    'https://backend-aroy.onrender.com'
+  ).trim(),
+  waafiBackendUrl: (
+    process.env.WAAFI_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_WAAFI_BACKEND_URL ||
+    'https://backend-aroy.onrender.com'
+  ).trim(),
+  stripePublishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim(),
+  waafiEndpoint: (process.env.WAAFI_ENDPOINT || 'https://api.waafipay.net/asm').trim(),
+  waafiMerchantUid: (
+    process.env.WAAFI_MERCHANT_UID ||
+    process.env.NEXT_PUBLIC_WAAFI_MERCHANT_UID ||
+    ''
+  ).trim(),
+  waafiApiUserId: (
+    process.env.WAAFI_API_USER_ID ||
+    process.env.NEXT_PUBLIC_WAAFI_API_USER_ID ||
+    ''
+  ).trim(),
+  waafiApiKey: (
+    process.env.WAAFI_API_KEY ||
+    process.env.NEXT_PUBLIC_WAAFI_API_KEY ||
+    ''
+  ).trim(),
 };
 
 if (config.network !== 'testnet' && config.network !== 'mainnet') {
