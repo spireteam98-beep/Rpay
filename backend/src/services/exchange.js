@@ -64,11 +64,32 @@ const COINGECKO_IDS = {
   ADA: 'cardano',
 };
 
+// CoinGecko's free tier rate-limits aggressively, and every trade calls
+// lastPrice() -> market() on top of whatever the market screen requests —
+// a short cache keeps normal traffic well under that limit. On a fetch
+// failure we serve the last-known-good snapshot rather than erroring, so a
+// transient CoinGecko hiccup doesn't block trading on a stale-but-fine price.
+const MARKET_CACHE_TTL_MS = 20000;
+let marketCache = { data: null, fetchedAt: 0 };
+
 /** Live prices + 24h stats for all supported assets (CoinGecko). */
 async function market() {
+  const now = Date.now();
+  if (marketCache.data && now - marketCache.fetchedAt < MARKET_CACHE_TTL_MS) {
+    return marketCache.data;
+  }
   const ids = Object.values(COINGECKO_IDS).join(',');
-  const res = await fetch(`${COINGECKO_BASE}/coins/markets?vs_currency=usd&ids=${ids}`);
-  if (!res.ok) throw new Error(`Market data unavailable (${res.status})`);
+  let res;
+  try {
+    res = await fetch(`${COINGECKO_BASE}/coins/markets?vs_currency=usd&ids=${ids}`);
+  } catch (err) {
+    if (marketCache.data) return marketCache.data;
+    throw new Error(`Market data unavailable: ${err.message}`);
+  }
+  if (!res.ok) {
+    if (marketCache.data) return marketCache.data;
+    throw new Error(`Market data unavailable (${res.status})`);
+  }
   const rows = await res.json();
   const idToAsset = Object.fromEntries(
     Object.entries(COINGECKO_IDS).map(([asset, id]) => [id, asset]),
@@ -86,6 +107,7 @@ async function market() {
     };
   }
   out.USDT = { price: 1, change24h: 0, high24h: 1, low24h: 1, volume24h: 0 };
+  marketCache = { data: out, fetchedAt: now };
   return out;
 }
 
