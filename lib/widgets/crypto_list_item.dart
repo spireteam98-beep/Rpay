@@ -1,9 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import '../constants/app_theme.dart';
 import '../models/cryptocurrency.dart';
 import 'crypto_price_chart.dart';
 import 'touch_scale.dart';
+import 'bybit_wallet_ui.dart';
 
 class CryptoListItem extends StatelessWidget {
   final Cryptocurrency crypto;
@@ -19,7 +19,10 @@ class CryptoListItem extends StatelessWidget {
       pressedScale: 0.98,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: AppTheme.glassCard,
+        decoration: BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.circular(22),
+        ),
         child: Row(
           children: [
             _buildCryptoIcon(),
@@ -41,10 +44,9 @@ class CryptoListItem extends StatelessWidget {
       width: 40,
       height: 40,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppTheme.cardLightBackground,
+      decoration: const BoxDecoration(
+        color: BybitPalette.surface2,
         shape: BoxShape.circle,
-        border: Border.all(color: AppTheme.glassStroke),
       ),
       child: (iconUrl == null || iconUrl.isEmpty)
           ? _fallbackIcon()
@@ -62,8 +64,8 @@ class CryptoListItem extends StatelessWidget {
       child: Text(
         crypto.symbol.isEmpty ? '?' : crypto.symbol.substring(0, 1),
         style: const TextStyle(
-          color: AppTheme.textWhite,
-          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
           fontSize: 16,
         ),
       ),
@@ -77,22 +79,22 @@ class CryptoListItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            crypto.name,
+            '${crypto.symbol.toUpperCase()}/USDT',
             style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
               letterSpacing: -0.2,
-              color: AppTheme.textWhite,
+              color: Colors.white,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 3),
           Text(
-            crypto.symbol.toUpperCase(),
+            crypto.name,
             style: const TextStyle(
               fontSize: 12,
-              color: AppTheme.textGrey,
+              color: BybitPalette.muted2,
               letterSpacing: 0.2,
             ),
           ),
@@ -123,7 +125,7 @@ class CryptoListItem extends StatelessWidget {
               fontSize: 15,
               fontWeight: FontWeight.w700,
               letterSpacing: -0.3,
-              color: AppTheme.textWhite,
+              color: Colors.white,
             ),
           ),
           const SizedBox(height: 4),
@@ -132,8 +134,8 @@ class CryptoListItem extends StatelessWidget {
             decoration: BoxDecoration(
               color:
                   crypto.isPriceUp
-                      ? AppTheme.priceUp.withOpacity(0.12)
-                      : AppTheme.priceDown.withOpacity(0.12),
+                      ? BybitPalette.green.withOpacity(0.12)
+                      : BybitPalette.red.withOpacity(0.12),
               borderRadius: BorderRadius.circular(100),
             ),
             child: Row(
@@ -144,7 +146,7 @@ class CryptoListItem extends StatelessWidget {
                       ? Icons.arrow_upward_rounded
                       : Icons.arrow_downward_rounded,
                   size: 11,
-                  color: crypto.isPriceUp ? AppTheme.priceUp : AppTheme.priceDown,
+                  color: crypto.isPriceUp ? BybitPalette.green : BybitPalette.red,
                 ),
                 const SizedBox(width: 2),
                 Text(
@@ -152,7 +154,7 @@ class CryptoListItem extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
-                    color: crypto.isPriceUp ? AppTheme.priceUp : AppTheme.priceDown,
+                    color: crypto.isPriceUp ? BybitPalette.green : BybitPalette.red,
                   ),
                 ),
               ],

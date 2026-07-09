@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_theme.dart';
 import '../state/kash_app_state.dart';
-import '../widgets/kash_widgets.dart';
+import '../widgets/bybit_wallet_ui.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -11,8 +10,8 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = context.watch<KashAppState>();
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Profile'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Profile'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -22,22 +21,34 @@ class ProfileScreen extends StatelessWidget {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(22),
-                decoration: AppTheme.heroCard,
+                decoration: BoxDecoration(
+                  color: BybitPalette.surface,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: const Color(0xFF242832)),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const CircleIcon(
-                      Icons.person_rounded,
-                      color: AppTheme.onLime,
-                      size: 58,
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.person_rounded,
+                        color: BybitPalette.accent,
+                        size: 28,
+                      ),
                     ),
                     const SizedBox(height: 18),
                     Text(
                       appState.profileName,
                       style: const TextStyle(
-                        color: AppTheme.onLime,
+                        color: Colors.white,
                         fontSize: 25,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                         letterSpacing: -0.6,
                       ),
                     ),
@@ -45,9 +56,9 @@ class ProfileScreen extends StatelessWidget {
                     Text(
                       appState.phoneNumber,
                       style: const TextStyle(
-                        color: AppTheme.onLime,
+                        color: BybitPalette.muted2,
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
@@ -93,10 +104,19 @@ class ProfileScreen extends StatelessWidget {
   Widget _tile(IconData icon, String title, String subtitle) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: GlassTile(
+      child: BybitCard(
+        padding: const EdgeInsets.all(15),
         child: Row(
           children: [
-            CircleIcon(icon, size: 42),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                color: BybitPalette.surface2,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: BybitPalette.accent, size: 19),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -105,23 +125,23 @@ class ProfileScreen extends StatelessWidget {
                   Text(
                     title,
                     style: const TextStyle(
-                      color: AppTheme.textWhite,
+                      color: Colors.white,
                       fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 3),
                   Text(
                     subtitle,
                     style: const TextStyle(
-                      color: AppTheme.textGrey,
+                      color: BybitPalette.muted,
                       fontSize: 12,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: AppTheme.textGrey),
+            const Icon(Icons.chevron_right_rounded, color: BybitPalette.muted),
           ],
         ),
       ),

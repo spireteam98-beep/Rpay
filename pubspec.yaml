@@ -55,8 +55,10 @@ dependencies:
   intl: ^0.19.0
   shared_preferences: ^2.2.2
   http: ^1.2.0
-  flutter_stripe: ^11.5.0
-  flutter_stripe_web: ^6.5.0
+  flutter_stripe: ^13.0.0
+  flutter_stripe_web: ^8.0.0
+  stripe_js: ^8.0.0
+  web: ^1.1.1
   qr_flutter: ^4.1.0
 
 dev_dependencies:

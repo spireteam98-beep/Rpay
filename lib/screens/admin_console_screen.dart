@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_theme.dart';
 import '../state/kash_app_state.dart';
+import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
+import '../widgets/touch_scale.dart';
 import 'aml_queue_screen.dart';
 import 'ledger_screen.dart';
 
@@ -16,12 +17,19 @@ class AdminConsoleScreen extends StatelessWidget {
         .where((transaction) => transaction.isBalanced)
         .length;
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
+      backgroundColor: BybitPalette.bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: BybitPalette.bg,
         elevation: 0,
         centerTitle: false,
-        title: Text('Ops console', style: Theme.of(context).textTheme.displaySmall),
+        title: const Text(
+          'Ops console',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
       body: SafeArea(
         child: ListView(
@@ -30,18 +38,34 @@ class AdminConsoleScreen extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(22),
-              decoration: AppTheme.heroCard,
+              decoration: BoxDecoration(
+                color: BybitPalette.surface,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFF242832)),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleIcon(Icons.admin_panel_settings_outlined, color: AppTheme.onLime, size: 52),
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: const BoxDecoration(
+                      color: BybitPalette.surface2,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.admin_panel_settings_outlined,
+                      color: BybitPalette.accent,
+                      size: 24,
+                    ),
+                  ),
                   const SizedBox(height: 18),
                   const Text(
                     'Phase 1 controls',
                     style: TextStyle(
-                      color: AppTheme.onLime,
+                      color: Colors.white,
                       fontSize: 25,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       letterSpacing: -0.6,
                     ),
                   ),
@@ -49,7 +73,7 @@ class AdminConsoleScreen extends StatelessWidget {
                   const Text(
                     'Identity, AML and ledger health for the pilot.',
                     style: TextStyle(
-                      color: AppTheme.onLime,
+                      color: BybitPalette.muted2,
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
@@ -125,18 +149,18 @@ class AdminConsoleScreen extends StatelessWidget {
   }
 
   Widget _metric(String label, String value) {
-    return GlassTile(
+    return BybitCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: AppTheme.textGrey, fontSize: 12)),
+          Text(label, style: const TextStyle(color: BybitPalette.muted, fontSize: 12)),
           const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              color: AppTheme.textWhite,
+              color: Colors.white,
               fontSize: 15,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -153,34 +177,45 @@ class AdminConsoleScreen extends StatelessWidget {
   ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: GlassTile(
+      child: TouchScale(
         onTap: onTap,
-        child: Row(
-          children: [
-            CircleIcon(icon, size: 42),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: AppTheme.textWhite,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(color: AppTheme.textGrey, fontSize: 12),
-                  ),
-                ],
+        child: BybitCard(
+          padding: const EdgeInsets.all(15),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                  color: BybitPalette.surface2,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: BybitPalette.accent, size: 19),
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: AppTheme.textGrey),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: BybitPalette.muted),
+            ],
+          ),
         ),
       ),
     );

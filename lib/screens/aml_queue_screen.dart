@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_theme.dart';
 import '../models/aml_case.dart';
 import '../state/kash_app_state.dart';
-import '../widgets/kash_widgets.dart';
+import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/touch_scale.dart';
 
 class AmlQueueScreen extends StatelessWidget {
@@ -15,28 +14,40 @@ class AmlQueueScreen extends StatelessWidget {
     final appState = context.watch<KashAppState>();
     final cases = appState.amlCases;
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Monitoring queue'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Monitoring queue'),
       body: SafeArea(
         child: cases.isEmpty
-            ? const Center(
+            ? Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircleIcon(Icons.verified_outlined, size: 64),
-                    SizedBox(height: 16),
-                    Text(
-                      'No open cases',
-                      style: TextStyle(
-                        color: AppTheme.textWhite,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.verified_outlined,
+                        color: BybitPalette.accent,
+                        size: 28,
                       ),
                     ),
-                    SizedBox(height: 6),
-                    Text(
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No open cases',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
                       'Sanctions, velocity and limit rules are running.',
-                      style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                      style: TextStyle(color: BybitPalette.muted, fontSize: 13),
                     ),
                   ],
                 ),
@@ -62,7 +73,7 @@ class AmlQueueScreen extends StatelessWidget {
   ) {
     final isOpen = amlCase.status == 'Open';
     final color = switch (amlCase.kind) {
-      AmlCaseKind.sanctionsHit => AppTheme.priceDown,
+      AmlCaseKind.sanctionsHit => BybitPalette.red,
       AmlCaseKind.velocity => const Color(0xFFFFB74D),
       AmlCaseKind.limitBreach => const Color(0xFF8FA7FF),
     };
@@ -71,13 +82,21 @@ class AmlQueueScreen extends StatelessWidget {
       AmlCaseKind.velocity => Icons.speed_rounded,
       AmlCaseKind.limitBreach => Icons.data_thresholding_outlined,
     };
-    return GlassTile(
+    return BybitCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleIcon(icon, color: color, size: 40),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -95,9 +114,9 @@ class AmlQueueScreen extends StatelessWidget {
                     Text(
                       amlCase.subject,
                       style: const TextStyle(
-                        color: AppTheme.textWhite,
+                        color: Colors.white,
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
@@ -109,13 +128,13 @@ class AmlQueueScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: isOpen
                       ? color.withOpacity(0.14)
-                      : AppTheme.priceUp.withOpacity(0.14),
+                      : BybitPalette.green.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
                   amlCase.status,
                   style: TextStyle(
-                    color: isOpen ? color : AppTheme.priceUp,
+                    color: isOpen ? color : BybitPalette.green,
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
                   ),
@@ -127,7 +146,7 @@ class AmlQueueScreen extends StatelessWidget {
           Text(
             amlCase.details,
             style: const TextStyle(
-              color: AppTheme.textLightGrey,
+              color: BybitPalette.muted2,
               fontSize: 13,
               height: 1.4,
             ),
@@ -139,7 +158,7 @@ class AmlQueueScreen extends StatelessWidget {
               Text(
                 DateFormat('MMM d, HH:mm').format(amlCase.createdAt),
                 style:
-                    const TextStyle(color: AppTheme.textGrey, fontSize: 12),
+                    const TextStyle(color: BybitPalette.muted, fontSize: 12),
               ),
               if (isOpen)
                 TouchScale(
@@ -148,13 +167,13 @@ class AmlQueueScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 7),
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
+                      color: BybitPalette.accent,
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: const Text(
                       'Clear case',
                       style: TextStyle(
-                        color: AppTheme.onLime,
+                        color: Colors.black,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),

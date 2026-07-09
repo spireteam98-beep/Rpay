@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../constants/app_theme.dart';
 import '../models/cryptocurrency.dart';
+import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/touch_scale.dart';
 
 class WithdrawScreen extends StatefulWidget {
   final Cryptocurrency? selectedCrypto;
@@ -38,24 +39,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: AppBar(
-        backgroundColor: AppTheme.darkBackground,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'Withdraw Crypto',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textWhite,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.textWhite),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Withdraw Crypto'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -88,37 +73,31 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
           'Select Coin',
           style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textWhite,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 12),
-        InkWell(
+        TouchScale(
           onTap: () {
             _showCryptoSelectionBottomSheet();
           },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.cardDarkBackground,
-              borderRadius: BorderRadius.circular(12),
-            ),
+          child: BybitCard(
             child: Row(
               children: [
                 Container(
                   width: 36,
                   height: 36,
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardLightBackground,
-                    borderRadius: BorderRadius.circular(18),
+                  decoration: const BoxDecoration(
+                    color: BybitPalette.surface2,
+                    shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       _selectedCrypto!.symbol.substring(0, 1).toUpperCase(),
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textWhite,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -132,21 +111,21 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                         _selectedCrypto!.name,
                         style: const TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textWhite,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
                       ),
                       Text(
                         _selectedCrypto!.symbol.toUpperCase(),
                         style: const TextStyle(
                           fontSize: 14,
-                          color: AppTheme.textGrey,
+                          color: BybitPalette.muted,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.keyboard_arrow_down, color: AppTheme.textGrey),
+                const Icon(Icons.keyboard_arrow_down_rounded, color: BybitPalette.muted),
               ],
             ),
           ),
@@ -158,9 +137,9 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   void _showCryptoSelectionBottomSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.cardDarkBackground,
+      backgroundColor: BybitPalette.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return Column(
@@ -171,7 +150,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppTheme.textGrey,
+                color: BybitPalette.muted,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -182,8 +161,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                 'Select Coin to Withdraw',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -193,19 +172,19 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
               child: TextField(
                 decoration: InputDecoration(
                   hintText: 'Search coins',
-                  hintStyle: const TextStyle(color: AppTheme.textGrey),
+                  hintStyle: const TextStyle(color: BybitPalette.muted),
                   prefixIcon: const Icon(
-                    Icons.search,
-                    color: AppTheme.textGrey,
+                    Icons.search_rounded,
+                    color: BybitPalette.muted,
                   ),
                   filled: true,
-                  fillColor: AppTheme.cardLightBackground,
+                  fillColor: BybitPalette.input,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(100),
                     borderSide: BorderSide.none,
                   ),
                 ),
-                style: const TextStyle(color: AppTheme.textWhite),
+                style: const TextStyle(color: Colors.white),
               ),
             ),
             const SizedBox(height: 16),
@@ -219,16 +198,16 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     leading: Container(
                       width: 36,
                       height: 36,
-                      decoration: BoxDecoration(
-                        color: AppTheme.cardLightBackground,
-                        borderRadius: BorderRadius.circular(18),
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
                       ),
                       child: Center(
                         child: Text(
                           crypto.symbol.substring(0, 1).toUpperCase(),
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textWhite,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -236,13 +215,13 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     title: Text(
                       crypto.name,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textWhite,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
                       ),
                     ),
                     subtitle: Text(
                       '${crypto.symbol.toUpperCase()} • Available: 2.5',
-                      style: const TextStyle(color: AppTheme.textGrey),
+                      style: const TextStyle(color: BybitPalette.muted),
                     ),
                     onTap: () {
                       setState(() {
@@ -272,17 +251,12 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
           'Network',
           style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textWhite,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.cardDarkBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
+        BybitCard(
           child: Row(
             children: [
               const Expanded(
@@ -293,19 +267,19 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                       'Ethereum (ERC20)',
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textWhite,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
                       ),
                     ),
                     SizedBox(height: 4),
                     Text(
                       'Network Fee: 0.005 ETH',
-                      style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                      style: TextStyle(fontSize: 12, color: BybitPalette.muted),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.keyboard_arrow_down, color: AppTheme.textGrey),
+              const Icon(Icons.keyboard_arrow_down_rounded, color: BybitPalette.muted),
             ],
           ),
         ),
@@ -321,17 +295,12 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
           'Amount',
           style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textWhite,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.cardDarkBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
+        BybitCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -345,12 +314,12 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                       ),
                       style: const TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textWhite,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
                       ),
                       decoration: const InputDecoration(
                         hintText: '0',
-                        hintStyle: TextStyle(color: AppTheme.textGrey),
+                        hintStyle: TextStyle(color: BybitPalette.muted),
                         border: InputBorder.none,
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
@@ -361,8 +330,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     _selectedCrypto!.symbol.toUpperCase(),
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textWhite,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -375,10 +344,10 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     'Available: $_availableBalance ${_selectedCrypto!.symbol.toUpperCase()}',
                     style: const TextStyle(
                       fontSize: 12,
-                      color: AppTheme.textGrey,
+                      color: BybitPalette.muted,
                     ),
                   ),
-                  GestureDetector(
+                  TouchScale(
                     onTap: () {
                       setState(() {
                         _amountController.text = _availableBalance.toString();
@@ -388,8 +357,8 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                       'MAX',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w900,
+                        color: BybitPalette.accent,
                       ),
                     ),
                   ),
@@ -410,17 +379,12 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
           'Withdrawal Address',
           style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textWhite,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.cardDarkBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
+        BybitCard(
           child: Row(
             children: [
               Expanded(
@@ -428,11 +392,11 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                   controller: _addressController,
                   style: const TextStyle(
                     fontSize: 14,
-                    color: AppTheme.textWhite,
+                    color: Colors.white,
                   ),
                   decoration: const InputDecoration(
                     hintText: 'Enter or paste address',
-                    hintStyle: TextStyle(color: AppTheme.textGrey),
+                    hintStyle: TextStyle(color: BybitPalette.muted),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
@@ -449,14 +413,14 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Address pasted from clipboard'),
-                        backgroundColor: AppTheme.primaryColor,
+                        backgroundColor: BybitPalette.surface2,
                       ),
                     );
                   }
                 },
                 icon: const Icon(
                   Icons.paste_rounded,
-                  color: AppTheme.primaryColor,
+                  color: BybitPalette.accent,
                 ),
               ),
             ],
@@ -476,34 +440,29 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
               'Memo (Optional)',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textWhite,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
               ),
             ),
             const SizedBox(width: 8),
-            Tooltip(
+            const Tooltip(
               message: 'Some exchanges require a memo/tag for deposits',
-              child: const Icon(
-                Icons.info_outline,
-                color: AppTheme.textGrey,
+              child: Icon(
+                Icons.info_outline_rounded,
+                color: BybitPalette.muted,
                 size: 16,
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.cardDarkBackground,
-            borderRadius: BorderRadius.circular(12),
-          ),
+        BybitCard(
           child: TextField(
             controller: _memoController,
-            style: const TextStyle(fontSize: 14, color: AppTheme.textWhite),
+            style: const TextStyle(fontSize: 14, color: Colors.white),
             decoration: const InputDecoration(
               hintText: 'Enter memo if required',
-              hintStyle: TextStyle(color: AppTheme.textGrey),
+              hintStyle: TextStyle(color: BybitPalette.muted),
               border: InputBorder.none,
               isDense: true,
               contentPadding: EdgeInsets.zero,
@@ -519,12 +478,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
     double totalAmount = amount - _fee;
     if (totalAmount < 0) totalAmount = 0;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardDarkBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return BybitCard(
       child: Column(
         children: [
           Row(
@@ -532,34 +486,34 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
             children: [
               const Text(
                 'Network Fee',
-                style: TextStyle(fontSize: 14, color: AppTheme.textLightGrey),
+                style: TextStyle(fontSize: 14, color: BybitPalette.muted2),
               ),
               Text(
                 '$_fee ${_selectedCrypto!.symbol.toUpperCase()}',
                 style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(color: AppTheme.cardLightBackground),
+          const Divider(color: BybitPalette.surface2),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'You will receive',
-                style: TextStyle(fontSize: 14, color: AppTheme.textLightGrey),
+                style: TextStyle(fontSize: 14, color: BybitPalette.muted2),
               ),
               Text(
                 '$totalAmount ${_selectedCrypto!.symbol.toUpperCase()}',
                 style: const TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
                 ),
               ),
             ],
@@ -570,13 +524,14 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
   }
 
   Widget _buildWithdrawButton() {
-    return ElevatedButton(
-      onPressed: () {
+    return BybitPrimaryButton(
+      label: 'Withdraw',
+      onTap: () {
         if (_addressController.text.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Please enter a withdrawal address'),
-              backgroundColor: Colors.red,
+              backgroundColor: BybitPalette.red,
             ),
           );
           return;
@@ -586,7 +541,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Please enter an amount'),
-              backgroundColor: Colors.red,
+              backgroundColor: BybitPalette.red,
             ),
           );
           return;
@@ -594,19 +549,6 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
 
         _showWithdrawConfirmationDialog();
       },
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.primaryColor,
-        minimumSize: const Size(double.infinity, 56),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: const Text(
-        'Withdraw',
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
     );
   }
 
@@ -619,16 +561,16 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            backgroundColor: AppTheme.cardDarkBackground,
+            backgroundColor: BybitPalette.surface,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(24),
             ),
             title: const Text(
               'Confirm Withdrawal',
               style: TextStyle(
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textWhite,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
               ),
               textAlign: TextAlign.center,
             ),
@@ -637,7 +579,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
               children: [
                 const Text(
                   'Please confirm your withdrawal details',
-                  style: TextStyle(fontSize: 14, color: AppTheme.textLightGrey),
+                  style: TextStyle(fontSize: 14, color: BybitPalette.muted2),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -675,15 +617,15 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: AppTheme.textGrey),
+                          side: const BorderSide(color: BybitPalette.surface2),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(100),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         child: const Text(
                           'Cancel',
-                          style: TextStyle(color: AppTheme.textGrey),
+                          style: TextStyle(color: Colors.white),
                         ),
                       ),
                     ),
@@ -695,13 +637,19 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                           _showWithdrawSuccessDialog();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
+                          backgroundColor: BybitPalette.accent,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(100),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        child: const Text('Confirm'),
+                        child: const Text(
+                          'Confirm',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -718,15 +666,15 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: AppTheme.textLightGrey),
+          style: const TextStyle(fontSize: 14, color: BybitPalette.muted2),
         ),
         Flexible(
           child: Text(
             value,
             style: const TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textWhite,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
             ),
             textAlign: TextAlign.end,
             overflow: TextOverflow.ellipsis,
@@ -745,25 +693,29 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            backgroundColor: AppTheme.cardDarkBackground,
+            backgroundColor: BybitPalette.surface,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(24),
             ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.check_circle_outline,
-                  color: Colors.green,
-                  size: 64,
+                const CircleAvatar(
+                  radius: 32,
+                  backgroundColor: BybitPalette.accent,
+                  child: Icon(
+                    Icons.check_rounded,
+                    color: Colors.black,
+                    size: 36,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   'Withdrawal Successful',
                   style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textWhite,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -771,24 +723,17 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                   '$totalAmount ${_selectedCrypto!.symbol.toUpperCase()} has been sent to your wallet',
                   style: const TextStyle(
                     fontSize: 14,
-                    color: AppTheme.textLightGrey,
+                    color: BybitPalette.muted2,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
+                BybitPrimaryButton(
+                  label: 'Done',
+                  onTap: () {
                     Navigator.pop(context);
                     Navigator.pop(context);
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    minimumSize: const Size(double.infinity, 56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Done'),
                 ),
               ],
             ),

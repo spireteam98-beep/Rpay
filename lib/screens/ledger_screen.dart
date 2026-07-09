@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_theme.dart';
 import '../models/ledger_entry.dart';
 import '../state/kash_app_state.dart';
-import '../widgets/kash_widgets.dart';
+import '../widgets/bybit_wallet_ui.dart';
 
 class LedgerScreen extends StatelessWidget {
   const LedgerScreen({super.key});
@@ -13,109 +12,104 @@ class LedgerScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ledger = context.watch<KashAppState>().ledgerTransactions;
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Core ledger'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('History'),
       body: SafeArea(
         child: ListView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+          padding: const EdgeInsets.fromLTRB(24, 10, 24, 30),
           children: [
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: AppTheme.heroCard,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const CircleIcon(
-                    Icons.account_tree_outlined,
-                    color: AppTheme.onLime,
-                    size: 52,
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Double-entry ledger',
-                    style: TextStyle(
-                      color: AppTheme.onLime,
-                      fontSize: 25,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${ledger.length} transaction batches tracked',
-                    style: const TextStyle(
-                      color: AppTheme.onLime,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+            const Text(
+              'Transaction history',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.7,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              '${ledger.length} batches tracked across wallet rails',
+              style: const TextStyle(color: BybitPalette.muted2, fontSize: 15),
+            ),
+            const SizedBox(height: 22),
+            _filters(),
             const SizedBox(height: 18),
-            ...ledger.map(_ledgerBatch),
+            if (ledger.isEmpty) _emptyState() else ...ledger.map(_ledgerBatch),
           ],
         ),
       ),
     );
   }
 
+  Widget _filters() {
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(color: BybitPalette.surface2, borderRadius: BorderRadius.circular(100)),
+      child: Row(
+        children: const [
+          Expanded(child: _FilterChip('All', true)),
+          Expanded(child: _FilterChip('Send', false)),
+          Expanded(child: _FilterChip('Receive', false)),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    return const BybitCard(
+      child: Column(
+        children: [
+          CircleAvatar(
+            radius: 34,
+            backgroundColor: BybitPalette.surface2,
+            child: Icon(Icons.receipt_long_rounded, color: BybitPalette.muted, size: 32),
+          ),
+          SizedBox(height: 16),
+          Text('No wallet history yet', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+          SizedBox(height: 6),
+          Text('Cash in, send, receive, or trade to see activity here.', textAlign: TextAlign.center, style: TextStyle(color: BybitPalette.muted2, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
   Widget _ledgerBatch(LedgerTransaction transaction) {
     final time = DateFormat('MMM d, HH:mm').format(transaction.postedAt);
+    final balanced = transaction.isBalanced;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GlassTile(
+      child: BybitCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleIcon(
-                  transaction.isBalanced
-                      ? Icons.check_rounded
-                      : Icons.warning_amber_rounded,
-                  size: 42,
-                  color:
-                      transaction.isBalanced ? AppTheme.onLime : AppTheme.priceDown,
-                  bg:
-                      transaction.isBalanced ? AppTheme.primaryColor : null,
+                CircleAvatar(
+                  radius: 25,
+                  backgroundColor: balanced ? BybitPalette.green.withOpacity(0.15) : BybitPalette.red.withOpacity(0.15),
+                  child: Icon(
+                    balanced ? Icons.check_circle_rounded : Icons.error_rounded,
+                    color: balanced ? BybitPalette.green : BybitPalette.red,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        transaction.title,
-                        style: const TextStyle(
-                          color: AppTheme.textWhite,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      Text(transaction.title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
                       const SizedBox(height: 3),
-                      Text(
-                        '${transaction.id} - ${transaction.rail} - $time',
-                        style: const TextStyle(
-                          color: AppTheme.textGrey,
-                          fontSize: 12,
-                        ),
-                      ),
+                      Text('${transaction.id} - ${transaction.rail} - $time', style: const TextStyle(color: BybitPalette.muted2, fontSize: 12)),
                     ],
                   ),
                 ),
-                Text(
-                  transaction.status,
-                  style: const TextStyle(
-                    color: AppTheme.primaryColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                Text(transaction.status, style: const TextStyle(color: BybitPalette.accent, fontSize: 12, fontWeight: FontWeight.w900)),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             ...transaction.entries.map(_entryRow),
           ],
         ),
@@ -124,55 +118,55 @@ class LedgerScreen extends StatelessWidget {
   }
 
   Widget _entryRow(LedgerEntry entry) {
+    final isDebit = entry.direction == LedgerDirection.debit;
     return Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Row(
         children: [
           Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              color: entry.direction == LedgerDirection.debit
-                  ? AppTheme.priceDown
-                  : AppTheme.priceUp,
-              shape: BoxShape.circle,
-            ),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: isDebit ? BybitPalette.red : BybitPalette.green, shape: BoxShape.circle),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  entry.accountName,
-                  style: const TextStyle(
-                    color: AppTheme.textWhite,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text(entry.accountName, style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 2),
-                Text(
-                  entry.memo,
-                  style: const TextStyle(
-                    color: AppTheme.textGrey,
-                    fontSize: 11.5,
-                  ),
-                ),
+                Text(entry.memo, style: const TextStyle(color: BybitPalette.muted2, fontSize: 12)),
               ],
             ),
           ),
-          Text(
-            entry.amountLabel,
-            style: TextStyle(
-              color: entry.direction == LedgerDirection.debit
-                  ? AppTheme.priceDown
-                  : AppTheme.priceUp,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          Text(entry.amountLabel, style: TextStyle(color: isDebit ? BybitPalette.red : BybitPalette.green, fontSize: 13, fontWeight: FontWeight.w900)),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  const _FilterChip(this.label, this.selected);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? BybitPalette.selected : Colors.transparent,
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? Colors.white : BybitPalette.muted,
+          fontSize: 14,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }

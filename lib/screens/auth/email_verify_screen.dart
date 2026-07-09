@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../../constants/app_theme.dart';
 import '../../services/api_service.dart';
+import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
 import 'otp_screen.dart';
 
@@ -117,8 +117,8 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Verify email'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Verify email'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -130,16 +130,16 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
               const Text(
                 'Enter the 6-digit code',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 'We sent a code to ${widget.email}',
-                style: const TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 28),
               Row(
@@ -151,19 +151,19 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                     height: 56,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppTheme.cardDarkBackground,
+                      color: BybitPalette.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: active ? AppTheme.primaryColor : AppTheme.glassStroke,
+                        color: active ? BybitPalette.accent : const Color(0xFF242832),
                         width: active ? 1.4 : 1,
                       ),
                     ),
                     child: Text(
                       _digits[i],
                       style: const TextStyle(
-                        color: AppTheme.textWhite,
+                        color: Colors.white,
                         fontSize: 22,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   );
@@ -173,15 +173,18 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
               Center(
                 child: TextButton(
                   onPressed: (_resending || _cooldown > 0) ? null : _resend,
-                  child: Text(_resendLabel),
+                  child: Text(
+                    _resendLabel,
+                    style: const TextStyle(color: BybitPalette.accent),
+                  ),
                 ),
               ),
               const SizedBox(height: 18),
               _keypad(),
               const SizedBox(height: 12),
-              PrimaryButton(
-                label: 'Verify',
-                isLoading: _verifying,
+              BybitPrimaryButton(
+                label: _verifying ? 'Verifying…' : 'Verify',
+                enabled: _filled == 6 && !_verifying,
                 onTap: _filled == 6 ? _verify : () {},
               ),
               const SizedBox(height: 20),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../constants/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../state/kash_app_state.dart';
+import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
 import 'email_verify_screen.dart';
 
@@ -87,8 +87,8 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Create account'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Create account'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -99,26 +99,26 @@ class _SignupScreenState extends State<SignupScreen> {
               const Text(
                 'Join RoyallPay',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: -0.6,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
                 'One signup gives you a crypto wallet, a mobile money wallet and a bank account.',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 28),
-              KashTextField(
+              BybitTextField(
                 label: 'Full name',
                 hint: 'Mohamed Ali',
                 icon: Icons.person_outline_rounded,
                 controller: _nameController,
               ),
               const SizedBox(height: 18),
-              KashTextField(
+              BybitTextField(
                 label: 'Phone number',
                 hint: '+252 61 000 0000',
                 icon: Icons.phone_iphone_rounded,
@@ -126,7 +126,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 controller: _phoneController,
               ),
               const SizedBox(height: 18),
-              KashTextField(
+              BybitTextField(
                 label: 'Email address',
                 hint: 'you@example.com',
                 icon: Icons.alternate_email_rounded,
@@ -134,7 +134,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 controller: _emailController,
               ),
               const SizedBox(height: 28),
-              PrimaryButton(
+              BybitPrimaryButton(
                 label: 'Continue',
                 onTap: _handleContinue,
               ),
@@ -143,7 +143,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Text(
                   'By continuing you agree to our Terms & Privacy Policy.',
                   style: TextStyle(
-                    color: AppTheme.textGrey.withAlpha(204),
+                    color: BybitPalette.muted.withOpacity(0.8),
                     fontSize: 12,
                   ),
                 ),

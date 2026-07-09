@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -21,7 +22,10 @@ class ApiService {
         'pk_live_51RdTmVP6aNiJxRzPl7AiE5MTIrm2pGCIuMfQ0pYIbCrT62GZjtMiOA6APngCOVPmtQwfY1dRgNJKr5fgqIBuUsbg00zyyRnl1M',
   );
   static const _tokenKey = 'api_jwt';
-  static const Duration _timeout = Duration(seconds: 6);
+  // Render's free tier spins the backend down after 15 minutes idle, and a
+  // cold start can take 30-50s — a short timeout here just turns "the
+  // server is waking up" into a false "can't reach backend" error.
+  static const Duration _timeout = Duration(seconds: 25);
 
   static SharedPreferences get _prefs => AuthService.prefs;
 
@@ -43,6 +47,19 @@ class ApiService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Fire-and-forget ping sent as soon as the app starts, so a sleeping
+  /// Render instance is already waking up in the background by the time the
+  /// user reaches a screen that actually needs it — shortens or avoids the
+  /// cold-start wait on the first real request entirely.
+  static void warmUp() {
+    unawaited(
+      http.get(Uri.parse('$baseUrl/health')).timeout(
+            const Duration(seconds: 60),
+            onTimeout: () => http.Response('', 0),
+          ),
+    );
   }
 
   /// Registers on the backend; returns the on-chain deposit address.

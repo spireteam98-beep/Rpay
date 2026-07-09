@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../constants/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../state/kash_app_state.dart';
+import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
+import '../../widgets/touch_scale.dart';
 import '../main_navigation.dart';
 
 /// Step 4: tiered KYC — verify identity to unlock full limits.
@@ -22,8 +23,8 @@ class _KycScreenState extends State<KycScreen> {
   Widget build(BuildContext context) {
     final ready = _idDone && _selfieDone;
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Verify identity'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Verify identity'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -34,16 +35,16 @@ class _KycScreenState extends State<KycScreen> {
               const Text(
                 'Two quick steps',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
                 'Verification keeps your money safe and unlocks full limits for crypto, remittance and bank transfers.',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 24),
               _kycStep(
@@ -62,28 +63,40 @@ class _KycScreenState extends State<KycScreen> {
                 onTap: () => setState(() => _selfieDone = true),
               ),
               const SizedBox(height: 24),
-              GlassTile(
+              BybitCard(
                 child: Row(
                   children: [
-                    const CircleIcon(Icons.verified_user_outlined, size: 40),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.verified_user_outlined,
+                        color: BybitPalette.accent,
+                        size: 18,
+                      ),
+                    ),
                     const SizedBox(width: 12),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Tier 1 unlocked at signup',
                             style: TextStyle(
-                              color: AppTheme.textWhite,
+                              color: Colors.white,
                               fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                           SizedBox(height: 3),
                           Text(
                             'Wallet up to \$300. Full verification lifts limits and enables IBAN.',
                             style: TextStyle(
-                              color: AppTheme.textGrey,
+                              color: BybitPalette.muted,
                               fontSize: 12,
                             ),
                           ),
@@ -94,16 +107,20 @@ class _KycScreenState extends State<KycScreen> {
                 ),
               ),
               const SizedBox(height: 28),
-              PrimaryButton(
+              BybitPrimaryButton(
                 label:
                     ready ? 'Submit & open my accounts' : 'Complete both steps',
+                enabled: ready,
                 onTap: ready ? () => _finish(context) : () {},
               ),
               const SizedBox(height: 12),
               Center(
                 child: TextButton(
                   onPressed: () => _finish(context),
-                  child: const Text('Skip for now — limited account'),
+                  child: const Text(
+                    'Skip for now — limited account',
+                    style: TextStyle(color: BybitPalette.muted2),
+                  ),
                 ),
               ),
             ],
@@ -124,25 +141,21 @@ class _KycScreenState extends State<KycScreen> {
       barrierDismissible: false,
       builder:
           (_) => Dialog(
-            backgroundColor: AppTheme.cardDarkBackground,
+            backgroundColor: BybitPalette.surface,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppTheme.rCard),
+              borderRadius: BorderRadius.circular(28),
             ),
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
+                  const CircleAvatar(
+                    radius: 38,
+                    backgroundColor: BybitPalette.accent,
+                    child: Icon(
                       Icons.check_rounded,
-                      color: AppTheme.onLime,
+                      color: Colors.black,
                       size: 40,
                     ),
                   ),
@@ -150,19 +163,19 @@ class _KycScreenState extends State<KycScreen> {
                   const Text(
                     'Your accounts are ready',
                     style: TextStyle(
-                      color: AppTheme.textWhite,
+                      color: Colors.white,
                       fontSize: 19,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 10),
                   const Text(
                     'Crypto wallet · Mobile money wallet · Virtual bank account',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                    style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
                   ),
                   const SizedBox(height: 22),
-                  PrimaryButton(
+                  BybitPrimaryButton(
                     label: 'Go to my dashboard',
                     onTap:
                         () => Navigator.of(context).pushAndRemoveUntil(
@@ -184,45 +197,56 @@ class _KycScreenState extends State<KycScreen> {
     required bool done,
     required VoidCallback onTap,
   }) {
-    return GlassTile(
+    return TouchScale(
       onTap: onTap,
-      child: Row(
-        children: [
-          CircleIcon(
-            done ? Icons.check_rounded : icon,
-            color: done ? AppTheme.onLime : AppTheme.primaryColor,
-            bg: done ? AppTheme.primaryColor : null,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppTheme.textWhite,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  done ? 'Done' : subtitle,
-                  style: TextStyle(
-                    color: done ? AppTheme.priceUp : AppTheme.textGrey,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
+      child: BybitCard(
+        padding: const EdgeInsets.all(15),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: done ? BybitPalette.accent : BybitPalette.surface2,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                done ? Icons.check_rounded : icon,
+                color: done ? Colors.black : BybitPalette.accent,
+                size: 21,
+              ),
             ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: AppTheme.textGrey,
-            size: 22,
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    done ? 'Done' : subtitle,
+                    style: TextStyle(
+                      color: done ? BybitPalette.green : BybitPalette.muted,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: BybitPalette.muted,
+              size: 22,
+            ),
+          ],
+        ),
       ),
     );
   }

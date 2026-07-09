@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import '../constants/app_theme.dart';
 import '../services/api_service.dart';
-import '../widgets/kash_widgets.dart';
+import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/touch_scale.dart';
 
 /// Real custody deposit address + QR code — the counterpart to Buy/Cash-in.
@@ -16,8 +15,8 @@ class ReceiveScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Receive crypto'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Receive crypto'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -28,16 +27,16 @@ class ReceiveScreen extends StatelessWidget {
               const Text(
                 'Your deposit address',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: -0.6,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
                 'Send ETH on Sepolia testnet to this address to fund your custody wallet.',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 24),
               FutureBuilder<Map<String, dynamic>?>(
@@ -47,19 +46,19 @@ class ReceiveScreen extends StatelessWidget {
                     return const Padding(
                       padding: EdgeInsets.symmetric(vertical: 60),
                       child: Center(
-                        child: CircularProgressIndicator(color: AppTheme.primaryColor),
+                        child: CircularProgressIndicator(color: BybitPalette.accent),
                       ),
                     );
                   }
                   final data = snapshot.data;
                   final address = data?['depositAddress'] as String?;
                   if (address == null || address.isEmpty) {
-                    return GlassTile(
+                    return BybitCard(
                       child: Text(
                         ApiService.hasSession
                             ? "Couldn't load your deposit address. Pull down to try again."
                             : 'Sign in to see your deposit address.',
-                        style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                        style: const TextStyle(color: BybitPalette.muted, fontSize: 13),
                       ),
                     );
                   }
@@ -78,10 +77,18 @@ class ReceiveScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        GlassTile(
+        BybitCard(
           child: Row(
             children: [
-              const CircleIcon(Icons.link_rounded, color: AppTheme.primaryColor),
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: BybitPalette.accent.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.link_rounded, color: BybitPalette.accent, size: 22),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -89,13 +96,13 @@ class ReceiveScreen extends StatelessWidget {
                   children: [
                     const Text(
                       'Network',
-                      style: TextStyle(color: AppTheme.textGrey, fontSize: 12),
+                      style: TextStyle(color: BybitPalette.muted, fontSize: 12),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       network,
                       style: const TextStyle(
-                        color: AppTheme.textWhite,
+                        color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                       ),
@@ -112,7 +119,7 @@ class ReceiveScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(AppTheme.rCard),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: const [
                 BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6)),
               ],
@@ -125,12 +132,12 @@ class ReceiveScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        Text(
+        const Text(
           'Deposit address',
-          style: const TextStyle(
-            color: AppTheme.textGrey,
+          style: TextStyle(
+            color: BybitPalette.muted,
             fontSize: 13,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 8),
@@ -140,7 +147,7 @@ class ReceiveScreen extends StatelessWidget {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Address copied'),
-                backgroundColor: AppTheme.cardLightBackground,
+                backgroundColor: BybitPalette.surface2,
               ),
             );
           },
@@ -148,9 +155,9 @@ class ReceiveScreen extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             decoration: BoxDecoration(
-              color: AppTheme.cardDarkBackground,
-              borderRadius: BorderRadius.circular(AppTheme.rInput),
-              border: Border.all(color: AppTheme.glassStroke),
+              color: BybitPalette.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF242832)),
             ),
             child: Row(
               children: [
@@ -158,28 +165,28 @@ class ReceiveScreen extends StatelessWidget {
                   child: Text(
                     address,
                     style: const TextStyle(
-                      color: AppTheme.textLightGrey,
+                      color: BybitPalette.muted2,
                       fontSize: 13.5,
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.copy_rounded, color: AppTheme.primaryColor, size: 20),
+                const Icon(Icons.copy_rounded, color: BybitPalette.accent, size: 20),
               ],
             ),
           ),
         ),
         const SizedBox(height: 24),
-        GlassTile(
+        BybitCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: const [
               Text(
                 'Before you send',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
+                  color: Colors.white,
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               SizedBox(height: 10),
@@ -204,7 +211,7 @@ class _InfoLine extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8),
       child: Text(
         '•  $text',
-        style: const TextStyle(color: AppTheme.textGrey, fontSize: 12.5, height: 1.4),
+        style: const TextStyle(color: BybitPalette.muted, fontSize: 12.5, height: 1.4),
       ),
     );
   }

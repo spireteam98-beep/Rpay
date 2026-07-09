@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_theme.dart';
-import '../models/cryptocurrency.dart';
 import '../models/kash_account.dart';
 import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
+import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
 import 'account_detail_screen.dart';
@@ -14,21 +13,38 @@ import 'ledger_screen.dart';
 import 'receive_screen.dart';
 import 'send_money_screen.dart';
 
-class WalletScreen extends StatelessWidget {
+class WalletScreen extends StatefulWidget {
   const WalletScreen({Key? key}) : super(key: key);
+
+  @override
+  State<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends State<WalletScreen> {
+  int _modeIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<KashAppState>();
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
+      backgroundColor: BybitPalette.bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: BybitPalette.bg,
         elevation: 0,
         centerTitle: false,
-        title: Text('Wallets', style: Theme.of(context).textTheme.displaySmall),
+        title: const Text(
+          'Wallet',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
         actions: [
-          _appBarAction(Icons.history_rounded, () {}),
+          _appBarAction(
+            Icons.history_rounded,
+            () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
+          ),
           const SizedBox(width: 8),
           _appBarAction(
             Icons.qr_code_scanner_rounded,
@@ -44,11 +60,17 @@ class WalletScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const BybitTopBar(),
+            const BybitSearchBar(),
             _balanceCard(context, appState),
             _onChainCustodyCard(),
-            _accountTabs(context, appState.accounts),
-            _sectionTitle('Custodied crypto assets'),
-            _assetsList(),
+            _walletModeTabs(),
+            if (_modeIndex == 0) ...[
+              _accountTabs(context, appState.accounts),
+              _sectionTitle('Coins'),
+              _assetsList(),
+            ] else
+              _modePlaceholder(_modeIndex == 1 ? 'Funding' : 'Earn'),
           ],
         ),
       ),
@@ -62,11 +84,10 @@ class WalletScreen extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: AppTheme.cardDarkBackground,
+          color: BybitPalette.surface2,
           shape: BoxShape.circle,
-          border: Border.all(color: AppTheme.glassStroke),
         ),
-        child: Icon(icon, color: AppTheme.textWhite, size: 19),
+        child: Icon(icon, color: Colors.white, size: 20),
       ),
     );
   }
@@ -75,29 +96,87 @@ class WalletScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
-      decoration: AppTheme.heroCard,
+      decoration: BoxDecoration(
+        color: BybitPalette.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFF242832)),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              const Text(
+                'Total assets',
+                style: TextStyle(
+                  color: BybitPalette.muted,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.visibility_off_outlined,
+                  color: BybitPalette.muted, size: 18),
+              const Spacer(),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: BybitPalette.surface2,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: const Text(
+                  'Web3',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  appState.totalBalance,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 42,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 5),
+                child: Text(
+                  'USD',
+                  style: TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           const Text(
-            'All wallet balances',
+            '+0.00 today',
             style: TextStyle(
-              color: AppTheme.onLime,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            appState.totalBalance,
-            style: const TextStyle(
-              color: AppTheme.onLime,
-              fontSize: 42,
+              color: BybitPalette.green,
+              fontSize: 14,
               fontWeight: FontWeight.w800,
-              letterSpacing: -1.6,
-              height: 1.0,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -143,24 +222,24 @@ class WalletScreen extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 52,
-            height: 52,
-            decoration: const BoxDecoration(
-              color: AppTheme.onLime,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppTheme.primaryColor, size: 22),
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: BybitPalette.surface2,
+            borderRadius: BorderRadius.circular(18),
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppTheme.onLime,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-            ),
+          child: Icon(icon, color: Colors.white, size: 24),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
           ),
-        ],
+        ),
+      ],
       ),
     );
   }
@@ -183,15 +262,14 @@ class WalletScreen extends StatelessWidget {
 
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: Container(
+          child: BybitCard(
             padding: const EdgeInsets.all(18),
-            decoration: AppTheme.glowCard,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const CircleIcon(Icons.link_rounded, size: 40),
+                    const _BybitMiniIcon(Icons.link_rounded),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -200,7 +278,7 @@ class WalletScreen extends StatelessWidget {
                           const Text(
                             'On-chain custody',
                             style: TextStyle(
-                              color: AppTheme.textWhite,
+                              color: Colors.white,
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                             ),
@@ -209,7 +287,7 @@ class WalletScreen extends StatelessWidget {
                           Text(
                             network,
                             style: const TextStyle(
-                              color: AppTheme.primaryColor,
+                              color: BybitPalette.accent,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                             ),
@@ -223,7 +301,7 @@ class WalletScreen extends StatelessWidget {
                         Text(
                           '${double.parse(balance).toStringAsFixed(5)} ETH',
                           style: const TextStyle(
-                            color: AppTheme.textWhite,
+                            color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
                           ),
@@ -232,7 +310,7 @@ class WalletScreen extends StatelessWidget {
                         Text(
                           '\$${usd.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            color: AppTheme.textGrey,
+                            color: BybitPalette.muted,
                             fontSize: 11.5,
                           ),
                         ),
@@ -255,9 +333,8 @@ class WalletScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
-                      color: AppTheme.cardLightBackground,
+                      color: BybitPalette.surface2,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppTheme.glassStroke),
                     ),
                     child: Row(
                       children: [
@@ -267,7 +344,7 @@ class WalletScreen extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: AppTheme.textLightGrey,
+                              color: BybitPalette.muted,
                               fontSize: 12,
                               fontFamily: 'monospace',
                             ),
@@ -275,7 +352,7 @@ class WalletScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         const Icon(Icons.copy_rounded,
-                            color: AppTheme.primaryColor, size: 16),
+                            color: BybitPalette.accent, size: 16),
                       ],
                     ),
                   ),
@@ -288,68 +365,140 @@ class WalletScreen extends StatelessWidget {
     );
   }
 
+  Widget _walletModeTabs() {
+    const labels = ['Assets', 'Funding', 'Earn'];
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: BybitPalette.surface2,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          for (int i = 0; i < labels.length; i++)
+            Expanded(
+              child: _ModeTab(
+                labels[i],
+                _modeIndex == i,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _modeIndex = i);
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modePlaceholder(String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      child: BybitCard(
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: const BoxDecoration(
+                color: BybitPalette.surface2,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.hourglass_top_rounded,
+                color: BybitPalette.accent,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              '$label is coming soon',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'This is part of the RoyallPay Phase 2 roadmap.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: BybitPalette.muted, fontSize: 12.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _accountTabs(BuildContext context, List<KashAccount> accounts) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       child: Column(
         children:
             accounts.map((account) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: GlassTile(
+                child: TouchScale(
                   onTap:
                       () => Navigator.of(
                         context,
                       ).push(kashRoute(AccountDetailScreen(account: account))),
-                  child: Row(
-                    children: [
-                      CircleIcon(account.icon, color: account.accent, size: 46),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  child: BybitCard(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      children: [
+                        _BybitMiniIcon(account.icon, color: account.accent),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                account.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                account.subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: BybitPalette.muted,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
-                              account.title,
+                              account.balance,
                               style: const TextStyle(
-                                color: AppTheme.textWhite,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              account.subtitle,
+                              account.currency,
                               style: const TextStyle(
-                                color: AppTheme.textGrey,
-                                fontSize: 12.5,
+                                color: BybitPalette.muted,
+                                fontSize: 11,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            account.balance,
-                            style: const TextStyle(
-                              color: AppTheme.textWhite,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            account.currency,
-                            style: const TextStyle(
-                              color: AppTheme.textGrey,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );
@@ -365,9 +514,8 @@ class WalletScreen extends StatelessWidget {
         title,
         style: const TextStyle(
           fontSize: 18,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.4,
-          color: AppTheme.textWhite,
+          fontWeight: FontWeight.w900,
+          color: Colors.white,
         ),
       ),
     );
@@ -377,91 +525,72 @@ class WalletScreen extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
-        children: Cryptocurrency.mockData.take(3).map(_assetItem).toList(),
+        children: bybitTokens.take(6).map(_assetItem).toList(),
       ),
     );
   }
 
-  Widget _assetItem(Cryptocurrency crypto) {
-    final ownedAmount =
-        crypto.currentPrice > 1000
-            ? 0.01 * (crypto.currentPrice / 1000)
-            : 1.5 * (1000 / crypto.currentPrice);
-    final valueUsd = ownedAmount * crypto.currentPrice;
-
+  Widget _assetItem(BybitTokenData token) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: GlassTile(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: AppTheme.cardLightBackground,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppTheme.glassStroke),
-              ),
-              child: Center(
-                child: Text(
-                  crypto.symbol.substring(0, 1),
-                  style: const TextStyle(
-                    color: AppTheme.textWhite,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    crypto.name,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textWhite,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${crypto.symbol.toUpperCase()} custody',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textGrey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '\$${valueUsd.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.textWhite,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${ownedAmount.toStringAsFixed(ownedAmount < 1 ? 4 : 2)} ${crypto.symbol.toUpperCase()}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textGrey,
-                  ),
-                ),
-              ],
-            ),
-          ],
+      padding: const EdgeInsets.only(bottom: 4),
+      child: BybitTokenRow(
+        token: token,
+        amount: token.symbol == 'ETH' ? '0.045' : '0.00',
+        value: token.symbol == 'ETH' ? '139.05 USD' : '0 USD',
+      ),
+    );
+  }
+}
+
+class _ModeTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ModeTab(this.label, this.selected, {required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return TouchScale(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? BybitPalette.selected : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : BybitPalette.muted,
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _BybitMiniIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+
+  const _BybitMiniIcon(this.icon, {this.color = BybitPalette.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Icon(icon, color: color, size: 23),
     );
   }
 }

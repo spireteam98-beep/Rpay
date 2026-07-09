@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../constants/app_theme.dart';
+import 'package:flutter/services.dart';
 import '../models/cryptocurrency.dart';
 import '../services/api_service.dart';
+import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/touch_scale.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class TradingScreen extends StatefulWidget {
@@ -44,35 +46,30 @@ class _TradingScreenState extends State<TradingScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
+      backgroundColor: BybitPalette.bg,
       appBar: AppBar(
-        backgroundColor: AppTheme.darkBackground,
+        backgroundColor: BybitPalette.bg,
         elevation: 0,
+        centerTitle: false,
         title: Row(
           children: [
             _buildCryptoIconSmall(),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Text(
               '${_selectedCrypto.name}/${_selectedCrypto.symbol.toUpperCase()}',
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textWhite,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
               ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.star_border),
-            color: AppTheme.textGrey,
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_vert),
-            color: AppTheme.textGrey,
-          ),
+          _appBarAction(Icons.star_border_rounded, () {}),
+          const SizedBox(width: 8),
+          _appBarAction(Icons.more_horiz_rounded, () {}),
+          const SizedBox(width: 12),
         ],
       ),
       body: SingleChildScrollView(
@@ -97,20 +94,35 @@ class _TradingScreenState extends State<TradingScreen>
     );
   }
 
+  Widget _appBarAction(IconData icon, VoidCallback onTap) {
+    return TouchScale(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: const BoxDecoration(
+          color: BybitPalette.surface2,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 18),
+      ),
+    );
+  }
+
   Widget _buildCryptoIconSmall() {
     return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        color: AppTheme.primaryColor,
-        borderRadius: BorderRadius.circular(12),
+      width: 26,
+      height: 26,
+      decoration: const BoxDecoration(
+        color: BybitPalette.accent,
+        shape: BoxShape.circle,
       ),
       child: Center(
         child: Text(
           _selectedCrypto.symbol.substring(0, 1).toUpperCase(),
           style: const TextStyle(
-            color: AppTheme.onLime,
-            fontWeight: FontWeight.bold,
+            color: Colors.black,
+            fontWeight: FontWeight.w900,
             fontSize: 14,
           ),
         ),
@@ -130,42 +142,42 @@ class _TradingScreenState extends State<TradingScreen>
               Text(
                 _selectedCrypto.formattedPrice,
                 style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textWhite,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
+                      horizontal: 7,
+                      vertical: 3,
                     ),
                     decoration: BoxDecoration(
                       color:
                           _selectedCrypto.isPriceUp
-                              ? AppTheme.priceUp.withOpacity(0.15)
-                              : AppTheme.priceDown.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(4),
+                              ? BybitPalette.green.withOpacity(0.15)
+                              : BybitPalette.red.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
                       _selectedCrypto.formattedPriceChange,
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w800,
                         color:
                             _selectedCrypto.isPriceUp
-                                ? AppTheme.priceUp
-                                : AppTheme.priceDown,
+                                ? BybitPalette.green
+                                : BybitPalette.red,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text(
+                  const Text(
                     '24h Change',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textGrey),
+                    style: TextStyle(fontSize: 12, color: BybitPalette.muted),
                   ),
                 ],
               ),
@@ -189,15 +201,15 @@ class _TradingScreenState extends State<TradingScreen>
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+          style: const TextStyle(fontSize: 12, color: BybitPalette.muted),
         ),
         const SizedBox(height: 4),
         Text(
           value,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textWhite,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
           ),
         ),
       ],
@@ -215,8 +227,9 @@ class _TradingScreenState extends State<TradingScreen>
         itemBuilder: (context, index) {
           final interval = _timeIntervals[index];
           final isSelected = interval == _selectedTimeInterval;
-          return GestureDetector(
+          return TouchScale(
             onTap: () {
+              HapticFeedback.selectionClick();
               setState(() {
                 _selectedTimeInterval = interval;
               });
@@ -225,19 +238,15 @@ class _TradingScreenState extends State<TradingScreen>
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: isSelected ? AppTheme.primaryColor : Colors.transparent,
+                color: isSelected ? BybitPalette.selected : BybitPalette.surface2,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected ? AppTheme.primaryColor : AppTheme.textGrey,
-                  width: 1,
-                ),
               ),
               child: Text(
                 interval,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : AppTheme.textGrey,
+                  color: isSelected ? Colors.white : BybitPalette.muted,
                   fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -252,10 +261,14 @@ class _TradingScreenState extends State<TradingScreen>
       height: 250,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glowCard,
+      decoration: BoxDecoration(
+        color: BybitPalette.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFF242832)),
+      ),
       child: LineChart(
         LineChartData(
-          gridData: const FlGridData(
+          gridData: FlGridData(
             show: true,
             drawVerticalLine: true,
             horizontalInterval: 1,
@@ -276,7 +289,7 @@ class _TradingScreenState extends State<TradingScreen>
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
                   const style = TextStyle(
-                    color: AppTheme.textGrey,
+                    color: BybitPalette.muted,
                     fontSize: 10,
                   );
                   Widget text;
@@ -322,7 +335,7 @@ class _TradingScreenState extends State<TradingScreen>
                   return Text(
                     '\$${value.toInt()}K',
                     style: const TextStyle(
-                      color: AppTheme.textGrey,
+                      color: BybitPalette.muted,
                       fontSize: 10,
                     ),
                     textAlign: TextAlign.left,
@@ -353,19 +366,18 @@ class _TradingScreenState extends State<TradingScreen>
                 FlSpot(11, 4.5),
               ],
               isCurved: true,
-              color: AppTheme.primaryColor,
+              color: BybitPalette.accent,
               barWidth: 2,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: false),
               belowBarData: BarAreaData(
                 show: true,
-                color: AppTheme.chartGradientStart,
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppTheme.chartGradientStart,
-                    AppTheme.chartGradientEnd,
+                    BybitPalette.accent.withOpacity(0.28),
+                    BybitPalette.accent.withOpacity(0.0),
                   ],
                 ),
               ),
@@ -373,7 +385,7 @@ class _TradingScreenState extends State<TradingScreen>
           ],
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
-              tooltipBgColor: AppTheme.cardDarkBackground.withOpacity(0.8),
+              tooltipBgColor: BybitPalette.surface2.withOpacity(0.9),
               getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
                 return touchedBarSpots.map((barSpot) {
                   return LineTooltipItem(
@@ -393,7 +405,7 @@ class _TradingScreenState extends State<TradingScreen>
   }
 
   static FlLine _getDrawingLine(double value) {
-    return FlLine(color: AppTheme.cardLightBackground, strokeWidth: 1);
+    return const FlLine(color: BybitPalette.surface2, strokeWidth: 1);
   }
 
   Widget _buildTabBar() {
@@ -401,12 +413,24 @@ class _TradingScreenState extends State<TradingScreen>
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: AppTheme.cardDarkBackground,
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: AppTheme.glassStroke),
+        color: BybitPalette.surface2,
+        borderRadius: BorderRadius.circular(10),
       ),
       child: TabBar(
         controller: _tabController,
+        indicator: BoxDecoration(
+          color: BybitPalette.selected,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: Colors.white,
+        unselectedLabelColor: BybitPalette.muted,
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+        ),
         tabs: const [
           Tab(text: 'Spot'),
           Tab(text: 'Futures'),
@@ -439,15 +463,15 @@ class _TradingScreenState extends State<TradingScreen>
     return Container(
       padding: const EdgeInsets.all(5),
       decoration: BoxDecoration(
-        color: AppTheme.cardDarkBackground,
-        borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: AppTheme.glassStroke),
+        color: BybitPalette.surface2,
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         children: [
           Expanded(
-            child: GestureDetector(
+            child: TouchScale(
               onTap: () {
+                HapticFeedback.selectionClick();
                 setState(() {
                   _isBuying = true;
                 });
@@ -457,15 +481,15 @@ class _TradingScreenState extends State<TradingScreen>
                 curve: Curves.easeOutCubic,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: _isBuying ? AppTheme.primaryColor : Colors.transparent,
-                  borderRadius: BorderRadius.circular(100),
+                  color: _isBuying ? BybitPalette.green : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
                   child: Text(
                     'Buy',
                     style: TextStyle(
-                      color: _isBuying ? AppTheme.onLime : AppTheme.textGrey,
-                      fontWeight: FontWeight.w700,
+                      color: _isBuying ? Colors.black : BybitPalette.muted,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
@@ -473,8 +497,9 @@ class _TradingScreenState extends State<TradingScreen>
             ),
           ),
           Expanded(
-            child: GestureDetector(
+            child: TouchScale(
               onTap: () {
+                HapticFeedback.selectionClick();
                 setState(() {
                   _isBuying = false;
                 });
@@ -484,15 +509,15 @@ class _TradingScreenState extends State<TradingScreen>
                 curve: Curves.easeOutCubic,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: !_isBuying ? AppTheme.priceDown : Colors.transparent,
-                  borderRadius: BorderRadius.circular(100),
+                  color: !_isBuying ? BybitPalette.red : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
                   child: Text(
                     'Sell',
                     style: TextStyle(
-                      color: !_isBuying ? Colors.white : AppTheme.textGrey,
-                      fontWeight: FontWeight.w700,
+                      color: !_isBuying ? Colors.white : BybitPalette.muted,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
@@ -511,35 +536,35 @@ class _TradingScreenState extends State<TradingScreen>
       children: [
         Text(
           label,
-          style: const TextStyle(color: AppTheme.textGrey, fontSize: 14),
+          style: const TextStyle(color: BybitPalette.muted, fontSize: 14),
         ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
-          style: const TextStyle(color: AppTheme.textWhite),
+          style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             hintText: '0.00',
-            hintStyle: const TextStyle(color: AppTheme.textGrey),
+            hintStyle: const TextStyle(color: BybitPalette.muted),
             filled: true,
-            fillColor: AppTheme.cardDarkBackground,
+            fillColor: BybitPalette.input,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppTheme.rInput),
+              borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppTheme.rInput),
-              borderSide: const BorderSide(color: AppTheme.glassStroke),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppTheme.rInput),
+              borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(
-                color: AppTheme.primaryColor,
+                color: BybitPalette.accent,
                 width: 1.4,
               ),
             ),
             suffixText: currency,
             suffixStyle: const TextStyle(
-              color: AppTheme.textGrey,
+              color: BybitPalette.muted,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -555,16 +580,16 @@ class _TradingScreenState extends State<TradingScreen>
       children: [
         const Text(
           'Total',
-          style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
+          style: TextStyle(color: BybitPalette.muted, fontSize: 14),
         ),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.cardDarkBackground,
-            borderRadius: BorderRadius.circular(AppTheme.rInput),
-            border: Border.all(color: AppTheme.glassStroke),
+            color: BybitPalette.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFF242832)),
           ),
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -572,14 +597,14 @@ class _TradingScreenState extends State<TradingScreen>
               Text(
                 '0.00',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
+                  color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 'USDT',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 16),
+                style: TextStyle(color: BybitPalette.muted, fontSize: 16),
               ),
             ],
           ),
@@ -590,20 +615,26 @@ class _TradingScreenState extends State<TradingScreen>
 
   Widget _buildTradeButton() {
     final symbol = _selectedCrypto.symbol.toUpperCase();
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: _isBuying ? AppTheme.primaryColor : AppTheme.priceDown,
-        foregroundColor: _isBuying ? AppTheme.onLime : Colors.white,
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-      ),
-      onPressed: _placingOrder ? null : _placeOrder,
-      child: Text(
-        _placingOrder
-            ? 'Placing order…'
-            : (_isBuying ? 'Buy $symbol' : 'Sell $symbol'),
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    return TouchScale(
+      onTap: _placingOrder ? () {} : _placeOrder,
+      child: Container(
+        width: double.infinity,
+        height: 56,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: _isBuying ? BybitPalette.green : BybitPalette.red,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          _placingOrder
+              ? 'Placing order…'
+              : (_isBuying ? 'Buy $symbol' : 'Sell $symbol'),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: _isBuying ? Colors.black : Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -659,7 +690,7 @@ class _TradingScreenState extends State<TradingScreen>
       child: Center(
         child: Text(
           'Futures Trading Interface',
-          style: TextStyle(color: AppTheme.textWhite),
+          style: TextStyle(color: BybitPalette.muted),
         ),
       ),
     );
@@ -671,7 +702,7 @@ class _TradingScreenState extends State<TradingScreen>
       child: Center(
         child: Text(
           'Margin Trading Interface',
-          style: TextStyle(color: AppTheme.textWhite),
+          style: TextStyle(color: BybitPalette.muted),
         ),
       ),
     );

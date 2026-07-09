@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import '../constants/app_theme.dart';
+import 'package:flutter/services.dart';
 import '../models/cryptocurrency.dart';
 import '../services/api_service.dart';
 import '../widgets/crypto_list_item.dart';
+import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
+import '../widgets/touch_scale.dart';
 import 'buy_screen.dart';
 
 class MarketScreen extends StatefulWidget {
@@ -18,6 +20,27 @@ class _MarketScreenState extends State<MarketScreen>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   List<Cryptocurrency> _coins = Cryptocurrency.assets;
+  String _selectedFilter = 'All';
+
+  List<Cryptocurrency> get _filteredCoins {
+    final coins = [..._coins];
+    switch (_selectedFilter) {
+      case 'Gainers':
+        return coins.where((c) => c.isPriceUp).toList()
+          ..sort((a, b) => b.priceChangePercentage24h
+              .compareTo(a.priceChangePercentage24h));
+      case 'Losers':
+        return coins.where((c) => !c.isPriceUp).toList()
+          ..sort((a, b) => a.priceChangePercentage24h
+              .compareTo(b.priceChangePercentage24h));
+      case 'Volume':
+        return coins..sort((a, b) => b.volume24h.compareTo(a.volume24h));
+      case 'Market Cap':
+        return coins..sort((a, b) => b.marketCap.compareTo(a.marketCap));
+      default:
+        return coins;
+    }
+  }
 
   @override
   void initState() {
@@ -46,24 +69,56 @@ class _MarketScreenState extends State<MarketScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
+      backgroundColor: BybitPalette.bg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: BybitPalette.bg,
         elevation: 0,
         centerTitle: false,
-        title: Text('Markets', style: Theme.of(context).textTheme.displaySmall),
+        title: const Text(
+          'Markets',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: CircleAvatar(
+              radius: 20,
+              backgroundColor: BybitPalette.surface2,
+              child: Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Container(
             margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: AppTheme.cardDarkBackground,
-              borderRadius: BorderRadius.circular(100),
-              border: Border.all(color: AppTheme.glassStroke),
+              color: BybitPalette.surface2,
+              borderRadius: BorderRadius.circular(10),
             ),
             child: TabBar(
               controller: _tabController,
+              indicator: BoxDecoration(
+                color: BybitPalette.selected,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: BybitPalette.muted,
+              labelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
               tabs: const [
                 Tab(text: 'All'),
                 Tab(text: 'Spot'),
@@ -99,16 +154,16 @@ class _MarketScreenState extends State<MarketScreen>
       padding: const EdgeInsets.all(16),
       child: TextField(
         controller: _searchController,
-        style: const TextStyle(color: AppTheme.textWhite),
+        style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
-          hintText: 'Search tokens',
-          hintStyle: const TextStyle(color: AppTheme.textGrey),
+          hintText: 'Search by token name or address',
+          hintStyle: const TextStyle(color: BybitPalette.muted),
           prefixIcon: const Icon(
             Icons.search_rounded,
-            color: AppTheme.textGrey,
+            color: BybitPalette.muted,
           ),
           filled: true,
-          fillColor: AppTheme.cardDarkBackground,
+          fillColor: BybitPalette.input,
           contentPadding: const EdgeInsets.symmetric(vertical: 0),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(100),
@@ -116,12 +171,12 @@ class _MarketScreenState extends State<MarketScreen>
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(100),
-            borderSide: const BorderSide(color: AppTheme.glassStroke),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(100),
             borderSide: const BorderSide(
-              color: AppTheme.primaryColor,
+              color: BybitPalette.accent,
               width: 1.4,
             ),
           ),
@@ -131,54 +186,70 @@ class _MarketScreenState extends State<MarketScreen>
   }
 
   Widget _buildCategoryFilters() {
+    const filters = ['All', 'Gainers', 'Losers', 'Volume', 'Market Cap'];
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
-        children: [
-          _buildFilterChip('All', true),
-          _buildFilterChip('Gainers', false),
-          _buildFilterChip('Losers', false),
-          _buildFilterChip('Volume', false),
-          _buildFilterChip('Market Cap', false),
-        ],
+        children: filters.map((label) {
+          return _buildFilterChip(label, label == _selectedFilter);
+        }).toList(),
       ),
     );
   }
 
   Widget _buildFilterChip(String label, bool isSelected) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      child: FilterChip(
-        selected: isSelected,
-        showCheckmark: false,
-        selectedColor: AppTheme.primaryColor,
-        backgroundColor: AppTheme.cardDarkBackground,
-        side: BorderSide(
-          color: isSelected ? Colors.transparent : AppTheme.glassStroke,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-        label: Text(label),
-        labelStyle: TextStyle(
-          color: isSelected ? AppTheme.onLime : AppTheme.textGrey,
-          fontSize: 13,
-          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        ),
-        onSelected: (value) {
-          // Implement filter selection
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: TouchScale(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() => _selectedFilter = label);
         },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          height: 36,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            color: isSelected ? BybitPalette.selected : BybitPalette.surface2,
+            borderRadius: BorderRadius.circular(100),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : BybitPalette.muted,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildCryptoList() {
+    final coins = _filteredCoins;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
       physics: const BouncingScrollPhysics(),
       children: [
+        _buildMarketSummary(),
+        const SizedBox(height: 16),
         _buildTableHeader(),
         const SizedBox(height: 8),
-        ..._coins.map((crypto) {
+        if (coins.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: Text(
+                'No $_selectedFilter coins right now.',
+                style: const TextStyle(color: BybitPalette.muted, fontSize: 13),
+              ),
+            ),
+          ),
+        ...coins.map((crypto) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: CryptoListItem(
@@ -204,7 +275,7 @@ class _MarketScreenState extends State<MarketScreen>
             flex: 3,
             child: Text(
               'Name',
-              style: TextStyle(color: AppTheme.textGrey, fontSize: 12),
+              style: TextStyle(color: BybitPalette.muted, fontSize: 12),
             ),
           ),
           const SizedBox(width: 12),
@@ -212,7 +283,7 @@ class _MarketScreenState extends State<MarketScreen>
             flex: 3,
             child: Text(
               '24h',
-              style: TextStyle(color: AppTheme.textGrey, fontSize: 12),
+              style: TextStyle(color: BybitPalette.muted, fontSize: 12),
             ),
           ),
           const SizedBox(width: 12),
@@ -222,12 +293,69 @@ class _MarketScreenState extends State<MarketScreen>
               alignment: Alignment.centerRight,
               child: Text(
                 'Price',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 12),
+                style: TextStyle(color: BybitPalette.muted, fontSize: 12),
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMarketSummary() {
+    final gainers = _coins.where((coin) => coin.isPriceUp).length;
+    return BybitCard(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          _summaryMetric('Listed', '${_coins.length}', 'tokens'),
+          _summaryDivider(),
+          _summaryMetric('Gainers', '$gainers', '24h'),
+          _summaryDivider(),
+          _summaryMetric('Mode', 'Web3', 'spot'),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryMetric(String label, String value, String caption) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: BybitPalette.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            caption,
+            style: const TextStyle(color: BybitPalette.muted2, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryDivider() {
+    return Container(
+      width: 1,
+      height: 52,
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      color: BybitPalette.surface2,
     );
   }
 }

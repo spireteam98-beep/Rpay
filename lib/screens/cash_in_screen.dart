@@ -2,10 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_theme.dart';
 import '../models/kash_account.dart';
 import '../state/kash_app_state.dart';
-import '../widgets/kash_widgets.dart';
+import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/payment_method_form.dart';
 
 class CashInScreen extends StatelessWidget {
@@ -16,50 +15,59 @@ class CashInScreen extends StatelessWidget {
     final appState = context.watch<KashAppState>();
     final wallet = appState.accountByType(KashAccountType.mobileMoney);
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Cash-in'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Cash In'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+          padding: const EdgeInsets.fromLTRB(24, 10, 24, 30),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Top up your account',
+                'Add money',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.6,
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.7,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
-                'Add money with Card, M-Pesa or Waafi, then use it for transfers, merchants and crypto.',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                'Cash in with card, M-Pesa or Waafi, then trade or transfer from your Web3 wallet.',
+                style: TextStyle(color: BybitPalette.muted2, fontSize: 15, height: 1.35),
               ),
               const SizedBox(height: 24),
-              GlassTile(
+              BybitCard(
+                padding: const EdgeInsets.all(20),
                 child: Row(
                   children: [
-                    CircleIcon(wallet.icon, color: wallet.accent, size: 46),
-                    const SizedBox(width: 12),
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: wallet.accent.withOpacity(0.18),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(wallet.icon, color: wallet.accent, size: 28),
+                    ),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Destination',
-                            style: TextStyle(color: AppTheme.textGrey, fontSize: 12),
+                            'Destination wallet',
+                            style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 5),
                           Text(
                             wallet.title,
                             style: const TextStyle(
-                              color: AppTheme.textWhite,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
                         ],
@@ -68,34 +76,54 @@ class CashInScreen extends StatelessWidget {
                     Text(
                       wallet.balance,
                       style: const TextStyle(
-                        color: AppTheme.textWhite,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              PaymentMethodForm(
-                initialAmountText: '1000',
-                submitLabel: 'Add money',
-                onCredited: (amount, currency, gateway, gatewayLabel) async {
-                  final amountUsd = currency == 'KES' ? amount / 130 : amount;
-                  appState.submitCashIn(
-                    destinationType: KashAccountType.mobileMoney,
-                    rail: gatewayLabel,
-                    amount: amountUsd,
-                  );
-                  // Reconcile with the real backend balance (the line above
-                  // is just an optimistic local update for instant feedback).
-                  unawaited(appState.syncFromBackend());
-                  await _showDone(
-                    context,
-                    'Money added',
-                    '${amountUsd.toStringAsFixed(2)} USD credited to your account.',
-                  );
-                },
+              const SizedBox(height: 18),
+              BybitCard(
+                padding: const EdgeInsets.all(18),
+                child: PaymentMethodForm(
+                  initialAmountText: '1000',
+                  submitLabel: 'Cash in now',
+                  onCredited: (amount, currency, gateway, gatewayLabel) async {
+                    final amountUsd = currency == 'KES' ? amount / 130 : amount;
+                    appState.submitCashIn(
+                      destinationType: KashAccountType.mobileMoney,
+                      rail: gatewayLabel,
+                      amount: amountUsd,
+                    );
+                    unawaited(appState.syncFromBackend());
+                    await _showDone(
+                      context,
+                      'Cash in complete',
+                      '${amountUsd.toStringAsFixed(2)} USD credited to your wallet.',
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 18),
+              const BybitCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Funding rails',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    BybitInfoLine('Card', 'Instant'),
+                    BybitInfoLine('M-Pesa', 'KES supported'),
+                    BybitInfoLine('Waafi', 'Somalia rail'),
+                  ],
+                ),
               ),
             ],
           ),
@@ -108,41 +136,35 @@ class CashInScreen extends StatelessWidget {
     return showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
-        backgroundColor: AppTheme.cardDarkBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.rCard),
-        ),
+        backgroundColor: BybitPalette.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 74,
-                height: 74,
-                decoration: const BoxDecoration(
-                  color: AppTheme.primaryColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_rounded, color: AppTheme.onLime, size: 38),
+              const CircleAvatar(
+                radius: 38,
+                backgroundColor: BybitPalette.accent,
+                child: Icon(Icons.check_rounded, color: Colors.black, size: 38),
               ),
               const SizedBox(height: 18),
               Text(
                 title,
                 style: const TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 22),
-              PrimaryButton(
+              BybitPrimaryButton(
                 label: 'Done',
                 onTap: () {
                   Navigator.of(dialogContext).pop();

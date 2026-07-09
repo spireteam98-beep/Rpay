@@ -11,6 +11,9 @@ import 'state/kash_app_state.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Kick off a health ping immediately — if the Render backend is asleep,
+  // this starts its cold start now instead of on the user's first tap.
+  ApiService.warmUp();
   Stripe.publishableKey = ApiService.stripePublishableKey;
   // Set preferred orientations to portrait mode
   SystemChrome.setPreferredOrientations([

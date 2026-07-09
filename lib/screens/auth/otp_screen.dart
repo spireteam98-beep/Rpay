@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../constants/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../state/kash_app_state.dart';
+import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
+import '../../widgets/touch_scale.dart';
 import 'kyc_screen.dart';
 
 /// Step 3: verify the phone with a 6-digit code.
@@ -37,8 +38,8 @@ class _OtpScreenState extends State<OtpScreen> {
   Widget build(BuildContext context) {
     final phoneNumber = context.watch<KashAppState>().phoneNumber;
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Verify phone'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Verify phone'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -50,16 +51,16 @@ class _OtpScreenState extends State<OtpScreen> {
               const Text(
                 'Enter the 6-digit code',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 'We sent an SMS to $phoneNumber',
-                style: const TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 28),
               Row(
@@ -71,22 +72,22 @@ class _OtpScreenState extends State<OtpScreen> {
                     height: 56,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppTheme.cardDarkBackground,
+                      color: BybitPalette.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color:
                             active
-                                ? AppTheme.primaryColor
-                                : AppTheme.glassStroke,
+                                ? BybitPalette.accent
+                                : const Color(0xFF242832),
                         width: active ? 1.4 : 1,
                       ),
                     ),
                     child: Text(
                       _digits[i],
                       style: const TextStyle(
-                        color: AppTheme.textWhite,
+                        color: Colors.white,
                         fontSize: 22,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   );
@@ -96,14 +97,18 @@ class _OtpScreenState extends State<OtpScreen> {
               Center(
                 child: TextButton(
                   onPressed: () {},
-                  child: const Text('Resend code (0:42)'),
+                  child: const Text(
+                    'Resend code (0:42)',
+                    style: TextStyle(color: BybitPalette.accent),
+                  ),
                 ),
               ),
               const SizedBox(height: 18),
               _keypad(),
               const SizedBox(height: 12),
-              PrimaryButton(
+              BybitPrimaryButton(
                 label: 'Verify',
+                enabled: _filled == 6,
                 onTap: _filled == 6
                     ? () async {
                         // Real backend verification when a session exists.
@@ -158,23 +163,24 @@ class TouchScaleKey extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return TouchScale(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      hoverScale: 1.0,
+      pressedScale: 0.85,
       child: Center(
         child:
             label == '<'
                 ? const Icon(
                   Icons.backspace_outlined,
-                  color: AppTheme.textWhite,
+                  color: Colors.white,
                   size: 22,
                 )
                 : Text(
                   label,
                   style: const TextStyle(
-                    color: AppTheme.textWhite,
+                    color: Colors.white,
                     fontSize: 22,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
       ),

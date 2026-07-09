@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
-import '../constants/app_theme.dart';
 import '../services/api_service.dart';
-import 'kash_widgets.dart';
+import 'bybit_wallet_ui.dart';
+import 'split_card_form.dart';
+import 'touch_scale.dart';
 
 /// Somali mobile numbers: 9 digits starting with 6, optionally prefixed
 /// with the 252 country code (e.g. 611234567 or +252611234567).
@@ -58,9 +58,11 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
   String _gateway = 'PAYSTACK';
   late final TextEditingController _amountController;
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _cardHolderController = TextEditingController();
+  final GlobalKey<SplitCardFormState> _splitCardKey = GlobalKey();
   bool _submitting = false;
   bool _awaitingApproval = false;
-  CardFieldInputDetails? _card;
+  bool _cardComplete = false;
 
   @override
   void initState() {
@@ -72,6 +74,7 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
   void dispose() {
     _amountController.dispose();
     _phoneController.dispose();
+    _cardHolderController.dispose();
     super.dispose();
   }
 
@@ -107,7 +110,7 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
       children: [
         _gatewaySelector(),
         const SizedBox(height: 20),
-        KashTextField(
+        BybitTextField(
           label: 'Amount ($_currency)',
           hint: '0.00',
           icon: Icons.payments_outlined,
@@ -117,7 +120,7 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         ),
         if (_gateway == 'WAAFI' || _gateway == 'PAYSTACK') ...[
           const SizedBox(height: 18),
-          KashTextField(
+          BybitTextField(
             label: _gateway == 'WAAFI'
                 ? 'Waafi phone (Somalia only)'
                 : 'M-Pesa phone (Kenya only)',
@@ -134,59 +137,19 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         ],
         if (_gateway == 'STRIPE') ...[
           const SizedBox(height: 18),
-          const Text(
-            'Card details',
-            style: TextStyle(
-              color: AppTheme.textGrey,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(AppTheme.rInput),
-              border: Border.all(color: Colors.black26, width: 1.2),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: CardField(
-              style: const TextStyle(color: Colors.black87, fontSize: 16),
-              cursorColor: Colors.black87,
-              numberHintText: '1234 1234 1234 1234',
-              expirationHintText: 'MM/YY',
-              cvcHintText: 'CVC',
-              decoration: const InputDecoration(
-                filled: true,
-                fillColor: Colors.white,
-                border: InputBorder.none,
-                prefixIcon: Icon(
-                  Icons.credit_card_rounded,
-                  color: Colors.black45,
-                  size: 20,
-                ),
-              ),
-              onCardChanged: (card) => setState(() => _card = card),
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Enter your full card number first — the expiry and CVC fields slide in once it\'s complete.',
-            style: TextStyle(color: AppTheme.textGrey, fontSize: 11.5),
+          SplitCardForm(
+            key: _splitCardKey,
+            nameController: _cardHolderController,
+            onCompleteChanged: (complete) =>
+                setState(() => _cardComplete = complete),
           ),
         ],
         const SizedBox(height: 28),
-        PrimaryButton(
-          label: widget.submitLabel,
-          isLoading: _submitting || _awaitingApproval,
+        BybitPrimaryButton(
+          label: _submitting || _awaitingApproval
+              ? 'Please wait…'
+              : widget.submitLabel,
+          enabled: !(_submitting || _awaitingApproval),
           onTap: _submit,
         ),
       ],
@@ -204,24 +167,21 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
       runSpacing: 8,
       children: gateways.map((gateway) {
         final selected = gateway.$1 == _gateway;
-        return GestureDetector(
+        return TouchScale(
           onTap: () => setState(() => _gateway = gateway.$1),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
             decoration: BoxDecoration(
-              color: selected ? AppTheme.primaryColor : AppTheme.cardDarkBackground,
+              color: selected ? BybitPalette.selected : BybitPalette.surface2,
               borderRadius: BorderRadius.circular(100),
-              border: Border.all(
-                color: selected ? AppTheme.primaryColor : AppTheme.glassStroke,
-              ),
             ),
             child: Text(
               gateway.$2,
               style: TextStyle(
-                color: selected ? AppTheme.onLime : AppTheme.textLightGrey,
+                color: selected ? Colors.white : BybitPalette.muted,
                 fontSize: 12.5,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w900,
               ),
             ),
           ),
@@ -282,9 +242,9 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
       builder: (dialogContext) => PopScope(
         canPop: false,
         child: Dialog(
-          backgroundColor: AppTheme.cardDarkBackground,
+          backgroundColor: BybitPalette.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.rCard),
+            borderRadius: BorderRadius.circular(28),
           ),
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -294,19 +254,19 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
                 const Text(
                   'Verify payment',
                   style: TextStyle(
-                    color: AppTheme.textWhite,
+                    color: Colors.white,
                     fontSize: 19,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: 12),
                 const Text(
                   'Check your phone for the payment prompt. Once you approve it, tap Verify to credit your account.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                  style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
                 ),
                 const SizedBox(height: 18),
-                PrimaryButton(
+                BybitPrimaryButton(
                   label: 'Verify payment',
                   onTap: () {
                     Navigator.of(dialogContext).pop();
@@ -316,7 +276,10 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
                 const SizedBox(height: 10),
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(color: BybitPalette.muted),
+                  ),
                 ),
               ],
             ),
@@ -339,7 +302,7 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
           : 'Enter a valid Kenya phone number');
       return;
     }
-    if (_gateway == 'STRIPE' && (_card == null || !_card!.complete)) {
+    if (_gateway == 'STRIPE' && !_cardComplete) {
       _showSnack('Enter your card details');
       return;
     }
@@ -373,19 +336,15 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
           _showMessage('Payment error', 'Card payment could not be started.');
           return;
         }
-        final intent = await Stripe.instance.confirmPayment(
-          paymentIntentClientSecret: clientSecret,
-          data: const PaymentMethodParams.card(
-            paymentMethodData: PaymentMethodData(),
-          ),
-        );
+        final result =
+            await _splitCardKey.currentState!.confirmCardPayment(clientSecret);
         if (!mounted) return;
-        if (intent.status == PaymentIntentsStatus.Succeeded) {
-          await _verifyTopUp('STRIPE', intent.id);
+        if (result.succeeded) {
+          await _verifyTopUp('STRIPE', result.paymentIntentId!);
         } else {
           setState(() => _submitting = false);
           _showMessage('Payment not completed',
-              'Card payment status: ${intent.status.name}');
+              result.errorMessage ?? 'Your card was declined.');
         }
         return;
       }
@@ -408,11 +367,6 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
 
       final message = response['message'] as String? ?? 'Payment initialized. Reference: pending';
       _showMessage('Payment started', message);
-    } on StripeException catch (err) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      _showMessage('Card payment failed',
-          err.error.localizedMessage ?? err.error.message ?? 'Your card was declined.');
     } on ApiException catch (err) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -426,7 +380,7 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppTheme.cardLightBackground,
+        backgroundColor: BybitPalette.surface2,
       ),
     );
   }
@@ -435,9 +389,9 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
-        backgroundColor: AppTheme.cardDarkBackground,
+        backgroundColor: BybitPalette.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.rCard),
+          borderRadius: BorderRadius.circular(28),
         ),
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -447,19 +401,19 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
               Text(
                 title,
                 style: const TextStyle(
-                  color: AppTheme.textWhite,
+                  color: Colors.white,
                   fontSize: 19,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                style: const TextStyle(color: BybitPalette.muted2, fontSize: 13),
               ),
               const SizedBox(height: 22),
-              PrimaryButton(
+              BybitPrimaryButton(
                 label: 'OK',
                 onTap: () => Navigator.of(dialogContext).pop(),
               ),

@@ -1,7 +1,10 @@
 /**
  * Exchange connectivity.
  *
- * MARKET DATA: always real — Binance public REST API (no key required).
+ * MARKET DATA: always real — Binance's public market-data mirror
+ * (data-api.binance.vision), which stays open in regions where
+ * api.binance.com's trading endpoints 451-block requests, with CoinGecko
+ * as an automatic fallback if that mirror is ever unreachable.
  * ORDERS: two modes, chosen automatically:
  *   - "binance-testnet": BINANCE_API_KEY/SECRET set in .env → signed
  *     MARKET orders on Binance Spot Testnet (real matching engine,
@@ -50,11 +53,14 @@ function symbolFor(asset) {
   return `${upper}USDT`;
 }
 
-// Binance's public market-data API returns 451 (blocked) for requests from
-// the US, which is where this backend is hosted (Render free tier) — so
-// market data comes from CoinGecko instead, which has no such restriction.
-// Actual order placement below still targets Binance (testnet or, later,
-// licensed mainnet), since that's unaffected while BINANCE_API_KEY is unset.
+// api.binance.com's trading endpoints return 451 (blocked) for requests
+// from the US, which is where this backend is hosted (Render free tier) —
+// but Binance also publishes a market-data-only mirror at
+// data-api.binance.vision specifically for regions where the main domain
+// is restricted, and it isn't subject to the same geo-block since it never
+// touches account/trading endpoints. That's the primary source below, with
+// CoinGecko kept as a fallback for the rare case the mirror itself is down.
+const BINANCE_DATA_BASE = 'https://data-api.binance.vision';
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 const COINGECKO_IDS = {
   BTC: 'bitcoin',
@@ -64,32 +70,42 @@ const COINGECKO_IDS = {
   ADA: 'cardano',
 };
 
-// CoinGecko's free tier rate-limits aggressively, and every trade calls
-// lastPrice() -> market() on top of whatever the market screen requests —
-// a short cache keeps normal traffic well under that limit. On a fetch
-// failure we serve the last-known-good snapshot rather than erroring, so a
-// transient CoinGecko hiccup doesn't block trading on a stale-but-fine price.
-const MARKET_CACHE_TTL_MS = 20000;
+// Binance's rate limits are generous (1200 req/min) so a short cache is
+// mostly about avoiding redundant calls across concurrent requests, not
+// staying under a quota. On a fetch failure we serve the last-known-good
+// snapshot rather than erroring, so a transient hiccup never blocks a live
+// price with a hard error.
+const MARKET_CACHE_TTL_MS = 10000;
 let marketCache = { data: null, fetchedAt: 0 };
 
-/** Live prices + 24h stats for all supported assets (CoinGecko). */
-async function market() {
-  const now = Date.now();
-  if (marketCache.data && now - marketCache.fetchedAt < MARKET_CACHE_TTL_MS) {
-    return marketCache.data;
+/** Live prices + 24h stats for all supported assets, straight off Binance. */
+async function fetchBinanceMarket() {
+  const symbols = SUPPORTED.filter((asset) => asset !== 'USDT').map((asset) => `${asset}USDT`);
+  const symbolsParam = encodeURIComponent(JSON.stringify(symbols));
+  const res = await fetch(`${BINANCE_DATA_BASE}/api/v3/ticker/24hr?symbols=${symbolsParam}`);
+  if (!res.ok) throw new Error(`Binance market data unavailable (${res.status})`);
+  const rows = await res.json();
+  const out = {};
+  for (const row of rows) {
+    const asset = row.symbol.replace(/USDT$/, '');
+    out[asset] = {
+      price: Number(row.lastPrice),
+      change24h: Number(Number(row.priceChangePercent || 0).toFixed(2)),
+      high24h: Number(row.highPrice),
+      low24h: Number(row.lowPrice),
+      volume24h: Number(row.quoteVolume),
+      iconUrl: null,
+    };
   }
+  out.USDT = { price: 1, change24h: 0, high24h: 1, low24h: 1, volume24h: 0, iconUrl: null };
+  return out;
+}
+
+/** Same shape as [fetchBinanceMarket], sourced from CoinGecko as a fallback. */
+async function fetchCoinGeckoMarket() {
   const ids = Object.values(COINGECKO_IDS).join(',');
-  let res;
-  try {
-    res = await fetch(`${COINGECKO_BASE}/coins/markets?vs_currency=usd&ids=${ids}`);
-  } catch (err) {
-    if (marketCache.data) return marketCache.data;
-    throw new Error(`Market data unavailable: ${err.message}`);
-  }
-  if (!res.ok) {
-    if (marketCache.data) return marketCache.data;
-    throw new Error(`Market data unavailable (${res.status})`);
-  }
+  const res = await fetch(`${COINGECKO_BASE}/coins/markets?vs_currency=usd&ids=${ids}`);
+  if (!res.ok) throw new Error(`Market data unavailable (${res.status})`);
   const rows = await res.json();
   const idToAsset = Object.fromEntries(
     Object.entries(COINGECKO_IDS).map(([asset, id]) => [id, asset]),
@@ -108,8 +124,29 @@ async function market() {
     };
   }
   out.USDT = { price: 1, change24h: 0, high24h: 1, low24h: 1, volume24h: 0, iconUrl: null };
-  marketCache = { data: out, fetchedAt: now };
   return out;
+}
+
+/** Live prices + 24h stats for all supported assets (Binance, then CoinGecko). */
+async function market() {
+  const now = Date.now();
+  if (marketCache.data && now - marketCache.fetchedAt < MARKET_CACHE_TTL_MS) {
+    return marketCache.data;
+  }
+  try {
+    const out = await fetchBinanceMarket();
+    marketCache = { data: out, fetchedAt: now };
+    return out;
+  } catch (binanceErr) {
+    try {
+      const out = await fetchCoinGeckoMarket();
+      marketCache = { data: out, fetchedAt: now };
+      return out;
+    } catch (_coinGeckoErr) {
+      if (marketCache.data) return marketCache.data;
+      throw new Error(`Market data unavailable: ${binanceErr.message}`);
+    }
+  }
 }
 
 /** Live last price for one asset. */

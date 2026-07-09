@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../constants/app_theme.dart';
 import '../../services/api_service.dart';
+import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
 import 'login_otp_screen.dart';
 
@@ -62,8 +62,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Log in'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Log in'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -74,19 +74,19 @@ class _LoginScreenState extends State<LoginScreen> {
               const Text(
                 'Welcome back',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: -0.6,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
                 "Enter your email and we'll send you a sign-in code.",
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 28),
-              KashTextField(
+              BybitTextField(
                 label: 'Email address',
                 hint: 'you@example.com',
                 icon: Icons.alternate_email_rounded,
@@ -94,9 +94,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _emailController,
               ),
               const SizedBox(height: 24),
-              PrimaryButton(
-                label: 'Send code',
-                isLoading: _sending,
+              BybitPrimaryButton(
+                label: _sending ? 'Sending…' : 'Send code',
+                enabled: !_sending,
                 onTap: _handleSendCode,
               ),
               const SizedBox(height: 18),

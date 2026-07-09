@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../constants/app_theme.dart';
+import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
+import '../../widgets/touch_scale.dart';
 import 'signup_screen.dart';
 import 'login_screen.dart';
 
@@ -11,7 +12,7 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
+      backgroundColor: BybitPalette.bg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -24,15 +25,11 @@ class WelcomeScreen extends StatelessWidget {
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppTheme.limeSoft, AppTheme.primaryColor],
-                  ),
+                  color: BybitPalette.accent,
                   borderRadius: BorderRadius.circular(22),
                   boxShadow: [
                     BoxShadow(
-                      color: AppTheme.primaryColor.withOpacity(0.35),
+                      color: BybitPalette.accent.withOpacity(0.35),
                       blurRadius: 40,
                       offset: const Offset(0, 10),
                     ),
@@ -40,7 +37,7 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.bolt_rounded,
-                  color: AppTheme.onLime,
+                  color: Colors.black,
                   size: 40,
                 ),
               ),
@@ -48,9 +45,9 @@ class WelcomeScreen extends StatelessWidget {
               const Text(
                 'RoyallPay',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
+                  color: Colors.white,
                   fontSize: 34,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: 2,
                 ),
               ),
@@ -58,9 +55,9 @@ class WelcomeScreen extends StatelessWidget {
               const Text(
                 'All your money. One app.',
                 style: TextStyle(
-                  color: AppTheme.primaryColor,
+                  color: BybitPalette.accent,
                   fontSize: 18,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: -0.2,
                 ),
               ),
@@ -82,7 +79,7 @@ class WelcomeScreen extends StatelessWidget {
                 'Pay anyone — person, merchant or bank',
               ),
               const Spacer(),
-              PrimaryButton(
+              BybitPrimaryButton(
                 label: 'Create account',
                 onTap:
                     () => Navigator.of(
@@ -90,16 +87,36 @@ class WelcomeScreen extends StatelessWidget {
                     ).push(kashRoute(const SignupScreen())),
               ),
               const SizedBox(height: 12),
-              PrimaryButton(
-                label: 'Log in',
-                outlined: true,
-                onTap:
-                    () => Navigator.of(
-                      context,
-                    ).push(kashRoute(const LoginScreen())),
+              _outlinedButton(
+                'Log in',
+                () => Navigator.of(context).push(kashRoute(const LoginScreen())),
               ),
               const SizedBox(height: 24),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _outlinedButton(String label, VoidCallback onTap) {
+    return TouchScale(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        height: 56,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: BybitPalette.surface2, width: 1.4),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.2,
           ),
         ),
       ),
@@ -111,13 +128,21 @@ class WelcomeScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          CircleIcon(icon, size: 38),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(
+              color: BybitPalette.surface2,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: BybitPalette.accent, size: 18),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
               style: const TextStyle(
-                color: AppTheme.textLightGrey,
+                color: BybitPalette.muted2,
                 fontSize: 14,
                 letterSpacing: -0.1,
               ),

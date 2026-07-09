@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../../constants/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
 import '../main_navigation.dart';
 import 'otp_screen.dart';
@@ -129,8 +129,8 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Enter code'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Enter code'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -142,16 +142,16 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
               const Text(
                 'Enter the 6-digit code',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontSize: 25,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
                 'We sent a code to ${widget.email}',
-                style: const TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 28),
               Row(
@@ -163,19 +163,19 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                     height: 56,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppTheme.cardDarkBackground,
+                      color: BybitPalette.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: active ? AppTheme.primaryColor : AppTheme.glassStroke,
+                        color: active ? BybitPalette.accent : const Color(0xFF242832),
                         width: active ? 1.4 : 1,
                       ),
                     ),
                     child: Text(
                       _digits[i],
                       style: const TextStyle(
-                        color: AppTheme.textWhite,
+                        color: Colors.white,
                         fontSize: 22,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   );
@@ -185,15 +185,18 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
               Center(
                 child: TextButton(
                   onPressed: (_resending || _cooldown > 0) ? null : _resend,
-                  child: Text(_resendLabel),
+                  child: Text(
+                    _resendLabel,
+                    style: const TextStyle(color: BybitPalette.accent),
+                  ),
                 ),
               ),
               const SizedBox(height: 18),
               _keypad(),
               const SizedBox(height: 12),
-              PrimaryButton(
-                label: 'Log in',
-                isLoading: _verifying,
+              BybitPrimaryButton(
+                label: _verifying ? 'Verifying…' : 'Log in',
+                enabled: _filled == 6 && !_verifying,
                 onTap: _filled == 6 ? _verify : () {},
               ),
               const SizedBox(height: 20),

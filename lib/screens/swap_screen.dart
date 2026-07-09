@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../constants/app_theme.dart';
 import '../models/cryptocurrency.dart';
 import '../services/api_service.dart';
+import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/touch_scale.dart';
 
 /// Real crypto-to-crypto swap: sells the "From" asset for USD, then buys
 /// the "To" asset with the proceeds — two chained calls to the same
@@ -102,24 +103,8 @@ class _SwapScreenState extends State<SwapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: AppBar(
-        backgroundColor: AppTheme.darkBackground,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'Swap Crypto',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.textWhite,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppTheme.textWhite),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Swap Crypto'),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -142,12 +127,7 @@ class _SwapScreenState extends State<SwapScreen> {
 
   Widget _buildFromCryptoField() {
     final available = _holdings[_fromCrypto.symbol] ?? 0;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardDarkBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return BybitCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -155,8 +135,8 @@ class _SwapScreenState extends State<SwapScreen> {
             'From',
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textGrey,
+              fontWeight: FontWeight.w700,
+              color: BybitPalette.muted,
             ),
           ),
           const SizedBox(height: 12),
@@ -170,12 +150,12 @@ class _SwapScreenState extends State<SwapScreen> {
                   ),
                   style: const TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textWhite,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
                   ),
                   decoration: const InputDecoration(
                     hintText: '0',
-                    hintStyle: TextStyle(color: AppTheme.textGrey),
+                    hintStyle: TextStyle(color: BybitPalette.muted),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
@@ -185,7 +165,7 @@ class _SwapScreenState extends State<SwapScreen> {
                   },
                 ),
               ),
-              InkWell(
+              TouchScale(
                 onTap: () {
                   _showCryptoSelectionBottomSheet(true);
                 },
@@ -194,16 +174,16 @@ class _SwapScreenState extends State<SwapScreen> {
                     Container(
                       width: 32,
                       height: 32,
-                      decoration: BoxDecoration(
-                        color: AppTheme.cardLightBackground,
-                        borderRadius: BorderRadius.circular(16),
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
                       ),
                       child: Center(
                         child: Text(
                           _fromCrypto.symbol.substring(0, 1).toUpperCase(),
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textWhite,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -213,14 +193,14 @@ class _SwapScreenState extends State<SwapScreen> {
                       _fromCrypto.symbol.toUpperCase(),
                       style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textWhite,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(width: 4),
                     const Icon(
-                      Icons.keyboard_arrow_down,
-                      color: AppTheme.textGrey,
+                      Icons.keyboard_arrow_down_rounded,
+                      color: BybitPalette.muted,
                     ),
                   ],
                 ),
@@ -230,7 +210,7 @@ class _SwapScreenState extends State<SwapScreen> {
           const SizedBox(height: 8),
           Text(
             'Available: ${available.toStringAsFixed(6)} ${_fromCrypto.symbol.toUpperCase()}',
-            style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+            style: const TextStyle(fontSize: 12, color: BybitPalette.muted),
           ),
         ],
       ),
@@ -239,28 +219,24 @@ class _SwapScreenState extends State<SwapScreen> {
 
   Widget _buildSwapButton() {
     return Center(
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppTheme.primaryColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: IconButton(
-          icon: const Icon(Icons.swap_vert, color: Colors.white),
-          onPressed: _swapCurrencies,
+      child: TouchScale(
+        onTap: _swapCurrencies,
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: BybitPalette.accent,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.swap_vert_rounded, color: Colors.black),
         ),
       ),
     );
   }
 
   Widget _buildToCryptoField() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardDarkBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return BybitCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -268,8 +244,8 @@ class _SwapScreenState extends State<SwapScreen> {
             'To',
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textGrey,
+              fontWeight: FontWeight.w700,
+              color: BybitPalette.muted,
             ),
           ),
           const SizedBox(height: 12),
@@ -281,19 +257,19 @@ class _SwapScreenState extends State<SwapScreen> {
                   readOnly: true,
                   style: const TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textWhite,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
                   ),
                   decoration: const InputDecoration(
                     hintText: '0',
-                    hintStyle: TextStyle(color: AppTheme.textGrey),
+                    hintStyle: TextStyle(color: BybitPalette.muted),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
               ),
-              InkWell(
+              TouchScale(
                 onTap: () {
                   _showCryptoSelectionBottomSheet(false);
                 },
@@ -302,16 +278,16 @@ class _SwapScreenState extends State<SwapScreen> {
                     Container(
                       width: 32,
                       height: 32,
-                      decoration: BoxDecoration(
-                        color: AppTheme.cardLightBackground,
-                        borderRadius: BorderRadius.circular(16),
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
                       ),
                       child: Center(
                         child: Text(
                           _toCrypto.symbol.substring(0, 1).toUpperCase(),
                           style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textWhite,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -321,14 +297,14 @@ class _SwapScreenState extends State<SwapScreen> {
                       _toCrypto.symbol.toUpperCase(),
                       style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textWhite,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(width: 4),
                     const Icon(
-                      Icons.keyboard_arrow_down,
-                      color: AppTheme.textGrey,
+                      Icons.keyboard_arrow_down_rounded,
+                      color: BybitPalette.muted,
                     ),
                   ],
                 ),
@@ -338,7 +314,7 @@ class _SwapScreenState extends State<SwapScreen> {
           const SizedBox(height: 8),
           Text(
             'You will receive: ${_toAmountController.text} ${_toCrypto.symbol.toUpperCase()}',
-            style: const TextStyle(fontSize: 12, color: AppTheme.textGrey),
+            style: const TextStyle(fontSize: 12, color: BybitPalette.muted),
           ),
         ],
       ),
@@ -349,12 +325,7 @@ class _SwapScreenState extends State<SwapScreen> {
     final rate = _toCrypto.currentPrice > 0
         ? _fromCrypto.currentPrice / _toCrypto.currentPrice
         : 0;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.cardDarkBackground,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return BybitCard(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -362,16 +333,16 @@ class _SwapScreenState extends State<SwapScreen> {
             'Exchange Rate',
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: AppTheme.textGrey,
+              fontWeight: FontWeight.w700,
+              color: BybitPalette.muted,
             ),
           ),
           Text(
             '1 ${_fromCrypto.symbol.toUpperCase()} = ${rate.toStringAsFixed(6)} ${_toCrypto.symbol.toUpperCase()}',
             style: const TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppTheme.textWhite,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
             ),
           ),
         ],
@@ -380,32 +351,19 @@ class _SwapScreenState extends State<SwapScreen> {
   }
 
   Widget _buildSwapNowButton() {
-    return ElevatedButton(
-      onPressed: _swapping ? null : _showSwapConfirmationDialog,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.primaryColor,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      child: Center(
-        child: Text(
-          _swapping ? 'Swapping...' : 'Swap Now',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
+    return BybitPrimaryButton(
+      label: _swapping ? 'Swapping…' : 'Swap Now',
+      enabled: !_swapping,
+      onTap: _showSwapConfirmationDialog,
     );
   }
 
   void _showCryptoSelectionBottomSheet(bool isFromCrypto) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.cardDarkBackground,
+      backgroundColor: BybitPalette.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
         return Column(
@@ -416,7 +374,7 @@ class _SwapScreenState extends State<SwapScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppTheme.textGrey,
+                color: BybitPalette.muted,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -427,8 +385,8 @@ class _SwapScreenState extends State<SwapScreen> {
                 isFromCrypto ? 'Select Source Coin' : 'Select Destination Coin',
                 style: const TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -442,16 +400,16 @@ class _SwapScreenState extends State<SwapScreen> {
                 leading: Container(
                   width: 36,
                   height: 36,
-                  decoration: BoxDecoration(
-                    color: AppTheme.cardLightBackground,
-                    borderRadius: BorderRadius.circular(18),
+                  decoration: const BoxDecoration(
+                    color: BybitPalette.surface2,
+                    shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: Text(
                       crypto.symbol.substring(0, 1).toUpperCase(),
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textWhite,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -459,17 +417,17 @@ class _SwapScreenState extends State<SwapScreen> {
                 title: Text(
                   crypto.name,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textWhite,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                   ),
                 ),
                 subtitle: Text(
                   crypto.symbol.toUpperCase(),
-                  style: const TextStyle(color: AppTheme.textGrey),
+                  style: const TextStyle(color: BybitPalette.muted),
                 ),
                 trailing: Text(
                   crypto.formattedPrice,
-                  style: const TextStyle(color: AppTheme.textWhite),
+                  style: const TextStyle(color: Colors.white),
                 ),
                 onTap: () {
                   setState(() {
@@ -499,9 +457,9 @@ class _SwapScreenState extends State<SwapScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
-        backgroundColor: AppTheme.cardDarkBackground,
+        backgroundColor: BybitPalette.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -512,8 +470,8 @@ class _SwapScreenState extends State<SwapScreen> {
                 'Confirm Swap',
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 24),
@@ -541,9 +499,9 @@ class _SwapScreenState extends State<SwapScreen> {
                     child: OutlinedButton(
                       onPressed: () => Navigator.of(dialogContext).pop(),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppTheme.textGrey),
+                        side: const BorderSide(color: BybitPalette.surface2),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(100),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -551,8 +509,8 @@ class _SwapScreenState extends State<SwapScreen> {
                         'Cancel',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textWhite,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -565,9 +523,9 @@ class _SwapScreenState extends State<SwapScreen> {
                         _executeSwap();
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
+                        backgroundColor: BybitPalette.accent,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(100),
                         ),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
@@ -575,8 +533,8 @@ class _SwapScreenState extends State<SwapScreen> {
                         'Confirm',
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.onLime,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black,
                         ),
                       ),
                     ),
@@ -596,7 +554,7 @@ class _SwapScreenState extends State<SwapScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: AppTheme.textGrey),
+          style: const TextStyle(fontSize: 14, color: BybitPalette.muted),
         ),
         Row(
           children: [
@@ -604,8 +562,8 @@ class _SwapScreenState extends State<SwapScreen> {
               amount,
               style: const TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textWhite,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
               ),
             ),
             const SizedBox(width: 4),
@@ -613,8 +571,8 @@ class _SwapScreenState extends State<SwapScreen> {
               symbol,
               style: const TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textWhite,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
               ),
             ),
           ],
@@ -663,8 +621,8 @@ class _SwapScreenState extends State<SwapScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
-        backgroundColor: AppTheme.cardDarkBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: BybitPalette.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -674,28 +632,20 @@ class _SwapScreenState extends State<SwapScreen> {
                 'Swap failed',
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 12),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: AppTheme.textLightGrey),
+                style: const TextStyle(fontSize: 14, color: BybitPalette.muted2),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                ),
-                child: const Text(
-                  'OK',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.onLime),
-                ),
+              BybitPrimaryButton(
+                label: 'OK',
+                onTap: () => Navigator.of(dialogContext).pop(),
               ),
             ],
           ),
@@ -708,25 +658,21 @@ class _SwapScreenState extends State<SwapScreen> {
     showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
-        backgroundColor: AppTheme.cardDarkBackground,
+        backgroundColor: BybitPalette.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: const BoxDecoration(
-                  color: AppTheme.primaryColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
+              const CircleAvatar(
+                radius: 40,
+                backgroundColor: BybitPalette.accent,
+                child: Icon(
                   Icons.check_rounded,
-                  color: AppTheme.onLime,
+                  color: Colors.black,
                   size: 40,
                 ),
               ),
@@ -735,8 +681,8 @@ class _SwapScreenState extends State<SwapScreen> {
                 'Swap Successful!',
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 16),
@@ -744,30 +690,14 @@ class _SwapScreenState extends State<SwapScreen> {
                 'You have successfully swapped ${_fromAmountController.text} ${_fromCrypto.symbol.toUpperCase()} for ${qtyReceived.toStringAsFixed(6)} ${_toCrypto.symbol.toUpperCase()}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 16,
-                  color: AppTheme.textLightGrey,
+                  fontSize: 15,
+                  color: BybitPalette.muted2,
                 ),
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(dialogContext).pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                ),
-                child: const Text(
-                  'Done',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.onLime,
-                  ),
-                ),
+              BybitPrimaryButton(
+                label: 'Done',
+                onTap: () => Navigator.of(dialogContext).pop(),
               ),
             ],
           ),

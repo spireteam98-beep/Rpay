@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_theme.dart';
 import '../models/kash_account.dart';
 import '../state/kash_app_state.dart';
+import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
 import 'send_money_screen.dart';
@@ -18,8 +18,8 @@ class AccountDetailScreen extends StatelessWidget {
       account.type,
     );
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: KashBackBar(liveAccount.title),
+      backgroundColor: BybitPalette.bg,
+      appBar: BybitSubHeader(liveAccount.title),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -56,39 +56,34 @@ class AccountDetailScreen extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
-      decoration:
-          account.type == KashAccountType.crypto
-              ? AppTheme.heroCard
-              : BoxDecoration(
-                color: AppTheme.cardDarkBackground,
-                borderRadius: BorderRadius.circular(AppTheme.rHero),
-                border: Border.all(color: AppTheme.glassStroke),
-              ),
+      decoration: BoxDecoration(
+        color: BybitPalette.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(
+          color: account.type == KashAccountType.crypto
+              ? BybitPalette.accent.withOpacity(0.4)
+              : const Color(0xFF242832),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleIcon(
-            account.icon,
-            bg:
-                account.type == KashAccountType.crypto
-                    ? AppTheme.onLime.withOpacity(0.10)
-                    : AppTheme.cardLightBackground,
-            color:
-                account.type == KashAccountType.crypto
-                    ? AppTheme.onLime
-                    : account.accent,
-            size: 52,
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: account.accent.withOpacity(0.16),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(account.icon, color: account.accent, size: 24),
           ),
           const SizedBox(height: 22),
           Text(
             account.balance,
-            style: TextStyle(
-              color:
-                  account.type == KashAccountType.crypto
-                      ? AppTheme.onLime
-                      : AppTheme.textWhite,
+            style: const TextStyle(
+              color: Colors.white,
               fontSize: 38,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w900,
               letterSpacing: -1.4,
               height: 1,
             ),
@@ -96,23 +91,17 @@ class AccountDetailScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             account.currency,
-            style: TextStyle(
-              color:
-                  account.type == KashAccountType.crypto
-                      ? AppTheme.onLime.withOpacity(0.72)
-                      : AppTheme.textGrey,
+            style: const TextStyle(
+              color: BybitPalette.muted,
               fontSize: 13,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 18),
           Text(
             account.subtitle,
-            style: TextStyle(
-              color:
-                  account.type == KashAccountType.crypto
-                      ? AppTheme.onLime.withOpacity(0.78)
-                      : AppTheme.textLightGrey,
+            style: const TextStyle(
+              color: BybitPalette.muted2,
               fontSize: 14,
             ),
           ),
@@ -154,18 +143,22 @@ class AccountDetailScreen extends StatelessWidget {
       onTap: onTap,
       child: Container(
         height: 84,
-        decoration: AppTheme.glassCard,
+        decoration: BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF242832)),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: AppTheme.primaryColor, size: 22),
+            Icon(icon, color: BybitPalette.accent, size: 22),
             const SizedBox(height: 8),
             Text(
               label,
               style: const TextStyle(
-                color: AppTheme.textWhite,
+                color: Colors.white,
                 fontSize: 12.5,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -178,16 +171,15 @@ class AccountDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppTheme.cardDarkBackground,
+        color: BybitPalette.surface2,
         borderRadius: BorderRadius.circular(100),
-        border: Border.all(color: AppTheme.glassStroke),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          color: AppTheme.textLightGrey,
+          color: BybitPalette.muted2,
           fontSize: 12,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -196,10 +188,19 @@ class AccountDetailScreen extends StatelessWidget {
   Widget _transactionTile(KashTransaction transaction) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: GlassTile(
+      child: BybitCard(
+        padding: const EdgeInsets.all(15),
         child: Row(
           children: [
-            CircleIcon(transaction.icon, size: 42),
+            Container(
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                color: BybitPalette.surface2,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(transaction.icon, color: BybitPalette.accent, size: 19),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -208,7 +209,7 @@ class AccountDetailScreen extends StatelessWidget {
                   Text(
                     transaction.title,
                     style: const TextStyle(
-                      color: AppTheme.textWhite,
+                      color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
                     ),
@@ -217,7 +218,7 @@ class AccountDetailScreen extends StatelessWidget {
                   Text(
                     transaction.subtitle,
                     style: const TextStyle(
-                      color: AppTheme.textGrey,
+                      color: BybitPalette.muted,
                       fontSize: 12,
                     ),
                   ),
@@ -227,8 +228,8 @@ class AccountDetailScreen extends StatelessWidget {
             Text(
               transaction.amount,
               style: const TextStyle(
-                color: AppTheme.textWhite,
-                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
                 fontSize: 13,
               ),
             ),
@@ -239,15 +240,23 @@ class AccountDetailScreen extends StatelessWidget {
   }
 
   Widget _emptyActivity() {
-    return GlassTile(
+    return BybitCard(
       child: Row(
         children: [
-          const CircleIcon(Icons.history_rounded, color: AppTheme.textGrey),
+          Container(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(
+              color: BybitPalette.surface2,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.history_rounded, color: BybitPalette.muted),
+          ),
           const SizedBox(width: 12),
           const Expanded(
             child: Text(
               'No transactions yet on this account.',
-              style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+              style: TextStyle(color: BybitPalette.muted, fontSize: 13),
             ),
           ),
         ],
@@ -259,9 +268,9 @@ class AccountDetailScreen extends StatelessWidget {
     return Text(
       title,
       style: const TextStyle(
-        color: AppTheme.textWhite,
+        color: Colors.white,
         fontSize: 18,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w900,
         letterSpacing: -0.4,
       ),
     );

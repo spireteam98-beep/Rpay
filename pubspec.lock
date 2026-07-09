@@ -170,18 +170,18 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_stripe
-      sha256: a474b283f4b07e8973687514bf48762e618073b0d6b7acc45cea9a60466d4f8c
+      sha256: e6984ab5600546df29ef081795b26bb88d2a6978dbb2e5953f2cb76ac7ab62d2
       url: "https://pub.dev"
     source: hosted
-    version: "11.5.0"
+    version: "13.0.0"
   flutter_stripe_web:
     dependency: "direct main"
     description:
       name: flutter_stripe_web
-      sha256: f248952994cf91b1b08672e86aa635f698892d594e33d6a9e0f512657ad8aa40
+      sha256: c6d35aec8920e640a86fdbf0583962cde7ec8fa38d4bbdeac619835bbda2649a
       url: "https://pub.dev"
     source: hosted
-    version: "6.5.1"
+    version: "8.0.0"
   flutter_svg:
     dependency: "direct main"
     description:
@@ -204,10 +204,10 @@ packages:
     dependency: transitive
     description:
       name: freezed_annotation
-      sha256: c2e2d632dd9b8a2b7751117abcfc2b4888ecfe181bd9fca7170d9ef02e595fe2
+      sha256: "7294967ff0a6d98638e7acb774aac3af2550777accd8149c90af5b014e6d44d8"
       url: "https://pub.dev"
     source: hosted
-    version: "2.4.4"
+    version: "3.1.0"
   go_router:
     dependency: "direct main"
     description:
@@ -609,34 +609,34 @@ packages:
     dependency: transitive
     description:
       name: stripe_android
-      sha256: a666352e0c20753ecd8feebb5944882bf597167be4f020641266515a495bd55f
+      sha256: "8d14fe209c4a2589786b08cab7cf0620bab23e8604d0285826a49612bc75e305"
       url: "https://pub.dev"
     source: hosted
-    version: "11.5.0"
+    version: "13.0.0"
   stripe_ios:
     dependency: transitive
     description:
       name: stripe_ios
-      sha256: "0f7afed3ac61e544e7525da9b692b23d93e762d56f6c9aa7f77fc6d9a686a65d"
+      sha256: "4f270dfa2e82b6653919473c48d4bf8b463efdcf096386b89e0efeb0928e58f4"
       url: "https://pub.dev"
     source: hosted
-    version: "11.5.0"
+    version: "13.0.0"
   stripe_js:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: stripe_js
-      sha256: b5113618f12feb3149dd467bf12286322196ea13218816086786d1d5f4c464d1
+      sha256: a1f3095ae080373f3c7ae001b720d41a729782541fb6c7c5e790d147d1372706
       url: "https://pub.dev"
     source: hosted
-    version: "6.4.0"
+    version: "8.0.0"
   stripe_platform_interface:
     dependency: transitive
     description:
       name: stripe_platform_interface
-      sha256: "23c10f3875da07f85a6196fcb676e64c767ad2d04ec73ba4e941ac797a4ee4d3"
+      sha256: a0bac657a075aacccbd97368bfc1c57b742f28e5811734e3df09bff891c2d514
       url: "https://pub.dev"
     source: hosted
-    version: "11.5.0"
+    version: "13.0.0"
   synchronized:
     dependency: transitive
     description:
@@ -782,7 +782,7 @@ packages:
     source: hosted
     version: "14.3.1"
   web:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: web
       sha256: "868d88a33d8a87b18ffc05f9f030ba328ffefba92d6c127917a2ba740f9cfe4a"

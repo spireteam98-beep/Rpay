@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../constants/app_theme.dart';
 import '../models/cryptocurrency.dart';
 import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
-import '../widgets/kash_widgets.dart';
+import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/payment_method_form.dart';
+import '../widgets/touch_scale.dart';
 
 /// Buy crypto directly with Card, M-Pesa or Waafi: pick an asset, pay, and
 /// the payment is immediately spent on a real trade (Binance testnet when
@@ -51,36 +51,39 @@ class _BuyScreenState extends State<BuyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBackground,
-      appBar: const KashBackBar('Buy Crypto'),
+      backgroundColor: BybitPalette.bg,
+      appBar: const BybitSubHeader('Buy Crypto'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+          padding: const EdgeInsets.fromLTRB(24, 10, 24, 30),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 'Buy crypto',
                 style: TextStyle(
-                  color: AppTheme.textWhite,
-                  fontSize: 25,
-                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
                   letterSpacing: -0.6,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               const Text(
                 'Pick an asset and pay with Card, M-Pesa or Waafi — it lands straight in your custody wallet.',
-                style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
+                style: TextStyle(color: BybitPalette.muted2, fontSize: 14, height: 1.35),
               ),
               const SizedBox(height: 24),
               _cryptoSelector(),
-              const SizedBox(height: 20),
-              PaymentMethodForm(
-                initialAmountText: '',
-                submitLabel: 'Buy ${_selectedCrypto.symbol}',
-                onCredited: _buyWith,
+              const SizedBox(height: 18),
+              BybitCard(
+                padding: const EdgeInsets.all(18),
+                child: PaymentMethodForm(
+                  initialAmountText: '',
+                  submitLabel: 'Buy ${_selectedCrypto.symbol}',
+                  onCredited: _buyWith,
+                ),
               ),
             ],
           ),
@@ -90,49 +93,63 @@ class _BuyScreenState extends State<BuyScreen> {
   }
 
   Widget _cryptoSelector() {
-    return GlassTile(
+    return TouchScale(
       onTap: _showCryptoPicker,
-      child: Row(
-        children: [
-          CircleIcon(
-            Icons.currency_bitcoin_rounded,
-            color: _selectedCrypto.isPriceUp
-                ? AppTheme.priceUp
-                : AppTheme.priceDown,
-            size: 46,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Asset',
-                  style: TextStyle(color: AppTheme.textGrey, fontSize: 12),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${_selectedCrypto.name} (${_selectedCrypto.symbol})',
-                  style: const TextStyle(
-                    color: AppTheme.textWhite,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
+      child: BybitCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: (_selectedCrypto.isPriceUp
+                        ? BybitPalette.green
+                        : BybitPalette.red)
+                    .withOpacity(0.16),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.currency_bitcoin_rounded,
+                color: _selectedCrypto.isPriceUp
+                    ? BybitPalette.green
+                    : BybitPalette.red,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Asset',
+                    style: TextStyle(color: BybitPalette.muted, fontSize: 12),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 3),
+                  Text(
+                    '${_selectedCrypto.name} (${_selectedCrypto.symbol})',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          Text(
-            _selectedCrypto.formattedPrice,
-            style: const TextStyle(
-              color: AppTheme.textWhite,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
+            Text(
+              _selectedCrypto.formattedPrice,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textGrey),
-        ],
+            const SizedBox(width: 6),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: BybitPalette.muted),
+          ],
+        ),
       ),
     );
   }
@@ -140,9 +157,9 @@ class _BuyScreenState extends State<BuyScreen> {
   void _showCryptoPicker() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppTheme.cardDarkBackground,
+      backgroundColor: BybitPalette.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
         return SafeArea(
@@ -154,29 +171,40 @@ class _BuyScreenState extends State<BuyScreen> {
                 'Select an asset',
                 style: TextStyle(
                   fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textWhite,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 8),
               ..._coins.map((crypto) {
                 return ListTile(
-                  leading: CircleIcon(
-                    Icons.currency_bitcoin_rounded,
-                    color: crypto.isPriceUp
-                        ? AppTheme.priceUp
-                        : AppTheme.priceDown,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: (crypto.isPriceUp
+                              ? BybitPalette.green
+                              : BybitPalette.red)
+                          .withOpacity(0.16),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.currency_bitcoin_rounded,
+                      color: crypto.isPriceUp
+                          ? BybitPalette.green
+                          : BybitPalette.red,
+                    ),
                   ),
                   title: Text(
                     crypto.name,
                     style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textWhite,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
                     ),
                   ),
                   subtitle: Text(
                     '${crypto.symbol} • ${crypto.formattedPrice}',
-                    style: const TextStyle(color: AppTheme.textGrey),
+                    style: const TextStyle(color: BybitPalette.muted),
                   ),
                   onTap: () {
                     setState(() => _selectedCrypto = crypto);
@@ -235,41 +263,35 @@ class _BuyScreenState extends State<BuyScreen> {
     return showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
-        backgroundColor: AppTheme.cardDarkBackground,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.rCard),
-        ),
+        backgroundColor: BybitPalette.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 74,
-                height: 74,
-                decoration: const BoxDecoration(
-                  color: AppTheme.primaryColor,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_rounded, color: AppTheme.onLime, size: 38),
+              const CircleAvatar(
+                radius: 38,
+                backgroundColor: BybitPalette.accent,
+                child: Icon(Icons.check_rounded, color: Colors.black, size: 38),
               ),
               const SizedBox(height: 18),
               Text(
                 title,
                 style: const TextStyle(
-                  color: AppTheme.textWhite,
+                  color: Colors.white,
                   fontSize: 19,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textGrey, fontSize: 13),
+                style: const TextStyle(color: BybitPalette.muted2, fontSize: 13),
               ),
               const SizedBox(height: 22),
-              PrimaryButton(
+              BybitPrimaryButton(
                 label: 'Done',
                 onTap: () {
                   Navigator.of(dialogContext).pop();
