@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_service.dart';
 
-/// Bridge to the RoyalPay backend (backend/ folder — Node + Postgres).
+/// Bridge to the RoyallPay backend (backend/ folder — Node + Postgres).
 /// This app requires a live backend session and does not use local sandbox-only mode.
 class ApiService {
   /// Backend URL, overridable at build time with `--dart-define=API_BASE_URL=`.
@@ -46,12 +46,12 @@ class ApiService {
   }
 
   /// Registers on the backend; returns the on-chain deposit address.
+  /// Sign-in is email + a one-time code, so signup never takes a password.
   /// If the backend is unreachable, signup fails with an error.
   static Future<String?> signup({
     required String fullName,
     required String email,
     required String phone,
-    required String password,
   }) async {
     try {
       final res = await http
@@ -62,7 +62,6 @@ class ApiService {
               'fullName': fullName,
               'email': email,
               'phone': phone,
-              'password': password,
             }),
           )
           .timeout(_timeout);
@@ -79,25 +78,49 @@ class ApiService {
     }
   }
 
-  /// Logs in on the backend; true on success, null if unreachable.
-  static Future<bool?> login({
+  /// Sends a 6-digit sign-in code to an existing account's email.
+  /// Returns true once sent, null if the backend is unreachable.
+  static Future<bool?> requestLoginOtp({required String email}) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/auth/login/request-otp'),
+            headers: _headers(),
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200) return body['sent'] == true;
+      throw ApiException(body['error'] as String? ?? 'Could not send sign-in code');
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Exchanges an email sign-in code for a session; true on success,
+  /// null if the backend is unreachable.
+  static Future<bool?> verifyLoginOtp({
     required String email,
-    required String password,
+    required String code,
   }) async {
     try {
       final res = await http
           .post(
-            Uri.parse('$baseUrl/auth/login'),
+            Uri.parse('$baseUrl/auth/login/verify-otp'),
             headers: _headers(),
-            body: jsonEncode({'email': email, 'password': password}),
+            body: jsonEncode({'email': email, 'code': code}),
           )
           .timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
       if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
         await _prefs.setString(_tokenKey, body['token'] as String);
         return true;
       }
-      return false;
+      throw ApiException(body['error'] as String? ?? 'Incorrect or expired code');
+    } on ApiException {
+      rethrow;
     } catch (_) {
       return null;
     }

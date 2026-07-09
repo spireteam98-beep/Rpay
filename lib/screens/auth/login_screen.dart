@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_theme.dart';
 import '../../services/api_service.dart';
-import '../../services/auth_service.dart';
 import '../../widgets/kash_widgets.dart';
-import '../main_navigation.dart';
+import 'login_otp_screen.dart';
 
-/// Returning users: email + password (biometrics later).
+/// Returning users: email + a one-time code sent to that email (no password).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -14,13 +13,12 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-    final TextEditingController _emailController = TextEditingController();
-    final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  bool _sending = false;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -30,38 +28,35 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleSendCode() async {
     final email = _emailController.text.trim().toLowerCase();
-    final password = _passwordController.text.trim();
-
-    if (email.isEmpty || password.isEmpty) {
-      _showMessage('Enter your email and password.');
+    if (email.isEmpty) {
+      _showMessage('Enter your email.');
+      return;
+    }
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      _showMessage('Enter a valid email address.');
       return;
     }
 
-    // Real backend only; do not fallback to local sandbox.
-    final backendResult =
-        await ApiService.login(email: email, password: password);
-    if (backendResult == true) {
-      await AuthService.signInBackendUser(email: email);
-      _enterApp();
-      return;
+    setState(() => _sending = true);
+    try {
+      final sent = await ApiService.requestLoginOtp(email: email);
+      if (!mounted) return;
+      if (sent == true) {
+        Navigator.of(context).push(kashRoute(LoginOtpScreen(email: email)));
+        return;
+      }
+      if (sent == false) {
+        _showMessage('Could not send a sign-in code. Try again.');
+        return;
+      }
+      _showMessage('Backend is not reachable. Start the RoyallPay API and try again.');
+    } on ApiException catch (err) {
+      _showMessage(err.message);
+    } finally {
+      if (mounted) setState(() => _sending = false);
     }
-    if (backendResult == false) {
-      _showMessage('Incorrect email or password. Check your details and try again.');
-      return;
-    }
-    _showMessage('Backend is not reachable. Start the RoyalPay API and try again.');
-  }
-
-  // Demo login removed: app requires a real backend session.
-
-  void _enterApp() {
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      kashRoute(const MainNavigation()),
-      (route) => false,
-    );
   }
 
   @override
@@ -87,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Your money is where you left it.',
+                "Enter your email and we'll send you a sign-in code.",
                 style: TextStyle(color: AppTheme.textGrey, fontSize: 14),
               ),
               const SizedBox(height: 28),
@@ -98,28 +93,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
                 controller: _emailController,
               ),
-              const SizedBox(height: 18),
-              KashTextField(
-                label: 'Password',
-                hint: 'Your password',
-                icon: Icons.lock_outline_rounded,
-                obscure: true,
-                controller: _passwordController,
-              ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text('Forgot password?'),
-                ),
-              ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 24),
               PrimaryButton(
-                label: 'Log in',
-                onTap: _handleLogin,
+                label: 'Send code',
+                isLoading: _sending,
+                onTap: _handleSendCode,
               ),
-              const SizedBox(height: 14),
               const SizedBox(height: 18),
             ],
           ),

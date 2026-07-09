@@ -79,6 +79,10 @@ async function migrate() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'customer';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
 
+    -- Sign-in is now email + one-time code, not a password — new accounts
+    -- never set password_hash, so it can no longer be required.
+    ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
     CREATE TABLE IF NOT EXISTS crypto_balances (
       user_id UUID NOT NULL REFERENCES users(id),
       asset   TEXT NOT NULL,

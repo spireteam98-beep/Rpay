@@ -5,9 +5,11 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../state/kash_app_state.dart';
 import '../../widgets/kash_widgets.dart';
-import 'otp_screen.dart';
+import 'email_verify_screen.dart';
 
 /// Step 2: create the account (phone-first, Somalia default).
+/// Sign-in is email + a one-time code, so signup never asks for a password —
+/// the email address collected here is confirmed next via [EmailVerifyScreen].
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -19,14 +21,12 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -40,10 +40,9 @@ class _SignupScreenState extends State<SignupScreen> {
     final fullName = _nameController.text.trim();
     final email = _emailController.text.trim().toLowerCase();
     final phone = _phoneController.text.trim();
-    final password = _passwordController.text.trim();
 
-    if (fullName.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
-      _showMessage('Fill in name, email, phone number, and password.');
+    if (fullName.isEmpty || email.isEmpty || phone.isEmpty) {
+      _showMessage('Fill in name, email and phone number.');
       return;
     }
 
@@ -52,27 +51,21 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    if (password.length < 8) {
-      _showMessage('Password must be at least 8 characters.');
-      return;
-    }
-
     // Register on the real backend — this provisions the user's
-    // on-chain custody wallet at signup.
+    // on-chain custody wallet at signup and sends the email code.
     String? ethAddress;
     try {
       ethAddress = await ApiService.signup(
         fullName: fullName,
         email: email,
         phone: phone,
-        password: password,
       );
     } on ApiException catch (err) {
       _showMessage(err.message);
       return;
     }
     if (ethAddress == null) {
-      _showMessage('Backend is not reachable. Start the RoyalPay API and try again.');
+      _showMessage('Backend is not reachable. Start the RoyallPay API and try again.');
       return;
     }
 
@@ -80,7 +73,6 @@ class _SignupScreenState extends State<SignupScreen> {
       fullName: fullName,
       email: email,
       phoneNumber: phone,
-      password: password,
     );
 
     if (!mounted) return;
@@ -89,12 +81,7 @@ class _SignupScreenState extends State<SignupScreen> {
           phoneNumber: phone,
         );
 
-    if (ethAddress.isNotEmpty) {
-      _showMessage('Custody wallet created: '
-          '${ethAddress.substring(0, 10)}…');
-    }
-
-    Navigator.of(context).push(kashRoute(const OtpScreen()));
+    Navigator.of(context).push(kashRoute(EmailVerifyScreen(email: email)));
   }
 
   @override
@@ -110,7 +97,7 @@ class _SignupScreenState extends State<SignupScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Join RoyalPay',
+                'Join RoyallPay',
                 style: TextStyle(
                   color: AppTheme.textWhite,
                   fontSize: 26,
@@ -145,14 +132,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 icon: Icons.alternate_email_rounded,
                 keyboardType: TextInputType.emailAddress,
                 controller: _emailController,
-              ),
-              const SizedBox(height: 18),
-              KashTextField(
-                label: 'Password',
-                hint: 'At least 8 characters',
-                icon: Icons.lock_outline_rounded,
-                obscure: true,
-                controller: _passwordController,
               ),
               const SizedBox(height: 28),
               PrimaryButton(
