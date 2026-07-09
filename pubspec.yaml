@@ -57,6 +57,7 @@ dependencies:
   http: ^1.2.0
   flutter_stripe: ^11.5.0
   flutter_stripe_web: ^6.5.0
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

@@ -275,83 +275,94 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _accountCarousel(BuildContext context, List<KashAccount> accounts) {
-    return SizedBox(
-      height: 210,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: accounts.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder:
-            (context, index) =>
-                _accountCard(context, accounts[index], index == 0),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          for (int i = 0; i < accounts.length; i++) ...[
+            if (i > 0) const SizedBox(height: 10),
+            _accountCard(context, accounts[i]),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _accountCard(
-    BuildContext context,
-    KashAccount account,
-    bool highlighted,
-  ) {
-    final lime = highlighted;
-    final ink = lime ? AppTheme.onLime : AppTheme.textWhite;
+  Widget _accountCard(BuildContext context, KashAccount account) {
     return TouchScale(
       onTap:
           () => Navigator.of(
             context,
           ).push(kashRoute(AccountDetailScreen(account: account))),
       child: Container(
-        width: 250,
+        width: double.infinity,
         padding: const EdgeInsets.all(18),
-        decoration: lime ? AppTheme.heroCard : AppTheme.glassCard,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        decoration: AppTheme.glassCard.copyWith(
+          border: Border.all(color: account.accent.withOpacity(0.28)),
+        ),
+        child: Row(
           children: [
-            Row(
-              children: [
-                CircleIcon(
-                  account.icon,
-                  size: 42,
-                  color: lime ? AppTheme.onLime : account.accent,
-                  bg: lime ? AppTheme.onLime.withOpacity(0.10) : null,
-                ),
-                const Spacer(),
-                Icon(Icons.chevron_right_rounded, color: ink.withOpacity(0.75)),
-              ],
+            CircleIcon(
+              account.icon,
+              size: 46,
+              color: account.accent,
+              bg: account.accent.withOpacity(0.14),
             ),
-            const Spacer(),
-            Text(
-              account.title,
-              style: TextStyle(
-                color: ink,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.2,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    account.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.textLightGrey,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    account.balance,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.textWhite,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: account.accent.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      account.status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: account.accent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 5),
-            Text(
-              account.balance,
-              style: TextStyle(
-                color: ink,
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.7,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              account.status,
-              style: TextStyle(
-                color:
-                    lime
-                        ? AppTheme.onLime.withOpacity(0.70)
-                        : AppTheme.textGrey,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: AppTheme.textGrey.withOpacity(0.7),
             ),
           ],
         ),

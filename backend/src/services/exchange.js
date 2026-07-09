@@ -104,9 +104,10 @@ async function market() {
       high24h: Number(row.high_24h),
       low24h: Number(row.low_24h),
       volume24h: Number(row.total_volume),
+      iconUrl: row.image || null,
     };
   }
-  out.USDT = { price: 1, change24h: 0, high24h: 1, low24h: 1, volume24h: 0 };
+  out.USDT = { price: 1, change24h: 0, high24h: 1, low24h: 1, volume24h: 0, iconUrl: null };
   marketCache = { data: out, fetchedAt: now };
   return out;
 }

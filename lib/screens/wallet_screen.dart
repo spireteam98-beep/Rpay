@@ -11,6 +11,7 @@ import '../widgets/touch_scale.dart';
 import 'account_detail_screen.dart';
 import 'cash_in_screen.dart';
 import 'ledger_screen.dart';
+import 'receive_screen.dart';
 import 'send_money_screen.dart';
 
 class WalletScreen extends StatelessWidget {
@@ -110,7 +111,7 @@ class WalletScreen extends StatelessWidget {
                 context,
                 Icons.south_rounded,
                 'Receive',
-                const LedgerScreen(),
+                const ReceiveScreen(),
               ),
               _heroAction(
                 context,
@@ -164,7 +165,7 @@ class WalletScreen extends StatelessWidget {
     );
   }
 
-  /// Live on-chain custody card — appears when the RoyalPay backend is
+  /// Live on-chain custody card — appears when the RoyallPay backend is
   /// running and the user has a real API session. Renders nothing in
   /// pure-sandbox mode, so the demo never breaks.
   Widget _onChainCustodyCard() {

@@ -185,12 +185,9 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         ],
         const SizedBox(height: 28),
         PrimaryButton(
-          label: _submitting
-              ? 'Submitting...'
-              : _awaitingApproval
-                  ? 'Waiting for approval...'
-                  : widget.submitLabel,
-          onTap: (_submitting || _awaitingApproval) ? () {} : _submit,
+          label: widget.submitLabel,
+          isLoading: _submitting || _awaitingApproval,
+          onTap: _submit,
         ),
       ],
     );

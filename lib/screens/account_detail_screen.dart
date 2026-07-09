@@ -41,7 +41,10 @@ class AccountDetailScreen extends StatelessWidget {
               const SizedBox(height: 24),
               _sectionTitle('Recent activity'),
               const SizedBox(height: 12),
-              ...liveAccount.transactions.map(_transactionTile),
+              if (liveAccount.transactions.isEmpty)
+                _emptyActivity()
+              else
+                ...liveAccount.transactions.map(_transactionTile),
             ],
           ),
         ),
@@ -231,6 +234,23 @@ class AccountDetailScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _emptyActivity() {
+    return GlassTile(
+      child: Row(
+        children: [
+          const CircleIcon(Icons.history_rounded, color: AppTheme.textGrey),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'No transactions yet on this account.',
+              style: TextStyle(color: AppTheme.textGrey, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../constants/app_theme.dart';
 import '../models/cryptocurrency.dart';
@@ -22,11 +23,11 @@ class CryptoListItem extends StatelessWidget {
         child: Row(
           children: [
             _buildCryptoIcon(),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             _buildCryptoInfo(),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             _buildPriceChart(),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             _buildPriceInfo(),
           ],
         ),
@@ -35,22 +36,35 @@ class CryptoListItem extends StatelessWidget {
   }
 
   Widget _buildCryptoIcon() {
+    final iconUrl = crypto.iconUrl;
     return Container(
-      width: 42,
-      height: 42,
+      width: 40,
+      height: 40,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppTheme.cardLightBackground,
         shape: BoxShape.circle,
         border: Border.all(color: AppTheme.glassStroke),
       ),
-      child: Center(
-        child: Text(
-          crypto.symbol.substring(0, 1),
-          style: const TextStyle(
-            color: AppTheme.textWhite,
-            fontWeight: FontWeight.w700,
-            fontSize: 17,
-          ),
+      child: (iconUrl == null || iconUrl.isEmpty)
+          ? _fallbackIcon()
+          : CachedNetworkImage(
+              imageUrl: iconUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => _fallbackIcon(),
+              errorWidget: (_, __, ___) => _fallbackIcon(),
+            ),
+    );
+  }
+
+  Widget _fallbackIcon() {
+    return Center(
+      child: Text(
+        crypto.symbol.isEmpty ? '?' : crypto.symbol.substring(0, 1),
+        style: const TextStyle(
+          color: AppTheme.textWhite,
+          fontWeight: FontWeight.w700,
+          fontSize: 16,
         ),
       ),
     );
@@ -89,7 +103,7 @@ class CryptoListItem extends StatelessWidget {
 
   Widget _buildPriceChart() {
     return Expanded(
-      flex: 3,
+      flex: 2,
       child: SizedBox(
         height: 40,
         child: CryptoPriceChart(crypto: crypto, height: 40),
@@ -114,7 +128,7 @@ class CryptoListItem extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
               color:
                   crypto.isPriceUp
@@ -122,13 +136,26 @@ class CryptoListItem extends StatelessWidget {
                       : AppTheme.priceDown.withOpacity(0.12),
               borderRadius: BorderRadius.circular(100),
             ),
-            child: Text(
-              crypto.formattedPriceChange,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-                color: crypto.isPriceUp ? AppTheme.priceUp : AppTheme.priceDown,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  crypto.isPriceUp
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded,
+                  size: 11,
+                  color: crypto.isPriceUp ? AppTheme.priceUp : AppTheme.priceDown,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  crypto.formattedPriceChange,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: crypto.isPriceUp ? AppTheme.priceUp : AppTheme.priceDown,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

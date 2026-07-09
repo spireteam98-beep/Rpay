@@ -1,8 +1,11 @@
+import 'package:intl/intl.dart';
+
 class Cryptocurrency {
   final String id;
   final String name;
   final String symbol;
   final String image;
+  final String? iconUrl;
   final double currentPrice;
   final double priceChangePercentage24h;
   final double high24h;
@@ -16,6 +19,7 @@ class Cryptocurrency {
     required this.name,
     required this.symbol,
     required this.image,
+    this.iconUrl,
     this.currentPrice = 0,
     this.priceChangePercentage24h = 0,
     this.high24h = 0,
@@ -27,8 +31,10 @@ class Cryptocurrency {
 
   bool get isPriceUp => priceChangePercentage24h >= 0;
 
-  String get formattedPrice =>
-      '\$${currentPrice.toStringAsFixed(currentPrice < 1 ? 4 : 2)}';
+  String get formattedPrice => NumberFormat.currency(
+        symbol: '\$',
+        decimalDigits: currentPrice < 1 ? 4 : 2,
+      ).format(currentPrice);
 
   String get formattedPriceChange {
     final sign = isPriceUp ? '+' : '';
@@ -63,6 +69,7 @@ class Cryptocurrency {
         name: coin.name,
         symbol: coin.symbol,
         image: coin.image,
+        iconUrl: live['iconUrl'] as String?,
         currentPrice: price,
         priceChangePercentage24h: (live['change24h'] as num?)?.toDouble() ?? 0,
         high24h: high,

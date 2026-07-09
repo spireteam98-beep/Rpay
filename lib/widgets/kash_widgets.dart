@@ -3,42 +3,63 @@ import 'package:flutter/services.dart';
 import '../constants/app_theme.dart';
 import 'touch_scale.dart';
 
-/// Shared building blocks for the RoyalPay neon-glass design system.
+/// Shared building blocks for the RoyallPay neon-glass design system.
 
 class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final bool outlined;
+  final bool isLoading;
   const PrimaryButton({
     super.key,
     required this.label,
     required this.onTap,
     this.outlined = false,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TouchScale(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 56,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: outlined ? Colors.transparent : AppTheme.primaryColor,
-          borderRadius: BorderRadius.circular(100),
-          border:
-              outlined
-                  ? Border.all(color: const Color(0x33FFFFFF), width: 1.2)
-                  : null,
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: outlined ? AppTheme.textWhite : AppTheme.onLime,
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.2,
+    final disabled = isLoading;
+    return IgnorePointer(
+      ignoring: disabled,
+      child: TouchScale(
+        onTap: onTap,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 150),
+          opacity: disabled ? 0.55 : 1,
+          child: Container(
+            width: double.infinity,
+            height: 56,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: outlined ? Colors.transparent : AppTheme.primaryColor,
+              borderRadius: BorderRadius.circular(100),
+              border:
+                  outlined
+                      ? Border.all(color: const Color(0x33FFFFFF), width: 1.2)
+                      : null,
+            ),
+            child: isLoading
+                ? SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      valueColor: AlwaysStoppedAnimation(
+                        outlined ? AppTheme.textWhite : AppTheme.onLime,
+                      ),
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: TextStyle(
+                      color: outlined ? AppTheme.textWhite : AppTheme.onLime,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
           ),
         ),
       ),
