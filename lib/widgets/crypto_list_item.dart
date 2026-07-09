@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../models/cryptocurrency.dart';
-import 'crypto_price_chart.dart';
 import 'touch_scale.dart';
 import 'bybit_wallet_ui.dart';
 
@@ -17,21 +16,19 @@ class CryptoListItem extends StatelessWidget {
     return TouchScale(
       onTap: onTap,
       pressedScale: 0.98,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: BybitPalette.surface,
-          borderRadius: BorderRadius.circular(22),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         child: Row(
           children: [
             _buildCryptoIcon(),
             const SizedBox(width: 12),
-            _buildCryptoInfo(),
-            const SizedBox(width: 8),
-            _buildPriceChart(),
-            const SizedBox(width: 8),
+            _buildNameAndTurnover(),
             _buildPriceInfo(),
+            const SizedBox(width: 10),
+            SizedBox(width: 78, child: Align(
+              alignment: Alignment.centerRight,
+              child: _buildChangePill(),
+            )),
           ],
         ),
       ),
@@ -41,8 +38,8 @@ class CryptoListItem extends StatelessWidget {
   Widget _buildCryptoIcon() {
     final iconUrl = crypto.iconUrl;
     return Container(
-      width: 40,
-      height: 40,
+      width: 38,
+      height: 38,
       clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(
         color: BybitPalette.surface2,
@@ -66,49 +63,53 @@ class CryptoListItem extends StatelessWidget {
         style: const TextStyle(
           color: Colors.white,
           fontWeight: FontWeight.w900,
-          fontSize: 16,
+          fontSize: 15,
         ),
       ),
     );
   }
 
-  Widget _buildCryptoInfo() {
+  Widget _buildNameAndTurnover() {
     return Expanded(
-      flex: 3,
+      flex: 4,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${crypto.symbol.toUpperCase()}/USDT',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -0.2,
-              color: Colors.white,
-            ),
+          RichText(
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: crypto.symbol.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.2,
+                    color: Colors.white,
+                  ),
+                ),
+                const TextSpan(
+                  text: ' / USDT',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: BybitPalette.muted,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(
-            crypto.name,
+            _formatTurnover(crypto.volume24h),
             style: const TextStyle(
               fontSize: 12,
-              color: BybitPalette.muted2,
-              letterSpacing: 0.2,
+              color: BybitPalette.muted,
+              letterSpacing: 0.1,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPriceChart() {
-    return Expanded(
-      flex: 2,
-      child: SizedBox(
-        height: 40,
-        child: CryptoPriceChart(crypto: crypto, height: 40),
       ),
     );
   }
@@ -120,48 +121,49 @@ class CryptoListItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            crypto.formattedPrice,
+            crypto.formattedPrice.replaceFirst('\$', ''),
             style: const TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
               color: Colors.white,
             ),
           ),
           const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color:
-                  crypto.isPriceUp
-                      ? BybitPalette.green.withOpacity(0.12)
-                      : BybitPalette.red.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(100),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  crypto.isPriceUp
-                      ? Icons.arrow_upward_rounded
-                      : Icons.arrow_downward_rounded,
-                  size: 11,
-                  color: crypto.isPriceUp ? BybitPalette.green : BybitPalette.red,
-                ),
-                const SizedBox(width: 2),
-                Text(
-                  crypto.formattedPriceChange,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: crypto.isPriceUp ? BybitPalette.green : BybitPalette.red,
-                  ),
-                ),
-              ],
+          Text(
+            crypto.formattedPrice,
+            style: const TextStyle(
+              fontSize: 12,
+              color: BybitPalette.muted,
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildChangePill() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: crypto.isPriceUp ? BybitPalette.accent : BybitPalette.red,
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        crypto.formattedPriceChange,
+        style: TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+          color: crypto.isPriceUp ? Colors.black : Colors.white,
+        ),
+      ),
+    );
+  }
+
+  String _formatTurnover(double v) {
+    if (v >= 1e9) return '\$${(v / 1e9).toStringAsFixed(2)}B';
+    if (v >= 1e6) return '\$${(v / 1e6).toStringAsFixed(0)}M';
+    if (v >= 1e3) return '\$${(v / 1e3).toStringAsFixed(0)}K';
+    return '\$${v.toStringAsFixed(0)}';
   }
 }

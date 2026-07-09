@@ -15,28 +15,28 @@ class MarketScreen extends StatefulWidget {
   State<MarketScreen> createState() => _MarketScreenState();
 }
 
-class _MarketScreenState extends State<MarketScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final TextEditingController _searchController = TextEditingController();
+class _MarketScreenState extends State<MarketScreen> {
+  static const _tabs = ['Favourites', 'Top', 'Hot', 'Gainers', 'New'];
+
   List<Cryptocurrency> _coins = Cryptocurrency.assets;
-  String _selectedFilter = 'All';
+  String _selectedTab = 'Favourites';
+  int _modeIndex = 0; // 0 = Exchange, 1 = Wallet
 
   List<Cryptocurrency> get _filteredCoins {
     final coins = [..._coins];
-    switch (_selectedFilter) {
+    switch (_selectedTab) {
+      case 'Top':
+        return coins..sort((a, b) => b.volume24h.compareTo(a.volume24h));
+      case 'Hot':
+        return coins..sort((a, b) => b.priceChangePercentage24h
+            .abs()
+            .compareTo(a.priceChangePercentage24h.abs()));
       case 'Gainers':
         return coins.where((c) => c.isPriceUp).toList()
           ..sort((a, b) => b.priceChangePercentage24h
               .compareTo(a.priceChangePercentage24h));
-      case 'Losers':
-        return coins.where((c) => !c.isPriceUp).toList()
-          ..sort((a, b) => a.priceChangePercentage24h
-              .compareTo(b.priceChangePercentage24h));
-      case 'Volume':
-        return coins..sort((a, b) => b.volume24h.compareTo(a.volume24h));
-      case 'Market Cap':
-        return coins..sort((a, b) => b.marketCap.compareTo(a.marketCap));
+      case 'New':
+      case 'Favourites':
       default:
         return coins;
     }
@@ -45,7 +45,6 @@ class _MarketScreenState extends State<MarketScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
     _loadMarket();
   }
 
@@ -60,169 +59,156 @@ class _MarketScreenState extends State<MarketScreen>
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: BybitPalette.bg,
-      appBar: AppBar(
-        backgroundColor: BybitPalette.bg,
-        elevation: 0,
-        centerTitle: false,
-        title: const Text(
-          'Markets',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-          ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _topIconsRow(context),
+            _waveHeader(),
+            Expanded(child: _buildCryptoList()),
+          ],
         ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 20,
-              backgroundColor: BybitPalette.surface2,
-              child: Icon(Icons.tune_rounded, color: Colors.white, size: 20),
-            ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              color: BybitPalette.surface2,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicator: BoxDecoration(
-                color: BybitPalette.selected,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              labelColor: Colors.white,
-              unselectedLabelColor: BybitPalette.muted,
-              labelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
-              tabs: const [
-                Tab(text: 'All'),
-                Tab(text: 'Spot'),
-                Tab(text: 'Futures'),
-                Tab(text: 'New'),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildCategoryFilters(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildCryptoList(),
-                _buildCryptoList(), // Placeholder for Spot tab
-                _buildCryptoList(), // Placeholder for Futures tab
-                _buildCryptoList(), // Placeholder for New tab
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _topIconsRow(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: TextField(
-        controller: _searchController,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          hintText: 'Search by token name or address',
-          hintStyle: const TextStyle(color: BybitPalette.muted),
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: BybitPalette.muted,
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _circleIconButton(Icons.menu_rounded, onTap: () {}),
+          Row(
+            children: [
+              _circleIconButton(Icons.card_giftcard_rounded, onTap: () {}),
+              const SizedBox(width: 10),
+              _circleIconButton(Icons.chat_bubble_outline_rounded, onTap: () {}),
+            ],
           ),
-          filled: true,
-          fillColor: BybitPalette.input,
-          contentPadding: const EdgeInsets.symmetric(vertical: 0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(100),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(100),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(100),
-            borderSide: const BorderSide(
-              color: BybitPalette.accent,
-              width: 1.4,
-            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _circleIconButton(IconData icon, {required VoidCallback onTap}) {
+    return TouchScale(
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: const BoxDecoration(
+          color: BybitPalette.surface2,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: 20),
+      ),
+    );
+  }
+
+  Widget _waveHeader() {
+    return SizedBox(
+      height: 214,
+      width: double.infinity,
+      child: ClipPath(
+        clipper: _WaveHeaderClipper(),
+        child: Container(
+          color: BybitPalette.accent,
+          padding: const EdgeInsets.fromLTRB(20, 92, 20, 20),
+          child: Column(
+            children: [
+              Center(child: _exchangeWalletSegment()),
+              const SizedBox(height: 14),
+              _categoryTabs(),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCategoryFilters() {
-    const filters = ['All', 'Gainers', 'Losers', 'Volume', 'Market Cap'];
+  Widget _exchangeWalletSegment() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _segmentOption('Exchang', 0),
+          _segmentOption('Wallet', 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _segmentOption(String label, int index) {
+    final selected = _modeIndex == index;
+    return TouchScale(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _modeIndex = index);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.black : Colors.white70,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _categoryTabs() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
-        children: filters.map((label) {
-          return _buildFilterChip(label, label == _selectedFilter);
+        children: _tabs.map((label) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: _categoryTab(label),
+          );
         }).toList(),
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, bool isSelected) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: TouchScale(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          setState(() => _selectedFilter = label);
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          height: 36,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          decoration: BoxDecoration(
-            color: isSelected ? BybitPalette.selected : BybitPalette.surface2,
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : BybitPalette.muted,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-            ),
+  Widget _categoryTab(String label) {
+    final selected = _selectedTab == label;
+    return TouchScale(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _selectedTab = label);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? Colors.black : Colors.transparent,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : Colors.black87,
+            fontWeight: FontWeight.w800,
+            fontSize: 13.5,
           ),
         ),
       ),
@@ -232,26 +218,24 @@ class _MarketScreenState extends State<MarketScreen>
   Widget _buildCryptoList() {
     final coins = _filteredCoins;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
       physics: const BouncingScrollPhysics(),
       children: [
-        _buildMarketSummary(),
-        const SizedBox(height: 16),
         _buildTableHeader(),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         if (coins.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 40),
             child: Center(
               child: Text(
-                'No $_selectedFilter coins right now.',
+                'No $_selectedTab coins right now.',
                 style: const TextStyle(color: BybitPalette.muted, fontSize: 13),
               ),
             ),
           ),
         ...coins.map((crypto) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 2),
             child: CryptoListItem(
               crypto: crypto,
               onTap: () => Navigator.of(context).push(
@@ -259,42 +243,32 @@ class _MarketScreenState extends State<MarketScreen>
               ),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
 
   Widget _buildTableHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
       child: Row(
         children: [
-          const SizedBox(width: 40), // Space for icon
-          const SizedBox(width: 12),
-          const Expanded(
-            flex: 3,
-            child: Text(
-              'Name',
-              style: TextStyle(color: BybitPalette.muted, fontSize: 12),
-            ),
+          Expanded(
+            flex: 4,
+            child: _headerLabel('Name / Turnover'),
           ),
-          const SizedBox(width: 12),
-          const Expanded(
-            flex: 3,
-            child: Text(
-              '24h',
-              style: TextStyle(color: BybitPalette.muted, fontSize: 12),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             flex: 3,
             child: Align(
               alignment: Alignment.centerRight,
-              child: Text(
-                'Price',
-                style: TextStyle(color: BybitPalette.muted, fontSize: 12),
-              ),
+              child: _headerLabel('Last Price'),
+            ),
+          ),
+          SizedBox(
+            width: 78,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: _headerLabel('Change'),
             ),
           ),
         ],
@@ -302,60 +276,49 @@ class _MarketScreenState extends State<MarketScreen>
     );
   }
 
-  Widget _buildMarketSummary() {
-    final gainers = _coins.where((coin) => coin.isPriceUp).length;
-    return BybitCard(
-      padding: const EdgeInsets.all(18),
-      child: Row(
-        children: [
-          _summaryMetric('Listed', '${_coins.length}', 'tokens'),
-          _summaryDivider(),
-          _summaryMetric('Gainers', '$gainers', '24h'),
-          _summaryDivider(),
-          _summaryMetric('Mode', 'Web3', 'spot'),
-        ],
-      ),
+  Widget _headerLabel(String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          text,
+          style: const TextStyle(
+            color: BybitPalette.muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 3),
+        const Icon(Icons.unfold_more_rounded, size: 14, color: BybitPalette.muted),
+      ],
     );
+  }
+}
+
+/// Dips inward at the top-center (peaking near the left/right edges) and
+/// rounds off into the black content below — the "scoop" header shape from
+/// the reference design.
+class _WaveHeaderClipper extends CustomClipper<Path> {
+  const _WaveHeaderClipper();
+
+  @override
+  Path getClip(Size size) {
+    final w = size.width;
+    final h = size.height;
+    const bottomRadius = 32.0;
+    final dip = h * 0.34;
+
+    return Path()
+      ..moveTo(0, 0)
+      ..quadraticBezierTo(w * 0.25, dip * 0.92, w * 0.5, dip)
+      ..quadraticBezierTo(w * 0.75, dip * 0.92, w, 0)
+      ..lineTo(w, h - bottomRadius)
+      ..quadraticBezierTo(w, h, w - bottomRadius, h)
+      ..lineTo(bottomRadius, h)
+      ..quadraticBezierTo(0, h, 0, h - bottomRadius)
+      ..close();
   }
 
-  Widget _summaryMetric(String label, String value, String caption) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: BybitPalette.muted,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            caption,
-            style: const TextStyle(color: BybitPalette.muted2, fontSize: 12),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryDivider() {
-    return Container(
-      width: 1,
-      height: 52,
-      margin: const EdgeInsets.symmetric(horizontal: 14),
-      color: BybitPalette.surface2,
-    );
-  }
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
