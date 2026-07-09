@@ -71,8 +71,10 @@ async function migrate() {
       ON users (LOWER(email))
       WHERE email IS NOT NULL;
 
-    -- Trading: sandbox USD funding + custody asset balances + order history
+    -- Trading: USD funding + custody asset balances + order history.
+    -- New users start at 0 — they fund the wallet for real via Card/M-Pesa/Waafi.
     ALTER TABLE users ADD COLUMN IF NOT EXISTS usd_balance NUMERIC(18,2) NOT NULL DEFAULT 10000;
+    ALTER TABLE users ALTER COLUMN usd_balance SET DEFAULT 0;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS kes_balance NUMERIC(18,2) NOT NULL DEFAULT 0;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'customer';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
