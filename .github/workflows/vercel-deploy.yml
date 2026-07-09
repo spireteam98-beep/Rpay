@@ -17,7 +17,12 @@ jobs:
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          # Pinned to an exact version instead of the "stable" channel —
+          # subosito/flutter-action's channel-based resolution has been
+          # failing outright ("Unable to determine Flutter version for
+          # channel: stable"), which is why every previous run of this
+          # workflow failed before it ever reached the build step.
+          flutter-version: '3.41.7'
 
       - name: Install dependencies
         run: flutter pub get
