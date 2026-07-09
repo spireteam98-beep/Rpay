@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// ROYALPAY design system — "Neon Glass"
+/// ROYALLPAY design system — "Neon Glass"
 /// Deep-black surfaces, neon-lime hero accents, soft glass cards,
 /// pill geometry and calm typography. Inspired by Revolut <18.
 class AppTheme {

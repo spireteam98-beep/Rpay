@@ -52,7 +52,7 @@ services:
       - key: EMAIL_PROVIDER
         value: resend
       - key: EMAIL_FROM
-        value: Kashflip <noreply@kashflip.app>
+        value: RoyallPay <noreply@royallpay.com>
       - key: EMAIL_OTP_TTL_MINUTES
         value: "10"
       - key: RESEND_API_URL

@@ -46,10 +46,10 @@ async function sendEmailOtp({ to, code, name = 'there' }) {
   const safeName = String(name || 'there').split(' ')[0];
   return sendEmail({
     to,
-    subject: 'Your Kashflip verification code',
+    subject: 'Your RoyallPay verification code',
     html: `<div style="font-family:Arial,sans-serif;line-height:1.5;color:#111;max-width:560px">
       <h2>Hi ${safeName},</h2>
-      <p>Use this code to verify your Kashflip account:</p>
+      <p>Use this code to verify your RoyallPay account:</p>
       <p style="font-size:32px;letter-spacing:6px;font-weight:700;margin:24px 0">${code}</p>
       <p style="color:#666;font-size:14px">This code expires in ${config.emailOtpTtlMinutes} minutes.</p>
       <p style="color:#888;font-size:13px">If you did not request this, you can safely ignore this email.</p>

@@ -64,7 +64,7 @@ const config = {
   emailProvider: (process.env.EMAIL_PROVIDER || 'resend').trim(),
   resendApiUrl: (process.env.RESEND_API_URL || 'https://api.resend.com/emails').trim(),
   resendApiKey: (process.env.RESEND_API_KEY || '').trim(),
-  emailFrom: (process.env.EMAIL_FROM || 'Kashflip <noreply@kashflip.app>').trim(),
+  emailFrom: (process.env.EMAIL_FROM || 'RoyallPay <noreply@royallpay.com>').trim(),
   emailOtpTtlMinutes: Number(process.env.EMAIL_OTP_TTL_MINUTES || '10'),
   paymentSandbox: (process.env.PAYMENT_SANDBOX || 'false').toLowerCase() === 'true',
   appPaymentReturnUrl: (

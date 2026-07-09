@@ -108,18 +108,18 @@ router.post('/', async (req, res, next) => {
     await ledger.postWithClient(
       client,
       req.userId,
-      { title: `Sent ${currency} to ${receiver.full_name}`, rail: 'Kashflip P2P' },
+      { title: `Sent ${currency} to ${receiver.full_name}`, rail: 'RoyallPay P2P' },
       [
         { accountName: `Customer ${currency} wallet`, direction: 'debit', amountUsd, memo },
-        { accountName: 'Kashflip transfer clearing', direction: 'credit', amountUsd, memo: transfer.rows[0].id },
+        { accountName: 'RoyallPay transfer clearing', direction: 'credit', amountUsd, memo: transfer.rows[0].id },
       ],
     );
     await ledger.postWithClient(
       client,
       receiver.id,
-      { title: `Received ${currency}`, rail: 'Kashflip P2P' },
+      { title: `Received ${currency}`, rail: 'RoyallPay P2P' },
       [
-        { accountName: 'Kashflip transfer clearing', direction: 'debit', amountUsd, memo: transfer.rows[0].id },
+        { accountName: 'RoyallPay transfer clearing', direction: 'debit', amountUsd, memo: transfer.rows[0].id },
         { accountName: `Customer ${currency} wallet`, direction: 'credit', amountUsd, memo },
       ],
     );

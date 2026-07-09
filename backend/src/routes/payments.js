@@ -330,7 +330,7 @@ router.post('/topups', async (req, res, next) => {
             invoiceId: requestId,
             amount: String(amount),
             currency,
-            description: `Kashflip ${currency} wallet top-up`,
+            description: `RoyallPay ${currency} wallet top-up`,
           },
         },
         customMetadata: { topUpId: topUp.id, userId: req.userId },
