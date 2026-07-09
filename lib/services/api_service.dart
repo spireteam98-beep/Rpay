@@ -108,7 +108,12 @@ class ApiService {
           .timeout(_timeout);
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       if (res.statusCode == 200) return body['sent'] == true;
-      throw ApiException(body['error'] as String? ?? 'Could not send sign-in code');
+      // The backend reports email-delivery failures under `warning` (a
+      // failed send isn't really a request "error") — check that first so
+      // the real reason surfaces instead of a generic fallback message.
+      throw ApiException(body['warning'] as String? ??
+          body['error'] as String? ??
+          'Could not send sign-in code');
     } on ApiException {
       rethrow;
     } catch (_) {
