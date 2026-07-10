@@ -229,6 +229,39 @@ async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_email_otps_email ON email_otps(LOWER(email), purpose, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_email_otps_user ON email_otps(user_id, created_at DESC);
+
+    -- Business onboarding fields on merchants (till_number already doubles
+    -- as the "merchant number" / business account for receiving payments).
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS business_type TEXT;
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS phone TEXT;
+
+    -- Agents: onboard customers (personal + business), earn commission on
+    -- assisted deposits/withdrawals and referred signups.
+    CREATE TABLE IF NOT EXISTS agents (
+      id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id            UUID NOT NULL REFERENCES users(id),
+      business_name      TEXT NOT NULL,
+      agent_code         TEXT NOT NULL UNIQUE,
+      phone              TEXT,
+      status             TEXT NOT NULL DEFAULT 'ACTIVE',
+      commission_balance NUMERIC(18,2) NOT NULL DEFAULT 0,
+      created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_agents_user ON agents(user_id);
+
+    CREATE TABLE IF NOT EXISTS agent_commissions (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      agent_id         UUID NOT NULL REFERENCES agents(id),
+      kind             TEXT NOT NULL CHECK (kind IN ('deposit','withdrawal','onboarding')),
+      currency         TEXT NOT NULL CHECK (currency IN ('KES','USD')),
+      amount           NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+      related_user_id  UUID REFERENCES users(id),
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_commissions_agent ON agent_commissions(agent_id, created_at DESC);
+
+    -- Which agent onboarded this customer, if any (drives onboarding commission).
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_agent_id UUID REFERENCES agents(id);
   `);
   console.log('[db] schema ready');
 }

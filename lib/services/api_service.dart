@@ -71,6 +71,7 @@ class ApiService {
     required String fullName,
     required String email,
     required String phone,
+    String? agentCode,
   }) async {
     try {
       final res = await http
@@ -81,6 +82,8 @@ class ApiService {
               'fullName': fullName,
               'email': email,
               'phone': phone,
+              if (agentCode != null && agentCode.isNotEmpty)
+                'agentCode': agentCode,
             }),
           )
           .timeout(_timeout);
@@ -489,6 +492,189 @@ class ApiService {
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode == 200) return body;
     throw ApiException(body['error'] as String? ?? 'Order failed');
+  }
+
+  // ── Merchant ─────────────────────────────────────────────────────
+
+  /// Registers a business under the current user — till number doubles as
+  /// the merchant number / business account for receiving payments.
+  static Future<Map<String, dynamic>> registerMerchant({
+    required String name,
+    String? businessType,
+    String? phone,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/merchants'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'name': name,
+            if (businessType != null && businessType.isNotEmpty)
+              'businessType': businessType,
+            if (phone != null && phone.isNotEmpty) 'phone': phone,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(
+      body['error'] as String? ?? 'Merchant registration failed',
+    );
+  }
+
+  /// The current user's registered businesses (usually zero or one).
+  static Future<List<dynamic>?> myMerchants() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/merchants/me'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Recent payments a merchant has received (the till's transaction feed).
+  static Future<List<dynamic>?> merchantPayments(String merchantId) async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/merchants/$merchantId/payments'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Pays a merchant directly by till number — the QR-scan-to-pay flow.
+  static Future<Map<String, dynamic>> payMerchantTill({
+    required String tillNumber,
+    required String currency,
+    required double amount,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/merchants/pay/$tillNumber'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'currency': currency.toUpperCase(),
+            'amount': amount,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Payment failed');
+  }
+
+  // ── Agent ────────────────────────────────────────────────────────
+
+  /// Registers the current user as a RoyallPay agent.
+  static Future<Map<String, dynamic>> registerAgent({
+    required String businessName,
+    String? phone,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/agents'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'businessName': businessName,
+            if (phone != null && phone.isNotEmpty) 'phone': phone,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Agent registration failed');
+  }
+
+  /// The current user's agent profile (null if not an agent).
+  static Future<Map<String, dynamic>?> myAgent() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/agents/me'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      return body['agent'] as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The agent's commission history.
+  static Future<List<dynamic>?> agentCommissions() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/agents/commissions'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Agent-assisted cash-in: the agent hands the customer cash and the
+  /// system credits their wallet, paying the agent a commission.
+  static Future<Map<String, dynamic>> agentAssistedDeposit({
+    required String customer,
+    required String currency,
+    required double amount,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/agents/deposits'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'customer': customer,
+            'currency': currency.toUpperCase(),
+            'amount': amount,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Deposit failed');
+  }
+
+  /// Agent-assisted cash-out: the system debits the customer's wallet and
+  /// the agent hands over cash, earning a commission.
+  static Future<Map<String, dynamic>> agentAssistedWithdrawal({
+    required String customer,
+    required String currency,
+    required double amount,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/agents/withdrawals'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'customer': customer,
+            'currency': currency.toUpperCase(),
+            'amount': amount,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Withdrawal failed');
   }
 
   static Future<void> clearSession() async {

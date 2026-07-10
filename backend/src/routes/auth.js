@@ -76,10 +76,22 @@ router.post('/signup', async (req, res, next) => {
       return res.status(409).json({ error: `An account with this ${field} already exists` });
     }
 
+    // Agent-assisted onboarding: a valid referral code links the new
+    // customer to the agent and pays a flat onboarding commission.
+    const agentCode = String(req.body?.agentCode || '').trim();
+    let referringAgent = null;
+    if (agentCode) {
+      referringAgent = (
+        await pool.query("SELECT id FROM agents WHERE agent_code = $1 AND status = 'ACTIVE'", [
+          agentCode,
+        ])
+      ).rows[0];
+    }
+
     const inserted = await pool.query(
-      `INSERT INTO users (full_name, email, phone)
-       VALUES ($1,$2,$3) RETURNING id, wallet_index`,
-      [String(fullName).trim(), cleanEmail, cleanPhone],
+      `INSERT INTO users (full_name, email, phone, referred_by_agent_id)
+       VALUES ($1,$2,$3,$4) RETURNING id, wallet_index`,
+      [String(fullName).trim(), cleanEmail, cleanPhone, referringAgent?.id || null],
     );
     const user = inserted.rows[0];
 
@@ -93,6 +105,20 @@ router.post('/signup', async (req, res, next) => {
        ON CONFLICT (account_number) DO NOTHING`,
       [user.id, String(fullName).trim(), accountNumber(user.id)],
     );
+
+    if (referringAgent) {
+      const ONBOARDING_COMMISSION_USD = 1;
+      await pool.query(
+        `UPDATE agents SET commission_balance = commission_balance + $1 WHERE id = $2`,
+        [ONBOARDING_COMMISSION_USD, referringAgent.id],
+      );
+      await pool.query(
+        `INSERT INTO agent_commissions (agent_id, kind, currency, amount, related_user_id)
+         VALUES ($1,'onboarding','USD',$2,$3)`,
+        [referringAgent.id, ONBOARDING_COMMISSION_USD, user.id],
+      );
+    }
+
     const emailVerification = await createAndSendEmailOtp(user.id, cleanEmail, fullName);
 
     res.status(201).json({

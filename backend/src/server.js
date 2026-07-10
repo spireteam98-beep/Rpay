@@ -19,6 +19,7 @@ app.use('/mobile-money', require('./routes/mobileMoney'));
 app.use('/payments', require('./routes/payments'));
 app.use('/transfers', require('./routes/transfers'));
 app.use('/merchants', require('./routes/merchants'));
+app.use('/agents', require('./routes/agents'));
 app.use('/remittance', require('./routes/remittance'));
 app.use('/banking', require('./routes/banking'));
 app.use('/admin', require('./routes/admin'));
