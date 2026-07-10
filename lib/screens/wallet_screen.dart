@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/kash_account.dart';
+import '../models/ledger_entry.dart';
 import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
@@ -47,9 +49,9 @@ class _WalletScreenState extends State<WalletScreen> {
                     _onChainCustodyCard(),
                     _walletModeTabs(),
                     if (_modeIndex == 0) ...[
+                      _peopleRow(context, appState),
                       _accountTabs(context, appState.accounts),
-                      _sectionTitle('Coins'),
-                      _assetsList(),
+                      _recentActivityCard(context, appState),
                     ] else
                       _modePlaceholder(_modeIndex == 1 ? 'Funding' : 'Earn'),
                   ],
@@ -310,6 +312,198 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
         ),
       ],
+      ),
+    );
+  }
+
+  /// Quick-send shortcuts built from real recipients of past transfers
+  /// (ledger transactions with status 'Queued' carry the recipient as the
+  /// title). Renders nothing until the user has actually sent money once.
+  /// Cards deliberately duplicate the _accountTabs card layout below so the
+  /// two horizontal scrollers feel like the same family of component.
+  Widget _peopleRow(BuildContext context, KashAppState appState) {
+    final people = <MapEntry<String, String>>[];
+    for (final t in appState.ledgerTransactions) {
+      final name = t.title.trim();
+      if (t.status == 'Queued' && name.isNotEmpty && !people.any((p) => p.key == name)) {
+        people.add(MapEntry(name, t.entries.first.amountLabel));
+      }
+      if (people.length >= 6) break;
+    }
+    if (people.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('People'),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 140,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            itemCount: people.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, i) => _personCard(context, people[i].key, people[i].value),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _personCard(BuildContext context, String name, String lastSentLabel) {
+    final initial = name.isEmpty ? '?' : name.substring(0, 1).toUpperCase();
+    return TouchScale(
+      onTap: () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+      child: Container(
+        width: 156,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF242832)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: BybitPalette.accent.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Text(
+                    initial,
+                    style: const TextStyle(color: BybitPalette.accent, fontSize: 13, fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const Spacer(),
+                const Icon(Icons.north_east_rounded, color: BybitPalette.muted, size: 14),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: BybitPalette.muted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Sent $lastSentLabel',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Recent activity pulled straight from the real ledger — no illustrative
+  /// data here, since cash-in and send flows already write real entries.
+  Widget _recentActivityCard(BuildContext context, KashAppState appState) {
+    final recent = appState.ledgerTransactions.take(4).toList();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Recent Activities',
+                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+              ),
+              TouchScale(
+                onTap: () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
+                child: const Text(
+                  'See all',
+                  style: TextStyle(color: BybitPalette.accent, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (recent.isEmpty)
+            Text(
+              'Send, receive, or top up to see activity here.',
+              style: const TextStyle(color: BybitPalette.muted, fontSize: 13),
+            )
+          else
+            ...recent.map((t) => _activityRow(context, t)),
+        ],
+      ),
+    );
+  }
+
+  Widget _activityRow(BuildContext context, LedgerTransaction transaction) {
+    final isTopUp = transaction.title.toLowerCase().contains('cash-in');
+    final entry = transaction.entries.first;
+    final isCredit = entry.direction == LedgerDirection.credit;
+    final label = isTopUp ? '${transaction.rail} Top-up' : transaction.title;
+    final subtitle = DateFormat('MMM d, HH:mm').format(transaction.postedAt);
+
+    return TouchScale(
+      onTap: () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
+              child: Icon(
+                isTopUp
+                    ? Icons.add_rounded
+                    : (isCredit ? Icons.south_west_rounded : Icons.north_east_rounded),
+                color: BybitPalette.muted,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(color: BybitPalette.muted, fontSize: 11.5)),
+                ],
+              ),
+            ),
+            Text(
+              entry.amountLabel,
+              style: TextStyle(
+                color: isCredit ? BybitPalette.green : BybitPalette.red,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -596,25 +790,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _assetsList() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: bybitTokens.take(6).map(_assetItem).toList(),
-      ),
-    );
-  }
-
-  Widget _assetItem(BybitTokenData token) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: BybitTokenRow(
-        token: token,
-        amount: token.symbol == 'ETH' ? '0.045' : '0.00',
-        value: token.symbol == 'ETH' ? '139.05 USD' : '0 USD',
-      ),
-    );
-  }
 }
 
 class _ModeTab extends StatelessWidget {
