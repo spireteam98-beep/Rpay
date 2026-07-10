@@ -414,8 +414,11 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  /// Recent activity pulled straight from the real ledger — no illustrative
-  /// data here, since cash-in and send flows already write real entries.
+  /// Recent activity: real ledger transactions once the user has actually
+  /// sent, received, or topped up. Until then we show illustrative everyday
+  /// spend examples (card purchases, subscriptions) so the section reads
+  /// like a live feed instead of a blank state — same convention the
+  /// Trending Data screen already uses for its illustrative candles.
   Widget _recentActivityCard(BuildContext context, KashAppState appState) {
     final recent = appState.ledgerTransactions.take(4).toList();
     return Padding(
@@ -441,12 +444,54 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           const SizedBox(height: 14),
           if (recent.isEmpty)
-            Text(
-              'Send, receive, or top up to see activity here.',
-              style: const TextStyle(color: BybitPalette.muted, fontSize: 13),
-            )
+            ..._illustrativeActivity.map(_merchantRow)
           else
             ...recent.map((t) => _activityRow(context, t)),
+        ],
+      ),
+    );
+  }
+
+  static final List<_MerchantActivity> _illustrativeActivity = [
+    _MerchantActivity('Starbucks', 'Coffee & snacks', 1.00, Icons.local_cafe_rounded, const Duration(hours: 2)),
+    _MerchantActivity('Netflix', 'Monthly subscription', 10.00, Icons.play_circle_fill_rounded, const Duration(hours: 9)),
+    _MerchantActivity('Spotify', 'Premium subscription', 9.99, Icons.music_note_rounded, const Duration(days: 1)),
+    _MerchantActivity('Amazon', 'Online purchase', 24.50, Icons.shopping_bag_rounded, const Duration(days: 2)),
+  ];
+
+  Widget _merchantRow(_MerchantActivity activity) {
+    final subtitle = DateFormat('MMM d, HH:mm').format(DateTime.now().subtract(activity.agoOffset));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
+            child: Icon(activity.icon, color: BybitPalette.muted, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  activity.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text('${activity.subtitle} · $subtitle', style: const TextStyle(color: BybitPalette.muted, fontSize: 11.5)),
+              ],
+            ),
+          ),
+          Text(
+            '-\$${activity.amount.toStringAsFixed(2)}',
+            style: const TextStyle(color: BybitPalette.red, fontSize: 14, fontWeight: FontWeight.w900),
+          ),
         ],
       ),
     );
@@ -790,6 +835,16 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
+}
+
+class _MerchantActivity {
+  final String name;
+  final String subtitle;
+  final double amount;
+  final IconData icon;
+  final Duration agoOffset;
+
+  const _MerchantActivity(this.name, this.subtitle, this.amount, this.icon, this.agoOffset);
 }
 
 class _ModeTab extends StatelessWidget {
