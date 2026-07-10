@@ -316,27 +316,20 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  static const List<MapEntry<String, String>> _illustrativePeople = [
-    MapEntry('Theresa', '-\$40.00'),
-    MapEntry('Gladys', '-\$120.00'),
-    MapEntry('Jane', '-\$18.50'),
-    MapEntry('Darlene', '-\$75.00'),
-  ];
+  static const List<String> _illustrativePeople = ['Theresa', 'Gladys', 'Jane', 'Darlene'];
 
   /// Quick-send shortcuts built from real recipients of past transfers
   /// (ledger transactions with status 'Queued' carry the recipient as the
   /// title). Falls back to illustrative sample contacts until the user has
   /// actually sent money once — same convention as _recentActivityCard.
-  /// Cards deliberately duplicate the _accountTabs card layout below so the
-  /// two horizontal scrollers feel like the same family of component.
   Widget _peopleRow(BuildContext context, KashAppState appState) {
-    final people = <MapEntry<String, String>>[];
+    final people = <String>[];
     for (final t in appState.ledgerTransactions) {
       final name = t.title.trim();
-      if (t.status == 'Queued' && name.isNotEmpty && !people.any((p) => p.key == name)) {
-        people.add(MapEntry(name, t.entries.first.amountLabel));
+      if (t.status == 'Queued' && name.isNotEmpty && !people.contains(name)) {
+        people.add(name);
       }
-      if (people.length >= 6) break;
+      if (people.length >= 5) break;
     }
     if (people.isEmpty) people.addAll(_illustrativePeople);
 
@@ -344,77 +337,75 @@ class _WalletScreenState extends State<WalletScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionTitle('People'),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         SizedBox(
-          height: 140,
-          child: ListView.separated(
+          height: 88,
+          child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            itemCount: people.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, i) => _personCard(context, people[i].key, people[i].value),
+            children: [
+              for (final name in people) _personAvatar(context, name),
+              _morePersonAvatar(context),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _personCard(BuildContext context, String name, String lastSentLabel) {
+  Widget _personAvatar(BuildContext context, String name) {
     final initial = name.isEmpty ? '?' : name.substring(0, 1).toUpperCase();
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: TouchScale(
+        onTap: () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+        child: SizedBox(
+          width: 60,
+          child: Column(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
+                child: Text(
+                  initial,
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: BybitPalette.muted2, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _morePersonAvatar(BuildContext context) {
     return TouchScale(
       onTap: () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
-      child: Container(
-        width: 156,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: BybitPalette.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF242832)),
-        ),
+      child: SizedBox(
+        width: 60,
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: BybitPalette.accent.withOpacity(0.16),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Text(
-                    initial,
-                    style: const TextStyle(color: BybitPalette.accent, fontSize: 13, fontWeight: FontWeight.w900),
-                  ),
-                ),
-                const Spacer(),
-                const Icon(Icons.north_east_rounded, color: BybitPalette.muted, size: 14),
-              ],
+            Container(
+              width: 56,
+              height: 56,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: BybitPalette.accent, shape: BoxShape.circle),
+              child: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black, size: 28),
             ),
-            const Spacer(),
-            Text(
-              name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: BybitPalette.muted,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              lastSentLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-              ),
+            const SizedBox(height: 8),
+            const Text(
+              'More',
+              style: TextStyle(color: BybitPalette.muted2, fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -438,7 +429,7 @@ class _WalletScreenState extends State<WalletScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Recent Activities',
+                'Recent Transaction',
                 style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
               ),
               TouchScale(
@@ -496,9 +487,19 @@ class _WalletScreenState extends State<WalletScreen> {
               ],
             ),
           ),
-          Text(
-            '-\$${activity.amount.toStringAsFixed(2)}',
-            style: const TextStyle(color: BybitPalette.red, fontSize: 14, fontWeight: FontWeight.w900),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '-\$${activity.amount.toStringAsFixed(2)}',
+                style: const TextStyle(color: BybitPalette.red, fontSize: 14, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '\$${activity.amount.toStringAsFixed(2)} USD',
+                style: const TextStyle(color: BybitPalette.muted, fontSize: 11),
+              ),
+            ],
           ),
         ],
       ),
@@ -511,6 +512,8 @@ class _WalletScreenState extends State<WalletScreen> {
     final isCredit = entry.direction == LedgerDirection.credit;
     final label = isTopUp ? '${transaction.rail} Top-up' : transaction.title;
     final subtitle = DateFormat('MMM d, HH:mm').format(transaction.postedAt);
+    final isPerson = !isTopUp;
+    final initial = label.isEmpty ? '?' : label.substring(0, 1).toUpperCase();
 
     return TouchScale(
       onTap: () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
@@ -523,13 +526,9 @@ class _WalletScreenState extends State<WalletScreen> {
               height: 44,
               alignment: Alignment.center,
               decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-              child: Icon(
-                isTopUp
-                    ? Icons.add_rounded
-                    : (isCredit ? Icons.south_west_rounded : Icons.north_east_rounded),
-                color: BybitPalette.muted,
-                size: 20,
-              ),
+              child: isPerson
+                  ? Text(initial, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800))
+                  : const Icon(Icons.add_rounded, color: BybitPalette.muted, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -547,13 +546,23 @@ class _WalletScreenState extends State<WalletScreen> {
                 ],
               ),
             ),
-            Text(
-              entry.amountLabel,
-              style: TextStyle(
-                color: isCredit ? BybitPalette.green : BybitPalette.red,
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  entry.amountLabel,
+                  style: TextStyle(
+                    color: isCredit ? BybitPalette.green : BybitPalette.red,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '\$${entry.amountUsd.toStringAsFixed(2)} USD',
+                  style: const TextStyle(color: BybitPalette.muted, fontSize: 11),
+                ),
+              ],
             ),
           ],
         ),
