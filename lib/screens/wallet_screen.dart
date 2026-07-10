@@ -24,9 +24,6 @@ class WalletScreen extends StatefulWidget {
 }
 
 class _WalletScreenState extends State<WalletScreen> {
-  int _modeIndex = 0;
-  int _networkModeIndex = 1; // 0 = Exchange, 1 = WEB3
-
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<KashAppState>();
@@ -41,21 +38,11 @@ class _WalletScreenState extends State<WalletScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _topBalanceCard(context, appState),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Align(alignment: Alignment.centerLeft, child: _networkModeSegment()),
-              ),
-              const SizedBox(height: 16),
-              const BybitSearchBar(),
+              const SizedBox(height: 20),
               _onChainCustodyCard(),
-              _walletModeTabs(),
-              if (_modeIndex == 0) ...[
-                _peopleRow(context, appState),
-                _accountTabs(context, appState.accounts),
-                _recentActivityCard(context, appState),
-              ] else
-                _modePlaceholder(_modeIndex == 1 ? 'Funding' : 'Earn'),
+              _peopleRow(context, appState),
+              _accountTabs(context, appState.accounts),
+              _recentActivityCard(context, appState),
             ],
           ),
         ),
@@ -189,47 +176,6 @@ class _WalletScreenState extends State<WalletScreen> {
         alignment: Alignment.center,
         decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
         child: Icon(icon, color: BybitPalette.accent, size: 22),
-      ),
-    );
-  }
-
-  Widget _networkModeSegment() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: BybitPalette.surface2, borderRadius: BorderRadius.circular(100)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _networkModeOption('Exchange', 0),
-          _networkModeOption('WEB3', 1),
-        ],
-      ),
-    );
-  }
-
-  Widget _networkModeOption(String label, int index) {
-    final selected = _networkModeIndex == index;
-    return TouchScale(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        setState(() => _networkModeIndex = index);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(100),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.black : Colors.white70,
-            fontWeight: FontWeight.w800,
-            fontSize: 14,
-          ),
-        ),
       ),
     );
   }
@@ -610,73 +556,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _walletModeTabs() {
-    const labels = ['Assets', 'Funding', 'Earn'];
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-      padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(
-        color: BybitPalette.surface2,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          for (int i = 0; i < labels.length; i++)
-            Expanded(
-              child: _ModeTab(
-                labels[i],
-                _modeIndex == i,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _modeIndex = i);
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _modePlaceholder(String label) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      child: BybitCard(
-        child: Column(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: const BoxDecoration(
-                color: BybitPalette.surface2,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.hourglass_top_rounded,
-                color: BybitPalette.accent,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              '$label is coming soon',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'This is part of the RoyallPay Phase 2 roadmap.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: BybitPalette.muted, fontSize: 12.5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _accountTabs(BuildContext context, List<KashAccount> accounts) {
     return SizedBox(
       height: 140,
@@ -781,39 +660,6 @@ class _MerchantActivity {
   final Duration agoOffset;
 
   const _MerchantActivity(this.name, this.subtitle, this.amount, this.icon, this.agoOffset);
-}
-
-class _ModeTab extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ModeTab(this.label, this.selected, {required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return TouchScale(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOutCubic,
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? BybitPalette.selected : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : BybitPalette.muted,
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _BybitMiniIcon extends StatelessWidget {
