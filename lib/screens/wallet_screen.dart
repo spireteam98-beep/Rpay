@@ -143,10 +143,10 @@ class _WalletScreenState extends State<WalletScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _quickActionCircle(context, Icons.arrow_upward_rounded, const SendMoneyScreen()),
-              _quickActionCircle(context, Icons.arrow_downward_rounded, const ReceiveScreen()),
-              _quickActionCircle(context, Icons.history_rounded, const LedgerScreen()),
-              _quickActionCircle(context, Icons.add_rounded, const CashInScreen()),
+              _quickActionCircle(context, Icons.arrow_upward_rounded, 'Send', const SendMoneyScreen()),
+              _quickActionCircle(context, Icons.arrow_downward_rounded, 'Receive', const ReceiveScreen()),
+              _quickActionCircle(context, Icons.history_rounded, 'History', const LedgerScreen()),
+              _quickActionCircle(context, Icons.add_rounded, 'Cash-in', const CashInScreen()),
             ],
           ),
         ],
@@ -167,15 +167,25 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _quickActionCircle(BuildContext context, IconData icon, Widget screen) {
+  Widget _quickActionCircle(BuildContext context, IconData icon, String label, Widget screen) {
     return TouchScale(
       onTap: () => Navigator.of(context).push(kashRoute(screen)),
       child: Container(
-        width: 56,
-        height: 56,
+        width: 64,
+        height: 64,
         alignment: Alignment.center,
         decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-        child: Icon(icon, color: BybitPalette.accent, size: 22),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: BybitPalette.accent, size: 18),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: const TextStyle(color: BybitPalette.accent, fontSize: 9, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
       ),
     );
   }
