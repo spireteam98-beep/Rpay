@@ -5,7 +5,9 @@ const { migrate } = require('./db');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+// Raised from the 100kb default so a payment-proof screenshot (base64 JSON
+// body, no multipart upload pipeline yet) fits in a single request.
+app.use(express.json({ limit: '6mb' }));
 
 app.get('/health', (_req, res) =>
   res.json({ ok: true, network: config.network, service: 'royallpay-api' }),
@@ -20,6 +22,7 @@ app.use('/payments', require('./routes/payments'));
 app.use('/transfers', require('./routes/transfers'));
 app.use('/merchants', require('./routes/merchants'));
 app.use('/agents', require('./routes/agents'));
+app.use('/p2p', require('./routes/p2p'));
 app.use('/remittance', require('./routes/remittance'));
 app.use('/banking', require('./routes/banking'));
 app.use('/admin', require('./routes/admin'));

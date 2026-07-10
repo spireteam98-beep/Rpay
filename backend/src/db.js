@@ -268,7 +268,51 @@ async function migrate() {
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES users(id);
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+
+    -- P2P: customer buys crypto from an agent's float using mobile money —
+    -- Binance-P2P style: customer pays the agent directly (outside the app),
+    -- uploads proof, agent confirms receipt and releases the crypto.
+    CREATE TABLE IF NOT EXISTS p2p_orders (
+      id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      customer_id       UUID NOT NULL REFERENCES users(id),
+      agent_id          UUID NOT NULL REFERENCES agents(id),
+      asset             TEXT NOT NULL,
+      crypto_amount     NUMERIC(28,8) NOT NULL CHECK (crypto_amount > 0),
+      fiat_currency     TEXT NOT NULL CHECK (fiat_currency IN ('KES','USD')),
+      fiat_amount       NUMERIC(18,2) NOT NULL CHECK (fiat_amount > 0),
+      rate_usd          NUMERIC(28,8) NOT NULL,
+      status            TEXT NOT NULL DEFAULT 'PENDING_PAYMENT'
+                         CHECK (status IN ('PENDING_PAYMENT','PROOF_SUBMITTED','RELEASED','REJECTED','CANCELLED')),
+      payment_proof     TEXT,
+      payment_reference TEXT,
+      admin_note        TEXT,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_p2p_orders_customer ON p2p_orders(customer_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_p2p_orders_agent ON p2p_orders(agent_id, status, created_at DESC);
   `);
+
+  // agent_commissions.kind originally only allowed deposit/withdrawal/onboarding —
+  // widen it to include p2p order commissions.
+  await pool.query(`
+    ALTER TABLE agent_commissions DROP CONSTRAINT IF EXISTS agent_commissions_kind_check;
+    ALTER TABLE agent_commissions
+      ADD CONSTRAINT agent_commissions_kind_check
+      CHECK (kind IN ('deposit','withdrawal','onboarding','p2p'));
+  `);
+
+  // Sole super-admin: keep this the only account with role='admin'. Runs
+  // every boot so it's self-healing across environments/DB resets.
+  await pool.query(
+    `UPDATE users SET role = 'admin' WHERE LOWER(email) = $1 AND role IS DISTINCT FROM 'admin'`,
+    [config.adminEmail],
+  );
+  await pool.query(
+    `UPDATE users SET role = 'customer' WHERE LOWER(email) IS DISTINCT FROM $1 AND role = 'admin'`,
+    [config.adminEmail],
+  );
+
   console.log('[db] schema ready');
 }
 

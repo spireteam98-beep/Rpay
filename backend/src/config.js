@@ -100,6 +100,9 @@ const config = {
     process.env.NEXT_PUBLIC_WAAFI_API_KEY ||
     ''
   ).trim(),
+  // Sole super-admin account — auto-promoted to role='admin' on every boot
+  // (see db.js migrate()) so the Admin Portal is only ever visible to them.
+  adminEmail: (process.env.ADMIN_EMAIL || 'reysdaaud@gmail.com').trim().toLowerCase(),
 };
 
 if (config.network !== 'testnet' && config.network !== 'mainnet') {

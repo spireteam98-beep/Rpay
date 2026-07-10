@@ -849,6 +849,165 @@ class ApiService {
     );
   }
 
+  // ── P2P: agent-mediated crypto buys (Binance-P2P style) ────────
+
+  /// Active agents a customer can buy crypto from.
+  static Future<List<dynamic>?> p2pAgents() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/p2p/agents'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Opens a buy order against a chosen agent's float.
+  static Future<Map<String, dynamic>> createP2pOrder({
+    required String agentId,
+    required String asset,
+    required double cryptoAmount,
+    required String fiatCurrency,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/p2p/orders'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'agentId': agentId,
+            'asset': asset.toUpperCase(),
+            'cryptoAmount': cryptoAmount,
+            'fiatCurrency': fiatCurrency.toUpperCase(),
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not create order');
+  }
+
+  /// The customer's own P2P order history.
+  static Future<List<dynamic>?> myP2pOrders() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/p2p/orders/mine'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// A single order's detail (customer or assigned agent may view it).
+  static Future<Map<String, dynamic>?> p2pOrder(String orderId) async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/p2p/orders/$orderId'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Uploads a payment screenshot (data URL) as proof of the mobile-money payment.
+  static Future<Map<String, dynamic>> uploadP2pProof({
+    required String orderId,
+    required String proofImageDataUrl,
+    String? reference,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/p2p/orders/$orderId/proof'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'proofImage': proofImageDataUrl,
+            if (reference != null && reference.isNotEmpty)
+              'reference': reference,
+          }),
+        )
+        .timeout(const Duration(seconds: 40));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not upload proof');
+  }
+
+  static Future<Map<String, dynamic>> cancelP2pOrder(String orderId) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/p2p/orders/$orderId/cancel'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not cancel order');
+  }
+
+  /// Orders assigned to the caller's agent profile, optionally filtered by status.
+  static Future<List<dynamic>?> assignedP2pOrders({String? status}) async {
+    if (!hasSession) return null;
+    try {
+      final uri = Uri.parse('$baseUrl/p2p/orders/assigned').replace(
+        queryParameters:
+            (status != null && status.isNotEmpty) ? {'status': status} : null,
+      );
+      final res = await http
+          .get(uri, headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>> confirmP2pOrder(String orderId) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/p2p/orders/$orderId/confirm'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(
+      body['error'] as String? ?? 'Could not release the order',
+    );
+  }
+
+  static Future<Map<String, dynamic>> rejectP2pOrder(
+    String orderId, {
+    String? note,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/p2p/orders/$orderId/reject'),
+          headers: _headers(authed: true),
+          body: jsonEncode({if (note != null && note.isNotEmpty) 'note': note}),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not reject order');
+  }
+
   static Future<void> clearSession() async {
     await _prefs.remove(_tokenKey);
   }

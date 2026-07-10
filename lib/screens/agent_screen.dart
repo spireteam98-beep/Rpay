@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
+import 'agent_p2p_queue_screen.dart';
 
 /// Agent hub: onboard as an agent, share a referral code that onboards new
 /// customers, and assist walk-in customers with cash deposits/withdrawals —
@@ -331,6 +333,48 @@ class _AgentScreenState extends State<AgentScreen> {
               ),
             ],
           ),
+        if (isActive) ...[
+          const SizedBox(height: 12),
+          TouchScale(
+            onTap:
+                () => Navigator.of(
+                  context,
+                ).push(kashRoute(const AgentP2pQueueScreen())),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              decoration: BoxDecoration(
+                color: BybitPalette.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF242832)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.handshake_outlined,
+                    color: BybitPalette.accent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'P2P crypto orders to review',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: BybitPalette.muted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 28),
         const Text(
           'Recent commissions',

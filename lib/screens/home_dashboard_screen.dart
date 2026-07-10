@@ -10,8 +10,8 @@ import 'buy_screen.dart';
 import 'cash_in_screen.dart';
 import 'ledger_screen.dart';
 import 'merchant_screen.dart';
+import 'p2p_buy_screen.dart';
 import 'profile_screen.dart';
-import 'send_money_screen.dart';
 import 'swap_screen.dart';
 
 class HomeDashboardScreen extends StatelessWidget {
@@ -278,7 +278,7 @@ class HomeDashboardScreen extends StatelessWidget {
       _DashAction(
         Icons.handshake_outlined,
         'P2P Trading',
-        const SendMoneyScreen(),
+        const P2pBuyScreen(),
       ),
       _DashAction(
         Icons.group_add_outlined,
