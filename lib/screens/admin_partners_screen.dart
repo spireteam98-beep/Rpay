@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/touch_scale.dart';
+import 'agent_network_screen.dart' show TierBadge;
 
 /// Admin control surface for the partner network: create Agents and
 /// Merchants, approve or deactivate them, and see agent commission totals.
@@ -326,6 +327,8 @@ class _AgentsTabState extends State<_AgentsTab> {
   Widget _agentCard(Map<String, dynamic> agent) {
     final id = agent['id'] as String;
     final status = agent['status'] as String? ?? 'PENDING';
+    final tier = agent['tier'] as String? ?? 'AGENT';
+    final parentName = agent['parent_name'] as String?;
     final busy = _busy.contains(id);
     final commission = (agent['commission_balance'] as num?)?.toDouble() ?? 0;
     return Padding(
@@ -341,13 +344,23 @@ class _AgentsTabState extends State<_AgentsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        agent['business_name'] as String? ?? '',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              agent['business_name'] as String? ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TierBadge(tier),
+                        ],
                       ),
                       const SizedBox(height: 3),
                       Text(
@@ -357,6 +370,16 @@ class _AgentsTabState extends State<_AgentsTab> {
                           fontSize: 12,
                         ),
                       ),
+                      if (parentName != null && parentName.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Reports to $parentName',
+                          style: const TextStyle(
+                            color: BybitPalette.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -392,6 +415,18 @@ class _AgentsTabState extends State<_AgentsTab> {
                   ),
               ],
             ),
+            if (tier == 'AGENT') ...[
+              const SizedBox(height: 10),
+              _actionButton(
+                'Promote to Super Agent',
+                BybitPalette.accent,
+                busy,
+                () => _act(
+                  id,
+                  () => ApiService.adminSetAgentTier(id, tier: 'SUPER_AGENT'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -449,6 +484,16 @@ class _CreateAgentSheetState extends State<_CreateAgentSheet> {
   final _businessNameController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _submitting = false;
+  String _tier = 'AGENT';
+  String? _parentAgentId;
+  bool _loadingSuperAgents = true;
+  List<dynamic> _superAgents = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSuperAgents();
+  }
 
   @override
   void dispose() {
@@ -456,6 +501,15 @@ class _CreateAgentSheetState extends State<_CreateAgentSheet> {
     _businessNameController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSuperAgents() async {
+    final agents = await ApiService.adminAgents(tier: 'SUPER_AGENT');
+    if (!mounted) return;
+    setState(() {
+      _superAgents = agents ?? const [];
+      _loadingSuperAgents = false;
+    });
   }
 
   Future<void> _submit() async {
@@ -475,6 +529,8 @@ class _CreateAgentSheetState extends State<_CreateAgentSheet> {
         identifier: identifier,
         businessName: businessName,
         phone: _phoneController.text.trim(),
+        tier: _tier,
+        parentAgentId: _tier == 'AGENT' ? _parentAgentId : null,
       );
       await widget.onCreated();
       if (!mounted) return;
@@ -536,6 +592,97 @@ class _CreateAgentSheetState extends State<_CreateAgentSheet> {
             icon: Icons.phone_outlined,
             controller: _phoneController,
           ),
+          const SizedBox(height: 16),
+          const Text(
+            'Tier',
+            style: TextStyle(
+              color: BybitPalette.muted,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: BybitPalette.input,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _tier,
+                dropdownColor: BybitPalette.surface2,
+                isExpanded: true,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'AGENT', child: Text('Agent')),
+                  DropdownMenuItem(
+                    value: 'SUPER_AGENT',
+                    child: Text('Super Agent (dealer / country / area lead)'),
+                  ),
+                ],
+                onChanged: (v) => setState(() => _tier = v ?? 'AGENT'),
+              ),
+            ),
+          ),
+          if (_tier == 'AGENT' &&
+              !_loadingSuperAgents &&
+              _superAgents.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'Reports to (optional)',
+              style: TextStyle(
+                color: BybitPalette.muted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: BybitPalette.input,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: _parentAgentId,
+                  dropdownColor: BybitPalette.surface2,
+                  isExpanded: true,
+                  hint: const Text(
+                    'No Super Agent',
+                    style: TextStyle(color: BybitPalette.muted, fontSize: 13),
+                  ),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('No Super Agent'),
+                    ),
+                    ..._superAgents.map(
+                      (raw) => DropdownMenuItem<String?>(
+                        value: raw['id'] as String,
+                        child: Text(
+                          '${raw['business_name']} (${raw['agent_code']})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _parentAgentId = v),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 22),
           BybitPrimaryButton(
             label: _submitting ? 'Creating...' : 'Create agent',

@@ -5,6 +5,7 @@ const { signToken, requireAuth } = require('../middleware/auth');
 const custody = require('../services/custody');
 const config = require('../config');
 const email = require('../services/email');
+const { creditAgentCommission } = require('../services/commission');
 
 const router = express.Router();
 
@@ -82,7 +83,7 @@ router.post('/signup', async (req, res, next) => {
     let referringAgent = null;
     if (agentCode) {
       referringAgent = (
-        await pool.query("SELECT id FROM agents WHERE agent_code = $1 AND status = 'ACTIVE'", [
+        await pool.query("SELECT * FROM agents WHERE agent_code = $1 AND status = 'ACTIVE'", [
           agentCode,
         ])
       ).rows[0];
@@ -108,15 +109,7 @@ router.post('/signup', async (req, res, next) => {
 
     if (referringAgent) {
       const ONBOARDING_COMMISSION_USD = 1;
-      await pool.query(
-        `UPDATE agents SET commission_balance = commission_balance + $1 WHERE id = $2`,
-        [ONBOARDING_COMMISSION_USD, referringAgent.id],
-      );
-      await pool.query(
-        `INSERT INTO agent_commissions (agent_id, kind, currency, amount, related_user_id)
-         VALUES ($1,'onboarding','USD',$2,$3)`,
-        [referringAgent.id, ONBOARDING_COMMISSION_USD, user.id],
-      );
+      await creditAgentCommission(pool, referringAgent, 'onboarding', 'USD', ONBOARDING_COMMISSION_USD, user.id);
     }
 
     const emailVerification = await createAndSendEmailOtp(user.id, cleanEmail, fullName);

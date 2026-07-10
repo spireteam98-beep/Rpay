@@ -631,6 +631,47 @@ class ApiService {
     }
   }
 
+  /// Recruits a subordinate into the agent hierarchy: a Super Agent recruits
+  /// an Agent, an Agent recruits a Sub-Agent (Safaricom-style aggregation).
+  static Future<Map<String, dynamic>> recruitSubordinate({
+    required String identifier,
+    required String businessName,
+    String? phone,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/agents/recruit'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'identifier': identifier,
+            'businessName': businessName,
+            if (phone != null && phone.isNotEmpty) 'phone': phone,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not recruit');
+  }
+
+  /// The agent's own recruited network (their direct Agents/Sub-Agents) plus
+  /// total override commission earned from them.
+  static Future<Map<String, dynamic>?> agentNetwork() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/agents/network'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Agent-assisted cash-in: the agent hands the customer cash and the
   /// system credits their wallet, paying the agent a commission.
   static Future<Map<String, dynamic>> agentAssistedDeposit({
@@ -680,13 +721,19 @@ class ApiService {
   // ── Admin: agents & merchants ──────────────────────────────────
 
   /// All agents (optionally filtered by status: PENDING, ACTIVE, SUSPENDED).
-  static Future<List<dynamic>?> adminAgents({String? status}) async {
+  static Future<List<dynamic>?> adminAgents({
+    String? status,
+    String? tier,
+  }) async {
     if (!hasSession) return null;
     try {
-      final uri = Uri.parse('$baseUrl/admin/agents').replace(
-        queryParameters:
-            (status != null && status.isNotEmpty) ? {'status': status} : null,
-      );
+      final query = <String, String>{
+        if (status != null && status.isNotEmpty) 'status': status,
+        if (tier != null && tier.isNotEmpty) 'tier': tier,
+      };
+      final uri = Uri.parse(
+        '$baseUrl/admin/agents',
+      ).replace(queryParameters: query.isEmpty ? null : query);
       final res = await http
           .get(uri, headers: _headers(authed: true))
           .timeout(_timeout);
@@ -698,10 +745,14 @@ class ApiService {
   }
 
   /// Admin directly onboards an existing user as a pre-approved agent.
+  /// [tier] is 'AGENT' (default) or 'SUPER_AGENT'; [parentAgentId] attaches
+  /// an Agent under an existing Super Agent.
   static Future<Map<String, dynamic>> adminCreateAgent({
     required String identifier,
     required String businessName,
     String? phone,
+    String tier = 'AGENT',
+    String? parentAgentId,
   }) async {
     final res = await http
         .post(
@@ -711,12 +762,37 @@ class ApiService {
             'identifier': identifier,
             'businessName': businessName,
             if (phone != null && phone.isNotEmpty) 'phone': phone,
+            'tier': tier,
+            if (parentAgentId != null && parentAgentId.isNotEmpty)
+              'parentAgentId': parentAgentId,
           }),
         )
         .timeout(_timeout);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode == 201) return body;
     throw ApiException(body['error'] as String? ?? 'Could not create agent');
+  }
+
+  /// Admin promotes/re-parents an existing agent (e.g. Agent -> Super Agent).
+  static Future<Map<String, dynamic>> adminSetAgentTier(
+    String id, {
+    required String tier,
+    String? parentAgentId,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/admin/agents/$id/tier'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'tier': tier,
+            if (parentAgentId != null && parentAgentId.isNotEmpty)
+              'parentAgentId': parentAgentId,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not update tier');
   }
 
   static Future<Map<String, dynamic>> adminApproveAgent(String id) async {

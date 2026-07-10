@@ -151,12 +151,33 @@ async function findUserByIdentifier(identifier) {
   return rows.rows[0] || null;
 }
 
-/** POST /admin/agents — admin directly onboards an existing user as an agent, pre-approved. */
+const AGENT_TIERS = ['SUPER_AGENT', 'AGENT', 'SUB_AGENT'];
+
+/** POST /admin/agents — admin directly onboards an existing user as an agent, pre-approved.
+ * Optional tier ('SUPER_AGENT' | 'AGENT', default 'AGENT') and parentAgentId let an admin
+ * place the new partner directly into the hierarchy — e.g. contracting a Super Agent
+ * (dealer/country/area lead) or attaching an Agent under one. */
 router.post('/agents', async (req, res, next) => {
   try {
     const businessName = String(req.body?.businessName || '').trim();
     const phone = String(req.body?.phone || '').trim() || null;
+    const tier = String(req.body?.tier || 'AGENT').toUpperCase();
+    const parentAgentId = String(req.body?.parentAgentId || '').trim() || null;
     if (!businessName) return res.status(400).json({ error: 'Business name is required' });
+    if (!['SUPER_AGENT', 'AGENT'].includes(tier)) {
+      return res.status(400).json({ error: 'tier must be SUPER_AGENT or AGENT' });
+    }
+
+    let parent = null;
+    if (parentAgentId) {
+      if (tier === 'SUPER_AGENT') {
+        return res.status(400).json({ error: 'A Super Agent cannot have a parent' });
+      }
+      parent = (await pool.query('SELECT * FROM agents WHERE id = $1', [parentAgentId])).rows[0];
+      if (!parent || parent.tier !== 'SUPER_AGENT') {
+        return res.status(400).json({ error: 'parentAgentId must reference a Super Agent' });
+      }
+    }
 
     const user = await findUserByIdentifier(req.body?.identifier);
     if (!user) return res.status(404).json({ error: 'No user found with that email or phone' });
@@ -167,10 +188,11 @@ router.post('/agents', async (req, res, next) => {
     }
 
     const inserted = await pool.query(
-      `INSERT INTO agents (user_id, business_name, agent_code, phone, status, approved_by, approved_at)
-       VALUES ($1,$2,$3,$4,'ACTIVE',$5,now())
+      `INSERT INTO agents
+        (user_id, business_name, agent_code, phone, status, tier, parent_agent_id, approved_by, approved_at)
+       VALUES ($1,$2,$3,$4,'ACTIVE',$5,$6,$7,now())
        RETURNING *`,
-      [user.id, businessName, generateAgentCode(), phone, req.userId],
+      [user.id, businessName, generateAgentCode(), phone, tier, parent?.id || null, req.userId],
     );
     res.status(201).json({ agent: inserted.rows[0] });
   } catch (err) {
@@ -181,22 +203,63 @@ router.post('/agents', async (req, res, next) => {
 router.get('/agents', async (req, res, next) => {
   try {
     const status = String(req.query.status || '').trim().toUpperCase();
+    const tier = String(req.query.tier || '').trim().toUpperCase();
+    const conditions = [];
     const params = [];
-    let where = '';
     if (status) {
-      where = 'WHERE a.status = $1';
       params.push(status);
+      conditions.push(`a.status = $${params.length}`);
     }
+    if (tier) {
+      params.push(tier);
+      conditions.push(`a.tier = $${params.length}`);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = await pool.query(
-      `SELECT a.*, u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+      `SELECT a.*, u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone,
+              p.business_name AS parent_name, p.agent_code AS parent_code
          FROM agents a
          JOIN users u ON u.id = a.user_id
+         LEFT JOIN agents p ON p.id = a.parent_agent_id
          ${where}
         ORDER BY a.created_at DESC
         LIMIT 200`,
       params,
     );
     res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /admin/agents/:id/tier — re-tier or re-parent an existing agent (e.g. promote to Super Agent). */
+router.post('/agents/:id/tier', async (req, res, next) => {
+  try {
+    const tier = String(req.body?.tier || '').toUpperCase();
+    const parentAgentId = String(req.body?.parentAgentId || '').trim() || null;
+    if (!AGENT_TIERS.includes(tier)) {
+      return res.status(400).json({ error: `tier must be one of ${AGENT_TIERS.join(', ')}` });
+    }
+    if (tier === 'SUPER_AGENT' && parentAgentId) {
+      return res.status(400).json({ error: 'A Super Agent cannot have a parent' });
+    }
+    if (parentAgentId === req.params.id) {
+      return res.status(400).json({ error: 'An agent cannot be its own parent' });
+    }
+    if (parentAgentId) {
+      const parent = (await pool.query('SELECT tier FROM agents WHERE id = $1', [parentAgentId])).rows[0];
+      if (!parent) return res.status(404).json({ error: 'parentAgentId not found' });
+      if (tier === 'SUB_AGENT' && parent.tier === 'SUB_AGENT') {
+        return res.status(400).json({ error: 'A Sub-Agent cannot be a parent' });
+      }
+    }
+
+    const rows = await pool.query(
+      `UPDATE agents SET tier = $1, parent_agent_id = $2 WHERE id = $3 RETURNING *`,
+      [tier, parentAgentId, req.params.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ agent: rows.rows[0] });
   } catch (err) {
     next(err);
   }
@@ -256,7 +319,7 @@ router.get('/commissions/summary', async (_req, res, next) => {
          FROM agents`,
     );
     const byAgent = await pool.query(
-      `SELECT a.id, a.business_name, a.agent_code, a.status, a.commission_balance,
+      `SELECT a.id, a.business_name, a.agent_code, a.status, a.commission_balance, a.tier,
               u.full_name AS owner_name, u.email AS owner_email,
               COUNT(c.id)::int AS transaction_count
          FROM agents a

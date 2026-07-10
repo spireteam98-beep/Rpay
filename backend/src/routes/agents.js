@@ -3,6 +3,7 @@ const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
+const { creditAgentCommission } = require('../services/commission');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -37,21 +38,6 @@ async function findCustomer(client, identifier) {
   return rows.rows[0] || null;
 }
 
-// commission_balance is tracked in USD (the ledger's normalizing currency);
-// the agent_commissions row keeps the original currency/amount for display.
-async function creditCommission(client, agentId, kind, currency, amount, relatedUserId) {
-  const amountUsd = compliance.toUsd(amount, currency);
-  await client.query(
-    `UPDATE agents SET commission_balance = commission_balance + $1 WHERE id = $2`,
-    [amountUsd, agentId],
-  );
-  await client.query(
-    `INSERT INTO agent_commissions (agent_id, kind, currency, amount, related_user_id)
-     VALUES ($1,$2,$3,$4,$5)`,
-    [agentId, kind, currency, amount, relatedUserId],
-  );
-}
-
 async function requireOwnAgent(client, userId) {
   const rows = await client.query('SELECT * FROM agents WHERE user_id = $1', [userId]);
   return rows.rows[0] || null;
@@ -82,6 +68,98 @@ router.post('/', async (req, res, next) => {
       [req.userId, businessName, agentCode(), phone],
     );
     res.status(201).json({ agent: inserted.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Which tier an agent may recruit under themselves — mirrors Safaricom's
+// model: a Super Agent (dealer/country/area lead) contracts Agents, an
+// Agent can recruit Sub-Agents, and Sub-Agents sit at the bottom (no
+// further nesting).
+const RECRUIT_TIER = { SUPER_AGENT: 'AGENT', AGENT: 'SUB_AGENT' };
+
+/** POST /agents/recruit — an active Agent/Super Agent onboards a subordinate. */
+router.post('/recruit', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const businessName = String(req.body?.businessName || '').trim();
+    const phone = String(req.body?.phone || '').trim() || null;
+    if (!businessName) {
+      return res.status(400).json({ error: 'Business name is required' });
+    }
+
+    await client.query('BEGIN');
+    const parent = await requireOwnAgent(client, req.userId);
+    if (!parent || parent.status !== 'ACTIVE') {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'You are not an active agent' });
+    }
+    const childTier = RECRUIT_TIER[parent.tier];
+    if (!childTier) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Sub-agents cannot recruit further' });
+    }
+
+    const user = await findCustomer(client, req.body?.identifier);
+    if (!user) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'No user found with that email or phone' });
+    }
+    const existing = await requireOwnAgent(client, user.id);
+    if (existing) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'This user is already registered as an agent' });
+    }
+
+    // Recruited tiers are auto-active — same convenience as Safaricom's
+    // aggregated-line onboarding, where the principal vets the recruit and
+    // Safaricom doesn't re-review each one; admins retain deactivate power.
+    const inserted = await client.query(
+      `INSERT INTO agents
+        (user_id, business_name, agent_code, phone, status, tier, parent_agent_id, approved_by, approved_at)
+       VALUES ($1,$2,$3,$4,'ACTIVE',$5,$6,$7,now())
+       RETURNING *`,
+      [user.id, businessName, agentCode(), phone, childTier, parent.id, req.userId],
+    );
+    await client.query('COMMIT');
+    res.status(201).json({ agent: inserted.rows[0] });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/** GET /agents/network — the caller's own recruits + override earnings. */
+router.get('/network', async (req, res, next) => {
+  try {
+    const agent = await requireOwnAgent(pool, req.userId);
+    if (!agent) return res.status(404).json({ error: 'You are not registered as an agent' });
+
+    const recruits = await pool.query(
+      `SELECT a.*, u.full_name AS owner_name, u.email AS owner_email
+         FROM agents a
+         JOIN users u ON u.id = a.user_id
+        WHERE a.parent_agent_id = $1
+        ORDER BY a.created_at DESC`,
+      [agent.id],
+    );
+    const overrideRows = await pool.query(
+      `SELECT amount, currency FROM agent_commissions WHERE agent_id = $1 AND kind = 'override'`,
+      [agent.id],
+    );
+    const overrideEarnedUsd = overrideRows.rows.reduce(
+      (sum, row) => sum + compliance.toUsd(Number(row.amount), row.currency),
+      0,
+    );
+    res.json({
+      recruits: recruits.rows,
+      canRecruit: Boolean(RECRUIT_TIER[agent.tier]),
+      recruitTier: RECRUIT_TIER[agent.tier] || null,
+      overrideEarnedUsd: Number(overrideEarnedUsd.toFixed(2)),
+    });
   } catch (err) {
     next(err);
   }
@@ -156,7 +234,7 @@ router.post('/deposits', async (req, res, next) => {
     );
 
     const commissionAmount = amount * DEPOSIT_COMMISSION_RATE;
-    await creditCommission(client, agent.id, 'deposit', currency, commissionAmount, customer.id);
+    await creditAgentCommission(client, agent, 'deposit', currency, commissionAmount, customer.id);
 
     await client.query('COMMIT');
     res.status(201).json({
@@ -231,7 +309,7 @@ router.post('/withdrawals', async (req, res, next) => {
     );
 
     const commissionAmount = amount * WITHDRAWAL_COMMISSION_RATE;
-    await creditCommission(client, agent.id, 'withdrawal', currency, commissionAmount, customer.id);
+    await creditAgentCommission(client, agent, 'withdrawal', currency, commissionAmount, customer.id);
 
     await client.query('COMMIT');
     res.status(201).json({

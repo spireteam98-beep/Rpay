@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
+import 'agent_network_screen.dart';
 import 'agent_p2p_queue_screen.dart';
 
 /// Agent hub: onboard as an agent, share a referral code that onboards new
@@ -195,14 +196,23 @@ class _AgentScreenState extends State<AgentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          agent['business_name'] as String? ?? '',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.6,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Flexible(
+              child: Text(
+                agent['business_name'] as String? ?? '',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.6,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            TierBadge(agent['tier'] as String?),
+          ],
         ),
         const SizedBox(height: 4),
         const Text(
@@ -359,6 +369,46 @@ class _AgentScreenState extends State<AgentScreen> {
                   const Expanded(
                     child: Text(
                       'P2P crypto orders to review',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: BybitPalette.muted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TouchScale(
+            onTap:
+                () => Navigator.of(
+                  context,
+                ).push(kashRoute(const AgentNetworkScreen())),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              decoration: BoxDecoration(
+                color: BybitPalette.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFF242832)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.account_tree_outlined,
+                    color: BybitPalette.accent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'My network — recruit & overrides',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 13.5,

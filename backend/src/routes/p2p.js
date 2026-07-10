@@ -5,6 +5,7 @@ const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
 const exchange = require('../services/exchange');
 const config = require('../config');
+const { creditAgentCommission } = require('../services/commission');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -259,16 +260,7 @@ router.post('/orders/:id/confirm', async (req, res, next) => {
     );
 
     const commissionAmount = Number(order.fiat_amount) * P2P_COMMISSION_RATE;
-    const commissionUsd = compliance.toUsd(commissionAmount, order.fiat_currency);
-    await client.query(
-      `UPDATE agents SET commission_balance = commission_balance + $1 WHERE id = $2`,
-      [commissionUsd, agent.id],
-    );
-    await client.query(
-      `INSERT INTO agent_commissions (agent_id, kind, currency, amount, related_user_id)
-       VALUES ($1,'p2p',$2,$3,$4)`,
-      [agent.id, order.fiat_currency, commissionAmount, order.customer_id],
-    );
+    await creditAgentCommission(client, agent, 'p2p', order.fiat_currency, commissionAmount, order.customer_id);
 
     await client.query('COMMIT');
     res.json({ released: true, orderId: order.id, asset: order.asset, cryptoAmount: order.crypto_amount });

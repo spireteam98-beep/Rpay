@@ -294,12 +294,32 @@ async function migrate() {
   `);
 
   // agent_commissions.kind originally only allowed deposit/withdrawal/onboarding —
-  // widen it to include p2p order commissions.
+  // widen it to include p2p order commissions and parent override payouts.
   await pool.query(`
     ALTER TABLE agent_commissions DROP CONSTRAINT IF EXISTS agent_commissions_kind_check;
     ALTER TABLE agent_commissions
       ADD CONSTRAINT agent_commissions_kind_check
-      CHECK (kind IN ('deposit','withdrawal','onboarding','p2p'));
+      CHECK (kind IN ('deposit','withdrawal','onboarding','p2p','override'));
+  `);
+
+  // Agent tier hierarchy — mirrors Safaricom M-Pesa's Super Agent / Agent /
+  // Sub-Agent model: a Super Agent (dealer/country/area lead) contracts and
+  // manages a network of Agents, an Agent can recruit Sub-Agents under
+  // itself, and every recruited tier's commission is split 80/20 with its
+  // immediate parent on the same aggregated-line convention Safaricom uses.
+  await pool.query(`
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'AGENT';
+    ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_tier_check;
+    ALTER TABLE agents ADD CONSTRAINT agents_tier_check
+      CHECK (tier IN ('SUPER_AGENT','AGENT','SUB_AGENT'));
+
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS parent_agent_id UUID REFERENCES agents(id);
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS override_rate NUMERIC(5,4) NOT NULL DEFAULT 0.20;
+    ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_override_rate_check;
+    ALTER TABLE agents ADD CONSTRAINT agents_override_rate_check
+      CHECK (override_rate >= 0 AND override_rate < 1);
+
+    CREATE INDEX IF NOT EXISTS idx_agents_parent ON agents(parent_agent_id);
   `);
 
   // Sole super-admin: keep this the only account with role='admin'. Runs
