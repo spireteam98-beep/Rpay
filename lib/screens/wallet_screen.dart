@@ -316,9 +316,17 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
+  static const List<MapEntry<String, String>> _illustrativePeople = [
+    MapEntry('Theresa', '-\$40.00'),
+    MapEntry('Gladys', '-\$120.00'),
+    MapEntry('Jane', '-\$18.50'),
+    MapEntry('Darlene', '-\$75.00'),
+  ];
+
   /// Quick-send shortcuts built from real recipients of past transfers
   /// (ledger transactions with status 'Queued' carry the recipient as the
-  /// title). Renders nothing until the user has actually sent money once.
+  /// title). Falls back to illustrative sample contacts until the user has
+  /// actually sent money once — same convention as _recentActivityCard.
   /// Cards deliberately duplicate the _accountTabs card layout below so the
   /// two horizontal scrollers feel like the same family of component.
   Widget _peopleRow(BuildContext context, KashAppState appState) {
@@ -330,7 +338,7 @@ class _WalletScreenState extends State<WalletScreen> {
       }
       if (people.length >= 6) break;
     }
-    if (people.isEmpty) return const SizedBox.shrink();
+    if (people.isEmpty) people.addAll(_illustrativePeople);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,12 +407,12 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             const SizedBox(height: 3),
             Text(
-              'Sent $lastSentLabel',
+              lastSentLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13.5,
+                fontSize: 15,
                 fontWeight: FontWeight.w900,
               ),
             ),
