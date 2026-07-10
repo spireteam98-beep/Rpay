@@ -208,7 +208,7 @@ class _WalletScreenState extends State<WalletScreen> {
         _sectionTitle('People'),
         const SizedBox(height: 14),
         SizedBox(
-          height: 92,
+          height: 104,
           child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -227,24 +227,24 @@ class _WalletScreenState extends State<WalletScreen> {
   Widget _personAvatar(BuildContext context, _PersonSample person) {
     final initial = person.name.isEmpty ? '?' : person.name.substring(0, 1).toUpperCase();
     return Padding(
-      padding: const EdgeInsets.only(right: 16),
+      padding: const EdgeInsets.only(right: 18),
       child: TouchScale(
         onTap: () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
         child: SizedBox(
-          width: 60,
+          width: 68,
           child: Column(
             children: [
               Container(
-                width: 56,
-                height: 56,
+                width: 66,
+                height: 66,
                 alignment: Alignment.center,
                 clipBehavior: Clip.antiAlias,
                 decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
                 child: person.avatarAsset != null
-                    ? Image.asset(person.avatarAsset!, fit: BoxFit.cover, width: 56, height: 56)
+                    ? Image.asset(person.avatarAsset!, fit: BoxFit.cover, width: 66, height: 66)
                     : Text(
                         initial,
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
                       ),
               ),
               const SizedBox(height: 8),
@@ -252,7 +252,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 person.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: BybitPalette.muted2, fontSize: 12, fontWeight: FontWeight.w600),
+                style: const TextStyle(color: BybitPalette.muted2, fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -265,20 +265,20 @@ class _WalletScreenState extends State<WalletScreen> {
     return TouchScale(
       onTap: () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
       child: SizedBox(
-        width: 60,
+        width: 68,
         child: Column(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 66,
+              height: 66,
               alignment: Alignment.center,
               decoration: const BoxDecoration(color: BybitPalette.accent, shape: BoxShape.circle),
-              child: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black, size: 28),
+              child: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black, size: 30),
             ),
             const SizedBox(height: 8),
             const Text(
               'More',
-              style: TextStyle(color: BybitPalette.muted2, fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(color: BybitPalette.muted2, fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -336,18 +336,18 @@ class _WalletScreenState extends State<WalletScreen> {
   Widget _merchantRow(_MerchantActivity activity) {
     final subtitle = DateFormat('MMM d, HH:mm').format(DateTime.now().subtract(activity.agoOffset));
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 50,
+            height: 50,
             alignment: Alignment.center,
             clipBehavior: Clip.antiAlias,
             decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
             child: activity.logoAsset != null
-                ? Image.asset(activity.logoAsset!, fit: BoxFit.cover, width: 44, height: 44)
-                : Icon(activity.icon, color: BybitPalette.muted, size: 20),
+                ? Image.asset(activity.logoAsset!, fit: BoxFit.cover, width: 50, height: 50)
+                : Icon(activity.icon, color: BybitPalette.muted, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -358,10 +358,10 @@ class _WalletScreenState extends State<WalletScreen> {
                   activity.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
                 ),
-                const SizedBox(height: 2),
-                Text('${activity.subtitle} · $subtitle', style: const TextStyle(color: BybitPalette.muted, fontSize: 11.5)),
+                const SizedBox(height: 3),
+                Text('${activity.subtitle} · $subtitle', style: const TextStyle(color: BybitPalette.muted, fontSize: 12.5)),
               ],
             ),
           ),
@@ -370,12 +370,12 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               Text(
                 '-\$${activity.amount.toStringAsFixed(2)}',
-                style: const TextStyle(color: BybitPalette.red, fontSize: 14, fontWeight: FontWeight.w900),
+                style: const TextStyle(color: BybitPalette.red, fontSize: 15.5, fontWeight: FontWeight.w900),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 '\$${activity.amount.toStringAsFixed(2)} USD',
-                style: const TextStyle(color: BybitPalette.muted, fontSize: 11),
+                style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
               ),
             ],
           ),
@@ -396,17 +396,17 @@ class _WalletScreenState extends State<WalletScreen> {
     return TouchScale(
       onTap: () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.only(bottom: 16),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 50,
+              height: 50,
               alignment: Alignment.center,
               decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
               child: isPerson
-                  ? Text(initial, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800))
-                  : const Icon(Icons.add_rounded, color: BybitPalette.muted, size: 20),
+                  ? Text(initial, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800))
+                  : const Icon(Icons.add_rounded, color: BybitPalette.muted, size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -417,10 +417,10 @@ class _WalletScreenState extends State<WalletScreen> {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w800),
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
                   ),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(color: BybitPalette.muted, fontSize: 11.5)),
+                  const SizedBox(height: 3),
+                  Text(subtitle, style: const TextStyle(color: BybitPalette.muted, fontSize: 12.5)),
                 ],
               ),
             ),
@@ -431,14 +431,14 @@ class _WalletScreenState extends State<WalletScreen> {
                   entry.amountLabel,
                   style: TextStyle(
                     color: isCredit ? BybitPalette.green : BybitPalette.red,
-                    fontSize: 14,
+                    fontSize: 15.5,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   '\$${entry.amountUsd.toStringAsFixed(2)} USD',
-                  style: const TextStyle(color: BybitPalette.muted, fontSize: 11),
+                  style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
                 ),
               ],
             ),
