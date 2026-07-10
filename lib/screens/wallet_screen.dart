@@ -180,18 +180,23 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  static const List<String> _illustrativePeople = ['Theresa', 'Gladys', 'Jane', 'Darlene'];
+  static const List<_PersonSample> _illustrativePeople = [
+    _PersonSample('Anfac', avatarAsset: 'assets/images/Anfac.png'),
+    _PersonSample('Theresa'),
+    _PersonSample('Gladys'),
+    _PersonSample('Jane'),
+  ];
 
   /// Quick-send shortcuts built from real recipients of past transfers
   /// (ledger transactions with status 'Queued' carry the recipient as the
   /// title). Falls back to illustrative sample contacts until the user has
   /// actually sent money once — same convention as _recentActivityCard.
   Widget _peopleRow(BuildContext context, KashAppState appState) {
-    final people = <String>[];
+    final people = <_PersonSample>[];
     for (final t in appState.ledgerTransactions) {
       final name = t.title.trim();
-      if (t.status == 'Queued' && name.isNotEmpty && !people.contains(name)) {
-        people.add(name);
+      if (t.status == 'Queued' && name.isNotEmpty && !people.any((p) => p.name == name)) {
+        people.add(_PersonSample(name));
       }
       if (people.length >= 5) break;
     }
@@ -209,7 +214,7 @@ class _WalletScreenState extends State<WalletScreen> {
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
-              for (final name in people) _personAvatar(context, name),
+              for (final person in people) _personAvatar(context, person),
               _morePersonAvatar(context),
             ],
           ),
@@ -219,8 +224,8 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _personAvatar(BuildContext context, String name) {
-    final initial = name.isEmpty ? '?' : name.substring(0, 1).toUpperCase();
+  Widget _personAvatar(BuildContext context, _PersonSample person) {
+    final initial = person.name.isEmpty ? '?' : person.name.substring(0, 1).toUpperCase();
     return Padding(
       padding: const EdgeInsets.only(right: 16),
       child: TouchScale(
@@ -233,15 +238,18 @@ class _WalletScreenState extends State<WalletScreen> {
                 width: 56,
                 height: 56,
                 alignment: Alignment.center,
+                clipBehavior: Clip.antiAlias,
                 decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-                child: Text(
-                  initial,
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
-                ),
+                child: person.avatarAsset != null
+                    ? Image.asset(person.avatarAsset!, fit: BoxFit.cover, width: 56, height: 56)
+                    : Text(
+                        initial,
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                      ),
               ),
               const SizedBox(height: 8),
               Text(
-                name,
+                person.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: BybitPalette.muted2, fontSize: 12, fontWeight: FontWeight.w600),
@@ -650,6 +658,13 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
+}
+
+class _PersonSample {
+  final String name;
+  final String? avatarAsset;
+
+  const _PersonSample(this.name, {this.avatarAsset});
 }
 
 class _MerchantActivity {
