@@ -503,76 +503,81 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _accountTabs(BuildContext context, List<KashAccount> accounts) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      child: Column(
-        children:
-            accounts.map((account) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: TouchScale(
-                  onTap:
-                      () => Navigator.of(
-                        context,
-                      ).push(kashRoute(AccountDetailScreen(account: account))),
-                  child: BybitCard(
-                    padding: const EdgeInsets.all(15),
-                    child: Row(
-                      children: [
-                        _BybitMiniIcon(account.icon, color: account.accent),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                account.title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                account.subtitle,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: BybitPalette.muted,
-                                  fontSize: 12.5,
-                                ),
-                              ),
-                            ],
-                          ),
+    return SizedBox(
+      height: 140,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        itemCount: accounts.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final account = accounts[i];
+          return TouchScale(
+            onTap:
+                () => Navigator.of(
+                  context,
+                ).push(kashRoute(AccountDetailScreen(account: account))),
+            child: Container(
+              width: 156,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: BybitPalette.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF242832)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: account.accent.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(11),
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              account.balance,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              account.currency,
-                              style: const TextStyle(
-                                color: BybitPalette.muted,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
+                        child: Icon(account.icon, color: account.accent, size: 16),
+                      ),
+                      const Spacer(),
+                      Text(
+                        account.currency,
+                        style: const TextStyle(
+                          color: BybitPalette.muted,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    account.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: BybitPalette.muted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-              );
-            }).toList(),
+                  const SizedBox(height: 3),
+                  Text(
+                    account.balance,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
