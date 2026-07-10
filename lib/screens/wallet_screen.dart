@@ -34,7 +34,7 @@ class _WalletScreenState extends State<WalletScreen> {
         child: Column(
           children: [
             _titleRow(context),
-            _waveHeader(),
+            _waveHeader(context, appState),
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
@@ -43,7 +43,6 @@ class _WalletScreenState extends State<WalletScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const BybitSearchBar(),
-                    _balanceCard(context, appState),
                     _onChainCustodyCard(),
                     _walletModeTabs(),
                     if (_modeIndex == 0) ...[
@@ -90,17 +89,76 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _waveHeader() {
-    return SizedBox(
-      height: 108,
-      width: double.infinity,
-      child: ClipPath(
-        clipper: const BybitWaveClipper(),
-        child: Container(
-          color: BybitPalette.accent,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.only(top: 40),
-          child: _networkModeSegment(),
+  Widget _waveHeader(BuildContext context, KashAppState appState) {
+    return ClipPath(
+      clipper: const BybitWaveClipper(),
+      child: Container(
+        width: double.infinity,
+        color: BybitPalette.accent,
+        padding: const EdgeInsets.fromLTRB(24, 180, 24, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(child: _networkModeSegment()),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                const Text(
+                  'Total assets',
+                  style: TextStyle(color: Colors.black54, fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.visibility_off_outlined, color: Colors.black54, size: 18),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(100)),
+                  child: const Text(
+                    'Web3',
+                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Flexible(
+                  child: Text(
+                    appState.totalBalance,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.black, fontSize: 42, fontWeight: FontWeight.w900, height: 1),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 5),
+                  child: Text(
+                    'USD',
+                    style: TextStyle(color: Colors.black54, fontSize: 15, fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '+0.00 today',
+              style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 26),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _heroAction(context, Icons.north_east_rounded, 'Send', const SendMoneyScreen()),
+                _heroAction(context, Icons.south_rounded, 'Receive', const ReceiveScreen()),
+                _heroAction(context, Icons.phone_iphone_rounded, 'Cash-in', const CashInScreen()),
+                _heroAction(context, Icons.receipt_long_rounded, 'Ledger', const LedgerScreen()),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -162,125 +220,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _balanceCard(BuildContext context, KashAppState appState) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
-      decoration: BoxDecoration(
-        color: BybitPalette.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFF242832)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Total assets',
-                style: TextStyle(
-                  color: BybitPalette.muted,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(Icons.visibility_off_outlined,
-                  color: BybitPalette.muted, size: 18),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: BybitPalette.surface2,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: const Text(
-                  'Web3',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Flexible(
-                child: Text(
-                  appState.totalBalance,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 5),
-                child: Text(
-                  'USD',
-                  style: TextStyle(
-                    color: BybitPalette.muted,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '+0.00 today',
-            style: TextStyle(
-              color: BybitPalette.green,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _heroAction(
-                context,
-                Icons.north_east_rounded,
-                'Send',
-                const SendMoneyScreen(),
-              ),
-              _heroAction(
-                context,
-                Icons.south_rounded,
-                'Receive',
-                const ReceiveScreen(),
-              ),
-              _heroAction(
-                context,
-                Icons.phone_iphone_rounded,
-                'Cash-in',
-                const CashInScreen(),
-              ),
-              _heroAction(
-                context,
-                Icons.receipt_long_rounded,
-                'Ledger',
-                const LedgerScreen(),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _heroAction(
     BuildContext context,
     IconData icon,
@@ -292,24 +231,24 @@ class _WalletScreenState extends State<WalletScreen> {
       child: Column(
         children: [
           Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: BybitPalette.surface2,
-            borderRadius: BorderRadius.circular(18),
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(icon, color: BybitPalette.accent, size: 24),
           ),
-          child: Icon(icon, color: Colors.white, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
