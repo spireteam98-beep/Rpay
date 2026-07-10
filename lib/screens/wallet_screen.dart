@@ -325,8 +325,10 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   static final List<_MerchantActivity> _illustrativeActivity = [
-    _MerchantActivity('Starbucks', 'Coffee & snacks', 1.00, Icons.local_cafe_rounded, const Duration(hours: 2)),
-    _MerchantActivity('Netflix', 'Monthly subscription', 10.00, Icons.play_circle_fill_rounded, const Duration(hours: 9)),
+    _MerchantActivity('Starbucks', 'Coffee & snacks', 1.00, Icons.local_cafe_rounded, const Duration(hours: 2),
+        logoAsset: 'assets/images/starbuxks.jpg'),
+    _MerchantActivity('Netflix', 'Monthly subscription', 10.00, Icons.play_circle_fill_rounded, const Duration(hours: 9),
+        logoAsset: 'assets/images/netflix.jpg'),
     _MerchantActivity('Spotify', 'Premium subscription', 9.99, Icons.music_note_rounded, const Duration(days: 1)),
     _MerchantActivity('Amazon', 'Online purchase', 24.50, Icons.shopping_bag_rounded, const Duration(days: 2)),
   ];
@@ -341,8 +343,11 @@ class _WalletScreenState extends State<WalletScreen> {
             width: 44,
             height: 44,
             alignment: Alignment.center,
+            clipBehavior: Clip.antiAlias,
             decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-            child: Icon(activity.icon, color: BybitPalette.muted, size: 20),
+            child: activity.logoAsset != null
+                ? Image.asset(activity.logoAsset!, fit: BoxFit.cover, width: 44, height: 44)
+                : Icon(activity.icon, color: BybitPalette.muted, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -673,8 +678,9 @@ class _MerchantActivity {
   final double amount;
   final IconData icon;
   final Duration agoOffset;
+  final String? logoAsset;
 
-  const _MerchantActivity(this.name, this.subtitle, this.amount, this.icon, this.agoOffset);
+  const _MerchantActivity(this.name, this.subtitle, this.amount, this.icon, this.agoOffset, {this.logoAsset});
 }
 
 class _BybitMiniIcon extends StatelessWidget {
