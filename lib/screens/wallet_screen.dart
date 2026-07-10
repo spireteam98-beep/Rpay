@@ -12,6 +12,7 @@ import '../widgets/touch_scale.dart';
 import 'account_detail_screen.dart';
 import 'cash_in_screen.dart';
 import 'ledger_screen.dart';
+import 'profile_screen.dart';
 import 'receive_screen.dart';
 import 'send_money_screen.dart';
 
@@ -33,58 +34,132 @@ class _WalletScreenState extends State<WalletScreen> {
       backgroundColor: BybitPalette.bg,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            _titleRow(context),
-            _waveHeader(),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const BybitSearchBar(),
-                    _balanceCard(context, appState),
-                    _onChainCustodyCard(),
-                    _walletModeTabs(),
-                    if (_modeIndex == 0) ...[
-                      _peopleRow(context, appState),
-                      _accountTabs(context, appState.accounts),
-                      _recentActivityCard(context, appState),
-                    ] else
-                      _modePlaceholder(_modeIndex == 1 ? 'Funding' : 'Earn'),
-                  ],
-                ),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _topBalanceCard(context, appState),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Align(alignment: Alignment.centerLeft, child: _networkModeSegment()),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              const BybitSearchBar(),
+              _onChainCustodyCard(),
+              _walletModeTabs(),
+              if (_modeIndex == 0) ...[
+                _peopleRow(context, appState),
+                _accountTabs(context, appState.accounts),
+                _recentActivityCard(context, appState),
+              ] else
+                _modePlaceholder(_modeIndex == 1 ? 'Funding' : 'Earn'),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _titleRow(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  /// Top balance card: consolidates identity, balance, and quick actions
+  /// into a single lime card at the top of the wallet, per the reference
+  /// design — replaces the old separate title row + wave header + dark
+  /// balance card.
+  Widget _topBalanceCard(BuildContext context, KashAppState appState) {
+    final initial = appState.firstName.isEmpty ? 'A' : appState.firstName.substring(0, 1).toUpperCase();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE9FF3D), BybitPalette.accent],
+        ),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Wallet',
-            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
-          ),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _appBarAction(
-                Icons.history_rounded,
-                () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
+              TouchScale(
+                onTap: () => Navigator.of(context).push(kashRoute(const ProfileScreen())),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+                  child: Text(
+                    initial,
+                    style: const TextStyle(color: BybitPalette.accent, fontSize: 15, fontWeight: FontWeight.w900),
+                  ),
+                ),
               ),
-              const SizedBox(width: 10),
-              _appBarAction(
-                Icons.qr_code_scanner_rounded,
-                () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+              Row(
+                children: [
+                  _darkIconButton(
+                    Icons.qr_code_scanner_rounded,
+                    () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+                  ),
+                  const SizedBox(width: 10),
+                  _darkIconButton(
+                    Icons.notifications_none_rounded,
+                    () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('No new notifications yet')),
+                    ),
+                  ),
+                ],
               ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          const Row(
+            children: [
+              Text(
+                'Total balance',
+                style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              SizedBox(width: 6),
+              Icon(Icons.visibility_outlined, color: Colors.black87, size: 17),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: Text(
+                  appState.totalBalance,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.black, fontSize: 38, fontWeight: FontWeight.w900, height: 1),
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 5),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('(USD)', style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w800)),
+                    Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black87, size: 18),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _quickActionCircle(context, Icons.arrow_upward_rounded, const SendMoneyScreen()),
+              _quickActionCircle(context, Icons.arrow_downward_rounded, const ReceiveScreen()),
+              _quickActionCircle(context, Icons.history_rounded, const LedgerScreen()),
+              _quickActionCircle(context, Icons.add_rounded, const CashInScreen()),
             ],
           ),
         ],
@@ -92,18 +167,28 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _waveHeader() {
-    return SizedBox(
-      height: 108,
-      width: double.infinity,
-      child: ClipPath(
-        clipper: const BybitWaveClipper(),
-        child: Container(
-          color: BybitPalette.accent,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.only(top: 40),
-          child: _networkModeSegment(),
-        ),
+  Widget _darkIconButton(IconData icon, VoidCallback onTap) {
+    return TouchScale(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+        child: Icon(icon, color: BybitPalette.accent, size: 18),
+      ),
+    );
+  }
+
+  Widget _quickActionCircle(BuildContext context, IconData icon, Widget screen) {
+    return TouchScale(
+      onTap: () => Navigator.of(context).push(kashRoute(screen)),
+      child: Container(
+        width: 56,
+        height: 56,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+        child: Icon(icon, color: BybitPalette.accent, size: 22),
       ),
     );
   }
@@ -111,7 +196,7 @@ class _WalletScreenState extends State<WalletScreen> {
   Widget _networkModeSegment() {
     return Container(
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(100)),
+      decoration: BoxDecoration(color: BybitPalette.surface2, borderRadius: BorderRadius.circular(100)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -149,173 +234,6 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _appBarAction(IconData icon, VoidCallback onTap) {
-    return TouchScale(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: BybitPalette.surface2,
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, color: Colors.white, size: 20),
-      ),
-    );
-  }
-
-  Widget _balanceCard(BuildContext context, KashAppState appState) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
-      decoration: BoxDecoration(
-        color: BybitPalette.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFF242832)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                'Total assets',
-                style: TextStyle(
-                  color: BybitPalette.muted,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Icon(Icons.visibility_off_outlined,
-                  color: BybitPalette.muted, size: 18),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: BybitPalette.surface2,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: const Text(
-                  'Web3',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Flexible(
-                child: Text(
-                  appState.totalBalance,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 5),
-                child: Text(
-                  'USD',
-                  style: TextStyle(
-                    color: BybitPalette.muted,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '+0.00 today',
-            style: TextStyle(
-              color: BybitPalette.green,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _heroAction(
-                context,
-                Icons.north_east_rounded,
-                'Send',
-                const SendMoneyScreen(),
-              ),
-              _heroAction(
-                context,
-                Icons.south_rounded,
-                'Receive',
-                const ReceiveScreen(),
-              ),
-              _heroAction(
-                context,
-                Icons.phone_iphone_rounded,
-                'Cash-in',
-                const CashInScreen(),
-              ),
-              _heroAction(
-                context,
-                Icons.receipt_long_rounded,
-                'Ledger',
-                const LedgerScreen(),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _heroAction(
-    BuildContext context,
-    IconData icon,
-    String label,
-    Widget screen,
-  ) {
-    return TouchScale(
-      onTap: () => Navigator.of(context).push(kashRoute(screen)),
-      child: Column(
-        children: [
-          Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: BybitPalette.surface2,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Icon(icon, color: Colors.white, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-      ),
-    );
-  }
-
   static const List<String> _illustrativePeople = ['Theresa', 'Gladys', 'Jane', 'Darlene'];
 
   /// Quick-send shortcuts built from real recipients of past transfers
@@ -339,17 +257,18 @@ class _WalletScreenState extends State<WalletScreen> {
         _sectionTitle('People'),
         const SizedBox(height: 14),
         SizedBox(
-          height: 88,
+          height: 92,
           child: ListView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
               for (final name in people) _personAvatar(context, name),
               _morePersonAvatar(context),
             ],
           ),
         ),
+        const SizedBox(height: 22),
       ],
     );
   }
