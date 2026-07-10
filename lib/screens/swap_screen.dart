@@ -57,14 +57,21 @@ class _SwapScreenState extends State<SwapScreen> {
     final holdings = <String, double>{};
     for (final holding in (balances?['holdings'] as List? ?? [])) {
       final map = holding as Map<String, dynamic>;
-      holdings[map['asset'] as String] = (map['amount'] as num?)?.toDouble() ?? 0;
+      holdings[map['asset'] as String] =
+          (map['amount'] as num?)?.toDouble() ?? 0;
     }
 
     setState(() {
       _coins = coins;
       _holdings = holdings;
-      _fromCrypto = coins.firstWhere((c) => c.symbol == _fromCrypto.symbol, orElse: () => _fromCrypto);
-      _toCrypto = coins.firstWhere((c) => c.symbol == _toCrypto.symbol, orElse: () => _toCrypto);
+      _fromCrypto = coins.firstWhere(
+        (c) => c.symbol == _fromCrypto.symbol,
+        orElse: () => _fromCrypto,
+      );
+      _toCrypto = coins.firstWhere(
+        (c) => c.symbol == _toCrypto.symbol,
+        orElse: () => _toCrypto,
+      );
       _calculateToAmount();
     });
   }
@@ -322,9 +329,10 @@ class _SwapScreenState extends State<SwapScreen> {
   }
 
   Widget _buildExchangeRate() {
-    final rate = _toCrypto.currentPrice > 0
-        ? _fromCrypto.currentPrice / _toCrypto.currentPrice
-        : 0;
+    final rate =
+        _toCrypto.currentPrice > 0
+            ? _fromCrypto.currentPrice / _toCrypto.currentPrice
+            : 0;
     return BybitCard(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -391,57 +399,59 @@ class _SwapScreenState extends State<SwapScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            ..._coins.where((crypto) {
-              return isFromCrypto
-                  ? crypto.symbol != _toCrypto.symbol
-                  : crypto.symbol != _fromCrypto.symbol;
-            }).map((crypto) {
-              return ListTile(
-                leading: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(
-                    color: BybitPalette.surface2,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      crypto.symbol.substring(0, 1).toUpperCase(),
+            ..._coins
+                .where((crypto) {
+                  return isFromCrypto
+                      ? crypto.symbol != _toCrypto.symbol
+                      : crypto.symbol != _fromCrypto.symbol;
+                })
+                .map((crypto) {
+                  return ListTile(
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          crypto.symbol.substring(0, 1).toUpperCase(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      crypto.name,
                       style: const TextStyle(
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w800,
                         color: Colors.white,
                       ),
                     ),
-                  ),
-                ),
-                title: Text(
-                  crypto.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                subtitle: Text(
-                  crypto.symbol.toUpperCase(),
-                  style: const TextStyle(color: BybitPalette.muted),
-                ),
-                trailing: Text(
-                  crypto.formattedPrice,
-                  style: const TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  setState(() {
-                    if (isFromCrypto) {
-                      _fromCrypto = crypto;
-                    } else {
-                      _toCrypto = crypto;
-                    }
-                    _calculateToAmount();
-                  });
-                  Navigator.pop(context);
-                },
-              );
-            }),
+                    subtitle: Text(
+                      crypto.symbol.toUpperCase(),
+                      style: const TextStyle(color: BybitPalette.muted),
+                    ),
+                    trailing: Text(
+                      crypto.formattedPrice,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    onTap: () {
+                      setState(() {
+                        if (isFromCrypto) {
+                          _fromCrypto = crypto;
+                        } else {
+                          _toCrypto = crypto;
+                        }
+                        _calculateToAmount();
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                }),
             const SizedBox(height: 12),
           ],
         );
@@ -456,95 +466,98 @@ class _SwapScreenState extends State<SwapScreen> {
   void _showSwapConfirmationDialog() {
     showDialog(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: BybitPalette.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Confirm Swap',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _buildSwapDetailsRow(
-                'You Pay',
-                _fromAmountController.text,
-                _fromCrypto.symbol.toUpperCase(),
-              ),
-              const SizedBox(height: 16),
-              _buildSwapDetailsRow(
-                'You Receive (est.)',
-                _toAmountController.text,
-                _toCrypto.symbol.toUpperCase(),
-              ),
-              const SizedBox(height: 16),
-              _buildSwapDetailsRow(
-                'Exchange Rate',
-                '1 ${_fromCrypto.symbol.toUpperCase()}',
-                '${(_toCrypto.currentPrice > 0 ? _fromCrypto.currentPrice / _toCrypto.currentPrice : 0).toStringAsFixed(6)} ${_toCrypto.symbol.toUpperCase()}',
-              ),
-              const SizedBox(height: 24),
-              Row(
+      builder:
+          (dialogContext) => Dialog(
+            backgroundColor: BybitPalette.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: BybitPalette.surface2),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
+                  const Text(
+                    'Confirm Swap',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        _executeSwap();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: BybitPalette.accent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(100),
+                  const SizedBox(height: 24),
+                  _buildSwapDetailsRow(
+                    'You Pay',
+                    _fromAmountController.text,
+                    _fromCrypto.symbol.toUpperCase(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSwapDetailsRow(
+                    'You Receive (est.)',
+                    _toAmountController.text,
+                    _toCrypto.symbol.toUpperCase(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildSwapDetailsRow(
+                    'Exchange Rate',
+                    '1 ${_fromCrypto.symbol.toUpperCase()}',
+                    '${(_toCrypto.currentPrice > 0 ? _fromCrypto.currentPrice / _toCrypto.currentPrice : 0).toStringAsFixed(6)} ${_toCrypto.symbol.toUpperCase()}',
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: BybitPalette.surface2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text(
-                        'Confirm',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.black,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop();
+                            _executeSwap();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: BybitPalette.accent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text(
+                            'Confirm',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -620,89 +633,96 @@ class _SwapScreenState extends State<SwapScreen> {
   void _showSwapErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: BybitPalette.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Swap failed',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
+      builder:
+          (dialogContext) => Dialog(
+            backgroundColor: BybitPalette.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Swap failed',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: BybitPalette.muted2,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  BybitPrimaryButton(
+                    label: 'OK',
+                    onTap: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: BybitPalette.muted2),
-              ),
-              const SizedBox(height: 20),
-              BybitPrimaryButton(
-                label: 'OK',
-                onTap: () => Navigator.of(dialogContext).pop(),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
   void _showSwapSuccessDialog(double qtyReceived) {
     showDialog(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: BybitPalette.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircleAvatar(
-                radius: 40,
-                backgroundColor: BybitPalette.accent,
-                child: Icon(
-                  Icons.check_rounded,
-                  color: Colors.black,
-                  size: 40,
-                ),
+      builder:
+          (dialogContext) => Dialog(
+            backgroundColor: BybitPalette.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircleAvatar(
+                    radius: 40,
+                    backgroundColor: BybitPalette.accent,
+                    child: Icon(
+                      Icons.check_rounded,
+                      color: Colors.black,
+                      size: 40,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Swap Successful!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'You have successfully swapped ${_fromAmountController.text} ${_fromCrypto.symbol.toUpperCase()} for ${qtyReceived.toStringAsFixed(6)} ${_toCrypto.symbol.toUpperCase()}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: BybitPalette.muted2,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  BybitPrimaryButton(
+                    label: 'Done',
+                    onTap: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Swap Successful!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'You have successfully swapped ${_fromAmountController.text} ${_fromCrypto.symbol.toUpperCase()} for ${qtyReceived.toStringAsFixed(6)} ${_toCrypto.symbol.toUpperCase()}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: BybitPalette.muted2,
-                ),
-              ),
-              const SizedBox(height: 24),
-              BybitPrimaryButton(
-                label: 'Done',
-                onTap: () => Navigator.of(dialogContext).pop(),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 }

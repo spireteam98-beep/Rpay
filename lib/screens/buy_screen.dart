@@ -79,15 +79,13 @@ class _BuyScreenState extends State<BuyScreen> {
     return usd / _selectedCrypto.currentPrice;
   }
 
-  String get _gatewayLabel =>
-      _gateways.firstWhere((g) => g.$1 == _gateway).$2;
-  IconData get _gatewayIcon =>
-      _gateways.firstWhere((g) => g.$1 == _gateway).$3;
+  String get _gatewayLabel => _gateways.firstWhere((g) => g.$1 == _gateway).$2;
+  IconData get _gatewayIcon => _gateways.firstWhere((g) => g.$1 == _gateway).$3;
 
   String get _processingTime => switch (_gateway) {
-        'STRIPE' => 'Instant',
-        _ => 'A few minutes',
-      };
+    'STRIPE' => 'Instant',
+    _ => 'A few minutes',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +141,10 @@ class _BuyScreenState extends State<BuyScreen> {
                     color: BybitPalette.surface2,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                  ),
                 ),
               ),
               Expanded(
@@ -234,7 +235,11 @@ class _BuyScreenState extends State<BuyScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 20),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -269,7 +274,9 @@ class _BuyScreenState extends State<BuyScreen> {
                 child: TextField(
                   key: ValueKey(_amountMode),
                   controller: _amountMode ? _amountController : _qtyController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w900,
@@ -287,14 +294,25 @@ class _BuyScreenState extends State<BuyScreen> {
               ),
               Text(
                 _amountMode ? 'USD' : _selectedCrypto.symbol,
-                style: const TextStyle(color: BybitPalette.muted, fontSize: 14, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: BybitPalette.muted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(width: 10),
-              const Text('|', style: TextStyle(color: BybitPalette.surface2, fontSize: 16)),
+              const Text(
+                '|',
+                style: TextStyle(color: BybitPalette.surface2, fontSize: 16),
+              ),
               const SizedBox(width: 10),
               const Text(
                 'Max',
-                style: TextStyle(color: BybitPalette.accent, fontSize: 14, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: BybitPalette.accent,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
@@ -402,7 +420,11 @@ class _BuyScreenState extends State<BuyScreen> {
         children: [
           const Text(
             'Payment info',
-            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           BybitInfoLine('Processing time', _processingTime),
           const BybitInfoLine('Rail', 'RoyallPay custody'),
@@ -427,7 +449,11 @@ class _BuyScreenState extends State<BuyScreen> {
               const SizedBox(height: 12),
               const Text(
                 'Select payment method',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white),
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 8),
               ..._gateways.map((gateway) {
@@ -443,11 +469,18 @@ class _BuyScreenState extends State<BuyScreen> {
                   ),
                   title: Text(
                     gateway.$2,
-                    style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
-                  trailing: gateway.$1 == _gateway
-                      ? const Icon(Icons.check_circle_rounded, color: BybitPalette.accent)
-                      : null,
+                  trailing:
+                      gateway.$1 == _gateway
+                          ? const Icon(
+                            Icons.check_circle_rounded,
+                            color: BybitPalette.accent,
+                          )
+                          : null,
                   onTap: () {
                     setState(() => _gateway = gateway.$1);
                     Navigator.of(sheetContext).pop();
@@ -498,9 +531,10 @@ class _BuyScreenState extends State<BuyScreen> {
                     ),
                     child: Icon(
                       Icons.currency_bitcoin_rounded,
-                      color: crypto.isPriceUp
-                          ? BybitPalette.green
-                          : BybitPalette.red,
+                      color:
+                          crypto.isPriceUp
+                              ? BybitPalette.green
+                              : BybitPalette.red,
                     ),
                   ),
                   title: Text(
@@ -548,7 +582,7 @@ class _BuyScreenState extends State<BuyScreen> {
       await _showResult(
         'Crypto purchased',
         '${qty.toStringAsFixed(6)} ${_selectedCrypto.symbol} added to your custody wallet'
-        '${executionMode == 'external-market' ? ' via Binance testnet.' : '.'}',
+            '${executionMode == 'external-market' ? ' via Binance testnet.' : '.'}',
       );
     } on ApiException catch (err) {
       if (!mounted) return;
@@ -570,46 +604,56 @@ class _BuyScreenState extends State<BuyScreen> {
   Future<void> _showResult(String title, String message) {
     return showDialog<void>(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: BybitPalette.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircleAvatar(
-                radius: 38,
-                backgroundColor: BybitPalette.accent,
-                child: Icon(Icons.check_rounded, color: Colors.black, size: 38),
+      builder:
+          (dialogContext) => Dialog(
+            backgroundColor: BybitPalette.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircleAvatar(
+                    radius: 38,
+                    backgroundColor: BybitPalette.accent,
+                    child: Icon(
+                      Icons.check_rounded,
+                      color: Colors.black,
+                      size: 38,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: BybitPalette.muted2,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  BybitPrimaryButton(
+                    label: 'Done',
+                    onTap: () {
+                      Navigator.of(dialogContext).pop();
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(height: 18),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: BybitPalette.muted2, fontSize: 13),
-              ),
-              const SizedBox(height: 22),
-              BybitPrimaryButton(
-                label: 'Done',
-                onTap: () {
-                  Navigator.of(dialogContext).pop();
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 }

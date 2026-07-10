@@ -56,6 +56,7 @@ class KashAppState extends ChangeNotifier {
   String _phoneNumber = '+252 61 000 0000';
   bool _phoneVerified = false;
   bool _kycSubmitted = false;
+  String _role = 'user';
   int _ledgerSequence = 1004;
   final List<LedgerTransaction> _ledgerTransactions = [];
   final List<AmlCase> _amlCases = [];
@@ -93,6 +94,7 @@ class KashAppState extends ChangeNotifier {
       _phoneVerified = me['phone_verified'] == true;
       final kycTier = me['kyc_tier'];
       _kycSubmitted = kycTier is num ? kycTier >= 2 : _kycSubmitted;
+      _role = me['role'] as String? ?? _role;
     }
 
     _accounts =
@@ -158,6 +160,7 @@ class KashAppState extends ChangeNotifier {
   String get phoneNumber => _phoneNumber;
   bool get phoneVerified => _phoneVerified;
   bool get kycSubmitted => _kycSubmitted;
+  bool get isAdmin => _role == 'admin';
   String get firstName => _profileName.split(' ').first;
   KycTier get tier => _kycSubmitted ? KycTier.full : KycTier.tier1;
   String get kycTier => tier.label;
@@ -481,6 +484,7 @@ class KashAppState extends ChangeNotifier {
       'phoneNumber': _phoneNumber,
       'phoneVerified': _phoneVerified,
       'kycSubmitted': _kycSubmitted,
+      'role': _role,
       'ledgerSequence': _ledgerSequence,
       'spentToday': _spentToday,
       'spentDate': _spentDate,
@@ -516,6 +520,7 @@ class KashAppState extends ChangeNotifier {
       _phoneNumber = state['phoneNumber'] as String? ?? _phoneNumber;
       _phoneVerified = state['phoneVerified'] as bool? ?? false;
       _kycSubmitted = state['kycSubmitted'] as bool? ?? false;
+      _role = state['role'] as String? ?? 'user';
       _ledgerSequence = state['ledgerSequence'] as int? ?? 1004;
       _spentToday = (state['spentToday'] as num?)?.toDouble() ?? 0;
       _spentDate = state['spentDate'] as String? ?? '';

@@ -31,9 +31,9 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _handleContinue() async {
@@ -65,7 +65,9 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
     if (ethAddress == null) {
-      _showMessage('Backend is not reachable. Start the RoyallPay API and try again.');
+      _showMessage(
+        'Backend is not reachable. Start the RoyallPay API and try again.',
+      );
       return;
     }
 
@@ -77,9 +79,9 @@ class _SignupScreenState extends State<SignupScreen> {
 
     if (!mounted) return;
     context.read<KashAppState>().completeSignup(
-          fullName: fullName,
-          phoneNumber: phone,
-        );
+      fullName: fullName,
+      phoneNumber: phone,
+    );
 
     Navigator.of(context).push(kashRoute(EmailVerifyScreen(email: email)));
   }
@@ -134,10 +136,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 controller: _emailController,
               ),
               const SizedBox(height: 28),
-              BybitPrimaryButton(
-                label: 'Continue',
-                onTap: _handleContinue,
-              ),
+              BybitPrimaryButton(label: 'Continue', onTap: _handleContinue),
               const SizedBox(height: 16),
               Center(
                 child: Text(

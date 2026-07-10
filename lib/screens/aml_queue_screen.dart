@@ -17,51 +17,55 @@ class AmlQueueScreen extends StatelessWidget {
       backgroundColor: BybitPalette.bg,
       appBar: const BybitSubHeader('Monitoring queue'),
       body: SafeArea(
-        child: cases.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: BybitPalette.surface2,
-                        shape: BoxShape.circle,
+        child:
+            cases.isEmpty
+                ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: const BoxDecoration(
+                          color: BybitPalette.surface2,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.verified_outlined,
+                          color: BybitPalette.accent,
+                          size: 28,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.verified_outlined,
-                        color: BybitPalette.accent,
-                        size: 28,
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No open cases',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'No open cases',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Sanctions, velocity and limit rules are running.',
+                        style: TextStyle(
+                          color: BybitPalette.muted,
+                          fontSize: 13,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Sanctions, velocity and limit rules are running.',
-                      style: TextStyle(color: BybitPalette.muted, fontSize: 13),
-                    ),
-                  ],
+                    ],
+                  ),
+                )
+                : ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                  itemCount: cases.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final amlCase = cases[index];
+                    return _caseTile(context, appState, amlCase);
+                  },
                 ),
-              )
-            : ListView.separated(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                itemCount: cases.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final amlCase = cases[index];
-                  return _caseTile(context, appState, amlCase);
-                },
-              ),
       ),
     );
   }
@@ -123,12 +127,15 @@ class AmlQueueScreen extends StatelessWidget {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
-                  color: isOpen
-                      ? color.withOpacity(0.14)
-                      : BybitPalette.green.withOpacity(0.14),
+                  color:
+                      isOpen
+                          ? color.withOpacity(0.14)
+                          : BybitPalette.green.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
@@ -157,15 +164,16 @@ class AmlQueueScreen extends StatelessWidget {
             children: [
               Text(
                 DateFormat('MMM d, HH:mm').format(amlCase.createdAt),
-                style:
-                    const TextStyle(color: BybitPalette.muted, fontSize: 12),
+                style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
               ),
               if (isOpen)
                 TouchScale(
                   onTap: () => appState.clearAmlCase(amlCase.id),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 7),
+                      horizontal: 14,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: BybitPalette.accent,
                       borderRadius: BorderRadius.circular(100),

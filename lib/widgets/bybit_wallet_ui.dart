@@ -12,6 +12,7 @@ class BybitPalette {
   static const selected = Color(0xFF4B525F);
   static const muted = Color(0xFF80848D);
   static const muted2 = Color(0xFF777B84);
+
   /// RoyallPay's signature neon-lime brand accent (matches [AppTheme.primaryColor]).
   static const accent = Color(0xFFDDF716);
   static const green = Color(0xFF20C997);
@@ -95,8 +96,11 @@ class BybitStatusBar extends StatelessWidget {
             children: [
               Icon(Icons.wifi_rounded, color: Colors.white, size: 22),
               SizedBox(width: 8),
-              Icon(Icons.signal_cellular_alt_rounded,
-                  color: Colors.white, size: 21),
+              Icon(
+                Icons.signal_cellular_alt_rounded,
+                color: Colors.white,
+                size: 21,
+              ),
               SizedBox(width: 8),
               Icon(Icons.battery_full_rounded, color: Colors.white, size: 23),
               SizedBox(width: 3),
@@ -142,8 +146,11 @@ class BybitTopBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          const Icon(Icons.qr_code_scanner_rounded,
-              color: Colors.white, size: 34),
+          const Icon(
+            Icons.qr_code_scanner_rounded,
+            color: Colors.white,
+            size: 34,
+          ),
         ],
       ),
     );
@@ -153,12 +160,13 @@ class BybitTopBar extends StatelessWidget {
     return Container(
       height: 52,
       alignment: Alignment.center,
-      decoration: selected
-          ? BoxDecoration(
-              color: BybitPalette.selected,
-              borderRadius: BorderRadius.circular(8),
-            )
-          : null,
+      decoration:
+          selected
+              ? BoxDecoration(
+                color: BybitPalette.selected,
+                borderRadius: BorderRadius.circular(8),
+              )
+              : null,
       child: Text(
         label,
         style: TextStyle(
@@ -408,11 +416,7 @@ class BybitTokenIcon extends StatelessWidget {
   final BybitTokenData token;
   final double size;
 
-  const BybitTokenIcon({
-    super.key,
-    required this.token,
-    this.size = 58,
-  });
+  const BybitTokenIcon({super.key, required this.token, this.size = 58});
 
   @override
   Widget build(BuildContext context) {
@@ -424,29 +428,35 @@ class BybitTokenIcon extends StatelessWidget {
           Container(
             width: size,
             height: size,
-            decoration: BoxDecoration(color: token.color, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: token.color,
+              shape: BoxShape.circle,
+            ),
             child: Center(
-              child: token.symbol == 'SOL'
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        _SolStripe(Color(0xFF14F195)),
-                        SizedBox(height: 3),
-                        _SolStripe(Color(0xFF9945FF)),
-                        SizedBox(height: 3),
-                        _SolStripe(Color(0xFF14F195)),
-                      ],
-                    )
-                  : Text(
-                      token.mark,
-                      style: TextStyle(
-                        color: token.symbol == 'USDT'
-                            ? Colors.black
-                            : Colors.white,
-                        fontSize: token.mark.length > 1 ? size * 0.28 : size * 0.42,
-                        fontWeight: FontWeight.w900,
+              child:
+                  token.symbol == 'SOL'
+                      ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          _SolStripe(Color(0xFF14F195)),
+                          SizedBox(height: 3),
+                          _SolStripe(Color(0xFF9945FF)),
+                          SizedBox(height: 3),
+                          _SolStripe(Color(0xFF14F195)),
+                        ],
+                      )
+                      : Text(
+                        token.mark,
+                        style: TextStyle(
+                          color:
+                              token.symbol == 'USDT'
+                                  ? Colors.black
+                                  : Colors.white,
+                          fontSize:
+                              token.mark.length > 1 ? size * 0.28 : size * 0.42,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
             ),
           ),
           Positioned(
@@ -464,9 +474,10 @@ class BybitTokenIcon extends StatelessWidget {
                 child: Text(
                   token.chainColor == const Color(0xFFF5F2FF) ? 'S' : 'E',
                   style: TextStyle(
-                    color: token.chainColor == const Color(0xFFF5F2FF)
-                        ? const Color(0xFF765AF6)
-                        : Colors.white,
+                    color:
+                        token.chainColor == const Color(0xFFF5F2FF)
+                            ? const Color(0xFF765AF6)
+                            : Colors.white,
                     fontSize: size * 0.16,
                     fontWeight: FontWeight.w900,
                   ),

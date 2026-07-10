@@ -68,7 +68,9 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _verify() async {
@@ -89,7 +91,9 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
         return;
       }
       setState(() => _verifying = false);
-      _showMessage('Backend is not reachable. Start the RoyallPay API and try again.');
+      _showMessage(
+        'Backend is not reachable. Start the RoyallPay API and try again.',
+      );
     } on ApiException catch (err) {
       if (!mounted) return;
       setState(() => _verifying = false);
@@ -151,7 +155,10 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
               const SizedBox(height: 6),
               Text(
                 'We sent a code to ${widget.email}',
-                style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
+                style: const TextStyle(
+                  color: BybitPalette.muted2,
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 28),
               Row(
@@ -166,7 +173,10 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                       color: BybitPalette.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: active ? BybitPalette.accent : const Color(0xFF242832),
+                        color:
+                            active
+                                ? BybitPalette.accent
+                                : const Color(0xFF242832),
                         width: active ? 1.4 : 1,
                       ),
                     ),
@@ -214,10 +224,11 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 2.1,
-      children: keys.map((k) {
-        if (k.isEmpty) return const SizedBox.shrink();
-        return TouchScaleKey(label: k, onTap: () => _tapKey(k));
-      }).toList(),
+      children:
+          keys.map((k) {
+            if (k.isEmpty) return const SizedBox.shrink();
+            return TouchScaleKey(label: k, onTap: () => _tapKey(k));
+          }).toList(),
     );
   }
 }

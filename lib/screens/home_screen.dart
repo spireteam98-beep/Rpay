@@ -189,7 +189,12 @@ class HomeScreen extends StatelessWidget {
             'Send',
             const SendMoneyScreen(),
           ),
-          _actionButton(context, Icons.add_rounded, 'Add', const CashInScreen()),
+          _actionButton(
+            context,
+            Icons.add_rounded,
+            'Add',
+            const CashInScreen(),
+          ),
           _actionButton(
             context,
             Icons.currency_bitcoin_rounded,
@@ -366,10 +371,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: BybitPalette.muted,
-            ),
+            const Icon(Icons.chevron_right_rounded, color: BybitPalette.muted),
           ],
         ),
       ),

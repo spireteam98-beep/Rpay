@@ -55,10 +55,11 @@ class CryptoExchangeApp extends StatelessWidget {
         }
 
         return ChangeNotifierProvider(
-          create: (_) => KashAppState(
-            profileName: AuthService.storedFullName,
-            phoneNumber: AuthService.storedPhone,
-          ),
+          create:
+              (_) => KashAppState(
+                profileName: AuthService.storedFullName,
+                phoneNumber: AuthService.storedPhone,
+              ),
           child: MaterialApp(
             title: 'RoyallPay',
             debugShowCheckedModeBanner: false,

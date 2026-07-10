@@ -94,7 +94,8 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     if (widget.gateway != null && widget.gateway != _gateway) {
       setState(() => _gateway = widget.gateway!);
     }
-    if (widget.fixedAmount != null && widget.fixedAmount != oldWidget.fixedAmount) {
+    if (widget.fixedAmount != null &&
+        widget.fixedAmount != oldWidget.fixedAmount) {
       _amountController.text = widget.fixedAmount!.toStringAsFixed(2);
     }
   }
@@ -120,9 +121,10 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     }
   }
 
-  bool _isPhoneValid(String phone) => _gateway == 'WAAFI'
-      ? _isValidSomaliPhone(phone)
-      : _isValidKenyaPhone(phone);
+  bool _isPhoneValid(String phone) =>
+      _gateway == 'WAAFI'
+          ? _isValidSomaliPhone(phone)
+          : _isValidKenyaPhone(phone);
 
   String? get _phoneErrorText {
     final phone = _phoneController.text;
@@ -153,9 +155,10 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         if (_gateway == 'WAAFI' || _gateway == 'PAYSTACK') ...[
           const SizedBox(height: 18),
           BybitTextField(
-            label: _gateway == 'WAAFI'
-                ? 'Waafi phone (Somalia only)'
-                : 'M-Pesa phone (Kenya only)',
+            label:
+                _gateway == 'WAAFI'
+                    ? 'Waafi phone (Somalia only)'
+                    : 'M-Pesa phone (Kenya only)',
             hint: _gateway == 'WAAFI' ? '2526XXXXXXX' : '07XXXXXXXX',
             icon: Icons.phone_iphone_rounded,
             keyboardType: TextInputType.phone,
@@ -172,15 +175,16 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
           SplitCardForm(
             key: _splitCardKey,
             nameController: _cardHolderController,
-            onCompleteChanged: (complete) =>
-                setState(() => _cardComplete = complete),
+            onCompleteChanged:
+                (complete) => setState(() => _cardComplete = complete),
           ),
         ],
         const SizedBox(height: 28),
         BybitPrimaryButton(
-          label: _submitting || _awaitingApproval
-              ? 'Please wait…'
-              : widget.submitLabel,
+          label:
+              _submitting || _awaitingApproval
+                  ? 'Please wait…'
+                  : widget.submitLabel,
           enabled: !(_submitting || _awaitingApproval),
           onTap: _submit,
         ),
@@ -197,28 +201,33 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: gateways.map((gateway) {
-        final selected = gateway.$1 == _gateway;
-        return TouchScale(
-          onTap: () => setState(() => _gateway = gateway.$1),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-            decoration: BoxDecoration(
-              color: selected ? BybitPalette.selected : BybitPalette.surface2,
-              borderRadius: BorderRadius.circular(100),
-            ),
-            child: Text(
-              gateway.$2,
-              style: TextStyle(
-                color: selected ? Colors.white : BybitPalette.muted,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w900,
+      children:
+          gateways.map((gateway) {
+            final selected = gateway.$1 == _gateway;
+            return TouchScale(
+              onTap: () => setState(() => _gateway = gateway.$1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      selected ? BybitPalette.selected : BybitPalette.surface2,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  gateway.$2,
+                  style: TextStyle(
+                    color: selected ? Colors.white : BybitPalette.muted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
     );
   }
 
@@ -249,13 +258,17 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
       }
 
       if (verified && alreadyCredited) {
-        _showMessage('Already credited',
-            'This payment has already been credited to your account.');
+        _showMessage(
+          'Already credited',
+          'This payment has already been credited to your account.',
+        );
         return;
       }
 
-      _showMessage('Payment not verified',
-          'The payment has not yet completed. Approve the prompt on your phone, then try verifying again.');
+      _showMessage(
+        'Payment not verified',
+        'The payment has not yet completed. Approve the prompt on your phone, then try verifying again.',
+      );
     } on ApiException catch (err) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -263,7 +276,10 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      _showMessage('Verification failed', 'Unexpected error during verification.');
+      _showMessage(
+        'Verification failed',
+        'Unexpected error during verification.',
+      );
     }
   }
 
@@ -271,58 +287,63 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => PopScope(
-        canPop: false,
-        child: Dialog(
-          backgroundColor: BybitPalette.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Verify payment',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                  ),
+      builder:
+          (dialogContext) => PopScope(
+            canPop: false,
+            child: Dialog(
+              backgroundColor: BybitPalette.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Verify payment',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Check your phone for the payment prompt. Once you approve it, tap Verify to credit your account.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: BybitPalette.muted2,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    BybitPrimaryButton(
+                      label: 'Verify payment',
+                      onTap: () {
+                        Navigator.of(dialogContext).pop();
+                        _verifyTopUp(gateway, reference);
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(color: BybitPalette.muted),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Check your phone for the payment prompt. Once you approve it, tap Verify to credit your account.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
-                ),
-                const SizedBox(height: 18),
-                BybitPrimaryButton(
-                  label: 'Verify payment',
-                  onTap: () {
-                    Navigator.of(dialogContext).pop();
-                    _verifyTopUp(gateway, reference);
-                  },
-                ),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(color: BybitPalette.muted),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
     );
   }
 
   Future<void> _submit() async {
-    final amount = widget.fixedAmount ??
+    final amount =
+        widget.fixedAmount ??
         double.tryParse(_amountController.text.trim()) ??
         0;
     final phone = _phoneController.text.trim();
@@ -330,10 +351,13 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
       _showSnack('Enter an amount greater than 0');
       return;
     }
-    if ((_gateway == 'WAAFI' || _gateway == 'PAYSTACK') && !_isPhoneValid(phone)) {
-      _showSnack(_gateway == 'WAAFI'
-          ? 'Enter a valid Somalia phone number'
-          : 'Enter a valid Kenya phone number');
+    if ((_gateway == 'WAAFI' || _gateway == 'PAYSTACK') &&
+        !_isPhoneValid(phone)) {
+      _showSnack(
+        _gateway == 'WAAFI'
+            ? 'Enter a valid Somalia phone number'
+            : 'Enter a valid Kenya phone number',
+      );
       return;
     }
     if (_gateway == 'STRIPE' && !_cardComplete) {
@@ -370,15 +394,18 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
           _showMessage('Payment error', 'Card payment could not be started.');
           return;
         }
-        final result =
-            await _splitCardKey.currentState!.confirmCardPayment(clientSecret);
+        final result = await _splitCardKey.currentState!.confirmCardPayment(
+          clientSecret,
+        );
         if (!mounted) return;
         if (result.succeeded) {
           await _verifyTopUp('STRIPE', result.paymentIntentId!);
         } else {
           setState(() => _submitting = false);
-          _showMessage('Payment not completed',
-              result.errorMessage ?? 'Your card was declined.');
+          _showMessage(
+            'Payment not completed',
+            result.errorMessage ?? 'Your card was declined.',
+          );
         }
         return;
       }
@@ -388,7 +415,12 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
       final providerRef = topUp?['providerRef'] as String?;
 
       if (credited) {
-        await widget.onCredited(chargedAmount, chargedCurrency, _gateway, gatewayLabel);
+        await widget.onCredited(
+          chargedAmount,
+          chargedCurrency,
+          _gateway,
+          gatewayLabel,
+        );
         return;
       }
 
@@ -399,7 +431,9 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         return;
       }
 
-      final message = response['message'] as String? ?? 'Payment initialized. Reference: pending';
+      final message =
+          response['message'] as String? ??
+          'Payment initialized. Reference: pending';
       _showMessage('Payment started', message);
     } on ApiException catch (err) {
       if (!mounted) return;
@@ -412,49 +446,50 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: BybitPalette.surface2,
-      ),
+      SnackBar(content: Text(message), backgroundColor: BybitPalette.surface2),
     );
   }
 
   void _showMessage(String title, String message) {
     showDialog(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: BybitPalette.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                ),
+      builder:
+          (dialogContext) => Dialog(
+            backgroundColor: BybitPalette.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: BybitPalette.muted2,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  BybitPrimaryButton(
+                    label: 'OK',
+                    onTap: () => Navigator.of(dialogContext).pop(),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: BybitPalette.muted2, fontSize: 13),
-              ),
-              const SizedBox(height: 22),
-              BybitPrimaryButton(
-                label: 'OK',
-                onTap: () => Navigator.of(dialogContext).pop(),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 }

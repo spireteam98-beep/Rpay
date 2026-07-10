@@ -55,7 +55,10 @@ class _WalletScreenState extends State<WalletScreen> {
   /// design — replaces the old separate title row + wave header + dark
   /// balance card.
   Widget _topBalanceCard(BuildContext context, KashAppState appState) {
-    final initial = appState.firstName.isEmpty ? 'A' : appState.firstName.substring(0, 1).toUpperCase();
+    final initial =
+        appState.firstName.isEmpty
+            ? 'A'
+            : appState.firstName.substring(0, 1).toUpperCase();
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
@@ -74,15 +77,25 @@ class _WalletScreenState extends State<WalletScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               TouchScale(
-                onTap: () => Navigator.of(context).push(kashRoute(const ProfileScreen())),
+                onTap:
+                    () => Navigator.of(
+                      context,
+                    ).push(kashRoute(const ProfileScreen())),
                 child: Container(
                   width: 40,
                   height: 40,
                   alignment: Alignment.center,
-                  decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: Colors.black,
+                    shape: BoxShape.circle,
+                  ),
                   child: Text(
                     initial,
-                    style: const TextStyle(color: BybitPalette.accent, fontSize: 15, fontWeight: FontWeight.w900),
+                    style: const TextStyle(
+                      color: BybitPalette.accent,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
@@ -90,7 +103,9 @@ class _WalletScreenState extends State<WalletScreen> {
                 children: [
                   _darkIconButton(
                     Icons.qr_code_scanner_rounded,
-                    () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+                    () => Navigator.of(
+                      context,
+                    ).push(kashRoute(const SendMoneyScreen())),
                   ),
                   const SizedBox(width: 10),
                   _darkIconButton(
@@ -108,7 +123,11 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               Text(
                 'Total balance',
-                style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               SizedBox(width: 6),
               Icon(Icons.visibility_outlined, color: Colors.black87, size: 17),
@@ -123,7 +142,12 @@ class _WalletScreenState extends State<WalletScreen> {
                   appState.totalBalance,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.black, fontSize: 38, fontWeight: FontWeight.w900, height: 1),
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 38,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -132,8 +156,19 @@ class _WalletScreenState extends State<WalletScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('(USD)', style: TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w800)),
-                    Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black87, size: 18),
+                    Text(
+                      '(USD)',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Colors.black87,
+                      size: 18,
+                    ),
                   ],
                 ),
               ),
@@ -143,10 +178,30 @@ class _WalletScreenState extends State<WalletScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _quickActionCircle(context, Icons.arrow_upward_rounded, 'Send', const SendMoneyScreen()),
-              _quickActionCircle(context, Icons.arrow_downward_rounded, 'Receive', const ReceiveScreen()),
-              _quickActionCircle(context, Icons.history_rounded, 'History', const LedgerScreen()),
-              _quickActionCircle(context, Icons.add_rounded, 'Cash-in', const CashInScreen()),
+              _quickActionCircle(
+                context,
+                Icons.arrow_upward_rounded,
+                'Send',
+                const SendMoneyScreen(),
+              ),
+              _quickActionCircle(
+                context,
+                Icons.arrow_downward_rounded,
+                'Receive',
+                const ReceiveScreen(),
+              ),
+              _quickActionCircle(
+                context,
+                Icons.history_rounded,
+                'History',
+                const LedgerScreen(),
+              ),
+              _quickActionCircle(
+                context,
+                Icons.add_rounded,
+                'Cash-in',
+                const CashInScreen(),
+              ),
             ],
           ),
         ],
@@ -161,20 +216,31 @@ class _WalletScreenState extends State<WalletScreen> {
         width: 38,
         height: 38,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+        decoration: const BoxDecoration(
+          color: Colors.black,
+          shape: BoxShape.circle,
+        ),
         child: Icon(icon, color: BybitPalette.accent, size: 18),
       ),
     );
   }
 
-  Widget _quickActionCircle(BuildContext context, IconData icon, String label, Widget screen) {
+  Widget _quickActionCircle(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Widget screen,
+  ) {
     return TouchScale(
       onTap: () => Navigator.of(context).push(kashRoute(screen)),
       child: Container(
         width: 64,
         height: 64,
         alignment: Alignment.center,
-        decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+        decoration: const BoxDecoration(
+          color: Colors.black,
+          shape: BoxShape.circle,
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -182,7 +248,11 @@ class _WalletScreenState extends State<WalletScreen> {
             const SizedBox(height: 3),
             Text(
               label,
-              style: const TextStyle(color: BybitPalette.accent, fontSize: 9, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: BybitPalette.accent,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),
@@ -205,7 +275,9 @@ class _WalletScreenState extends State<WalletScreen> {
     final people = <_PersonSample>[];
     for (final t in appState.ledgerTransactions) {
       final name = t.title.trim();
-      if (t.status == 'Queued' && name.isNotEmpty && !people.any((p) => p.name == name)) {
+      if (t.status == 'Queued' &&
+          name.isNotEmpty &&
+          !people.any((p) => p.name == name)) {
         people.add(_PersonSample(name));
       }
       if (people.length >= 5) break;
@@ -235,11 +307,14 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Widget _personAvatar(BuildContext context, _PersonSample person) {
-    final initial = person.name.isEmpty ? '?' : person.name.substring(0, 1).toUpperCase();
+    final initial =
+        person.name.isEmpty ? '?' : person.name.substring(0, 1).toUpperCase();
     return Padding(
       padding: const EdgeInsets.only(right: 18),
       child: TouchScale(
-        onTap: () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+        onTap:
+            () =>
+                Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
         child: SizedBox(
           width: 68,
           child: Column(
@@ -249,20 +324,37 @@ class _WalletScreenState extends State<WalletScreen> {
                 height: 66,
                 alignment: Alignment.center,
                 clipBehavior: Clip.antiAlias,
-                decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-                child: person.avatarAsset != null
-                    ? Image.asset(person.avatarAsset!, fit: BoxFit.cover, width: 66, height: 66)
-                    : Text(
-                        initial,
-                        style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800),
-                      ),
+                decoration: const BoxDecoration(
+                  color: BybitPalette.surface2,
+                  shape: BoxShape.circle,
+                ),
+                child:
+                    person.avatarAsset != null
+                        ? Image.asset(
+                          person.avatarAsset!,
+                          fit: BoxFit.cover,
+                          width: 66,
+                          height: 66,
+                        )
+                        : Text(
+                          initial,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
               ),
               const SizedBox(height: 8),
               Text(
                 person.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: BybitPalette.muted2, fontSize: 13, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  color: BybitPalette.muted2,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -273,7 +365,8 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Widget _morePersonAvatar(BuildContext context) {
     return TouchScale(
-      onTap: () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+      onTap:
+          () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
       child: SizedBox(
         width: 68,
         child: Column(
@@ -282,13 +375,24 @@ class _WalletScreenState extends State<WalletScreen> {
               width: 66,
               height: 66,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(color: BybitPalette.accent, shape: BoxShape.circle),
-              child: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black, size: 30),
+              decoration: const BoxDecoration(
+                color: BybitPalette.accent,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Colors.black,
+                size: 30,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
               'More',
-              style: TextStyle(color: BybitPalette.muted2, fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: BybitPalette.muted2,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -313,13 +417,24 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               const Text(
                 'Recent Transaction',
-                style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               TouchScale(
-                onTap: () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
+                onTap:
+                    () => Navigator.of(
+                      context,
+                    ).push(kashRoute(const LedgerScreen())),
                 child: const Text(
                   'See all',
-                  style: TextStyle(color: BybitPalette.accent, fontSize: 13, fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    color: BybitPalette.accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],
@@ -335,16 +450,42 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   static final List<_MerchantActivity> _illustrativeActivity = [
-    _MerchantActivity('Starbucks', 'Coffee & snacks', 1.00, Icons.local_cafe_rounded, const Duration(hours: 2),
-        logoAsset: 'assets/images/starbuxks.jpg'),
-    _MerchantActivity('Netflix', 'Monthly subscription', 10.00, Icons.play_circle_fill_rounded, const Duration(hours: 9),
-        logoAsset: 'assets/images/netflix.jpg'),
-    _MerchantActivity('Spotify', 'Premium subscription', 9.99, Icons.music_note_rounded, const Duration(days: 1)),
-    _MerchantActivity('Amazon', 'Online purchase', 24.50, Icons.shopping_bag_rounded, const Duration(days: 2)),
+    _MerchantActivity(
+      'Starbucks',
+      'Coffee & snacks',
+      1.00,
+      Icons.local_cafe_rounded,
+      const Duration(hours: 2),
+      logoAsset: 'assets/images/starbuxks.jpg',
+    ),
+    _MerchantActivity(
+      'Netflix',
+      'Monthly subscription',
+      10.00,
+      Icons.play_circle_fill_rounded,
+      const Duration(hours: 9),
+      logoAsset: 'assets/images/netflix.jpg',
+    ),
+    _MerchantActivity(
+      'Spotify',
+      'Premium subscription',
+      9.99,
+      Icons.music_note_rounded,
+      const Duration(days: 1),
+    ),
+    _MerchantActivity(
+      'Amazon',
+      'Online purchase',
+      24.50,
+      Icons.shopping_bag_rounded,
+      const Duration(days: 2),
+    ),
   ];
 
   Widget _merchantRow(_MerchantActivity activity) {
-    final subtitle = DateFormat('MMM d, HH:mm').format(DateTime.now().subtract(activity.agoOffset));
+    final subtitle = DateFormat(
+      'MMM d, HH:mm',
+    ).format(DateTime.now().subtract(activity.agoOffset));
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -354,10 +495,19 @@ class _WalletScreenState extends State<WalletScreen> {
             height: 50,
             alignment: Alignment.center,
             clipBehavior: Clip.antiAlias,
-            decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-            child: activity.logoAsset != null
-                ? Image.asset(activity.logoAsset!, fit: BoxFit.cover, width: 50, height: 50)
-                : Icon(activity.icon, color: BybitPalette.muted, size: 22),
+            decoration: const BoxDecoration(
+              color: BybitPalette.surface2,
+              shape: BoxShape.circle,
+            ),
+            child:
+                activity.logoAsset != null
+                    ? Image.asset(
+                      activity.logoAsset!,
+                      fit: BoxFit.cover,
+                      width: 50,
+                      height: 50,
+                    )
+                    : Icon(activity.icon, color: BybitPalette.muted, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -368,10 +518,20 @@ class _WalletScreenState extends State<WalletScreen> {
                   activity.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 3),
-                Text('${activity.subtitle} · $subtitle', style: const TextStyle(color: BybitPalette.muted, fontSize: 12.5)),
+                Text(
+                  '${activity.subtitle} · $subtitle',
+                  style: const TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 12.5,
+                  ),
+                ),
               ],
             ),
           ),
@@ -380,7 +540,11 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               Text(
                 '-\$${activity.amount.toStringAsFixed(2)}',
-                style: const TextStyle(color: BybitPalette.red, fontSize: 15.5, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                  color: BybitPalette.red,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(height: 3),
               Text(
@@ -413,10 +577,25 @@ class _WalletScreenState extends State<WalletScreen> {
               width: 50,
               height: 50,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-              child: isPerson
-                  ? Text(initial, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800))
-                  : const Icon(Icons.add_rounded, color: BybitPalette.muted, size: 22),
+              decoration: const BoxDecoration(
+                color: BybitPalette.surface2,
+                shape: BoxShape.circle,
+              ),
+              child:
+                  isPerson
+                      ? Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                      : const Icon(
+                        Icons.add_rounded,
+                        color: BybitPalette.muted,
+                        size: 22,
+                      ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -427,10 +606,20 @@ class _WalletScreenState extends State<WalletScreen> {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 3),
-                  Text(subtitle, style: const TextStyle(color: BybitPalette.muted, fontSize: 12.5)),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: BybitPalette.muted,
+                      fontSize: 12.5,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -448,7 +637,10 @@ class _WalletScreenState extends State<WalletScreen> {
                 const SizedBox(height: 3),
                 Text(
                   '\$${entry.amountUsd.toStringAsFixed(2)} USD',
-                  style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
+                  style: const TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
@@ -537,15 +729,15 @@ class _WalletScreenState extends State<WalletScreen> {
                   onTap: () {
                     Clipboard.setData(ClipboardData(text: address));
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Deposit address copied'),
-                      ),
+                      const SnackBar(content: Text('Deposit address copied')),
                     );
                   },
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: BybitPalette.surface2,
                       borderRadius: BorderRadius.circular(14),
@@ -565,8 +757,11 @@ class _WalletScreenState extends State<WalletScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Icon(Icons.copy_rounded,
-                            color: BybitPalette.accent, size: 16),
+                        const Icon(
+                          Icons.copy_rounded,
+                          color: BybitPalette.accent,
+                          size: 16,
+                        ),
                       ],
                     ),
                   ),
@@ -615,7 +810,11 @@ class _WalletScreenState extends State<WalletScreen> {
                           color: account.accent.withOpacity(0.16),
                           borderRadius: BorderRadius.circular(11),
                         ),
-                        child: Icon(account.icon, color: account.accent, size: 16),
+                        child: Icon(
+                          account.icon,
+                          color: account.accent,
+                          size: 16,
+                        ),
                       ),
                       const Spacer(),
                       Text(
@@ -672,7 +871,6 @@ class _WalletScreenState extends State<WalletScreen> {
       ),
     );
   }
-
 }
 
 class _PersonSample {
@@ -690,7 +888,14 @@ class _MerchantActivity {
   final Duration agoOffset;
   final String? logoAsset;
 
-  const _MerchantActivity(this.name, this.subtitle, this.amount, this.icon, this.agoOffset, {this.logoAsset});
+  const _MerchantActivity(
+    this.name,
+    this.subtitle,
+    this.amount,
+    this.icon,
+    this.agoOffset, {
+    this.logoAsset,
+  });
 }
 
 class _BybitMiniIcon extends StatelessWidget {

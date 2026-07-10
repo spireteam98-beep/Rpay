@@ -60,7 +60,10 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 6),
               Text(
                 'We sent an SMS to $phoneNumber',
-                style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
+                style: const TextStyle(
+                  color: BybitPalette.muted2,
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 28),
               Row(
@@ -109,27 +112,32 @@ class _OtpScreenState extends State<OtpScreen> {
               BybitPrimaryButton(
                 label: 'Verify',
                 enabled: _filled == 6,
-                onTap: _filled == 6
-                    ? () async {
-                        // Real backend verification when a session exists.
-                        await ApiService.verifyPhone(_digits.join());
+                onTap:
+                    _filled == 6
+                        ? () async {
+                          // Real backend verification when a session exists.
+                          await ApiService.verifyPhone(_digits.join());
 
-                        final signedIn = await AuthService.signInSavedUser();
-                        if (!signedIn) {
+                          final signedIn = await AuthService.signInSavedUser();
+                          if (!signedIn) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Unable to sign in. Please try again.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Unable to sign in. Please try again.'),
-                            ),
-                          );
-                          return;
+                          context.read<KashAppState>().verifyPhone();
+                          Navigator.of(
+                            context,
+                          ).push(kashRoute(const KycScreen()));
                         }
-
-                        if (!mounted) return;
-                        context.read<KashAppState>().verifyPhone();
-                        Navigator.of(context).push(kashRoute(const KycScreen()));
-                      }
-                    : () {},
+                        : () {},
               ),
               const SizedBox(height: 20),
             ],

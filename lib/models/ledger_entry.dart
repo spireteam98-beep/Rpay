@@ -24,7 +24,8 @@ class LedgerEntry {
     required this.memo,
   });
 
-  String get directionLabel => direction == LedgerDirection.debit ? 'Debit' : 'Credit';
+  String get directionLabel =>
+      direction == LedgerDirection.debit ? 'Debit' : 'Credit';
 
   String get amountLabel {
     final money = NumberFormat.currency(symbol: '\$');
@@ -32,26 +33,26 @@ class LedgerEntry {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'transactionId': transactionId,
-        'postedAt': postedAt.toIso8601String(),
-        'accountType': accountType.index,
-        'direction': direction.index,
-        'amountUsd': amountUsd,
-        'accountName': accountName,
-        'memo': memo,
-      };
+    'id': id,
+    'transactionId': transactionId,
+    'postedAt': postedAt.toIso8601String(),
+    'accountType': accountType.index,
+    'direction': direction.index,
+    'amountUsd': amountUsd,
+    'accountName': accountName,
+    'memo': memo,
+  };
 
   factory LedgerEntry.fromJson(Map<String, dynamic> json) => LedgerEntry(
-        id: json['id'] as String,
-        transactionId: json['transactionId'] as String,
-        postedAt: DateTime.parse(json['postedAt'] as String),
-        accountType: KashAccountType.values[json['accountType'] as int],
-        direction: LedgerDirection.values[json['direction'] as int],
-        amountUsd: (json['amountUsd'] as num).toDouble(),
-        accountName: json['accountName'] as String,
-        memo: json['memo'] as String,
-      );
+    id: json['id'] as String,
+    transactionId: json['transactionId'] as String,
+    postedAt: DateTime.parse(json['postedAt'] as String),
+    accountType: KashAccountType.values[json['accountType'] as int],
+    direction: LedgerDirection.values[json['direction'] as int],
+    amountUsd: (json['amountUsd'] as num).toDouble(),
+    accountName: json['accountName'] as String,
+    memo: json['memo'] as String,
+  );
 }
 
 class LedgerTransaction {
@@ -82,13 +83,13 @@ class LedgerTransaction {
   bool get isBalanced => (debits - credits).abs() < 0.001;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'postedAt': postedAt.toIso8601String(),
-        'title': title,
-        'rail': rail,
-        'status': status,
-        'entries': entries.map((entry) => entry.toJson()).toList(),
-      };
+    'id': id,
+    'postedAt': postedAt.toIso8601String(),
+    'title': title,
+    'rail': rail,
+    'status': status,
+    'entries': entries.map((entry) => entry.toJson()).toList(),
+  };
 
   factory LedgerTransaction.fromJson(Map<String, dynamic> json) =>
       LedgerTransaction(
@@ -97,9 +98,13 @@ class LedgerTransaction {
         title: json['title'] as String,
         rail: json['rail'] as String,
         status: json['status'] as String,
-        entries: (json['entries'] as List)
-            .map((entry) =>
-                LedgerEntry.fromJson(Map<String, dynamic>.from(entry as Map)))
-            .toList(),
+        entries:
+            (json['entries'] as List)
+                .map(
+                  (entry) => LedgerEntry.fromJson(
+                    Map<String, dynamic>.from(entry as Map),
+                  ),
+                )
+                .toList(),
       );
 }

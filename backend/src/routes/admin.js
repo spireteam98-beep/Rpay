@@ -107,16 +107,221 @@ router.post('/aml-cases/:id/resolve', async (req, res, next) => {
   }
 });
 
-router.get('/merchants', async (_req, res, next) => {
+router.get('/merchants', async (req, res, next) => {
   try {
+    const status = String(req.query.status || '').trim().toUpperCase();
+    const params = [];
+    let where = '';
+    if (status) {
+      where = 'WHERE m.status = $1';
+      params.push(status);
+    }
     const rows = await pool.query(
       `SELECT m.*, u.full_name AS owner_name, u.email AS owner_email
          FROM merchants m
          JOIN users u ON u.id = m.owner_id
+         ${where}
         ORDER BY m.created_at DESC
         LIMIT 200`,
+      params,
     );
     res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+function generateAgentCode() {
+  return `AG${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
+function generateTillNumber() {
+  return `KF${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
+async function findUserByIdentifier(identifier) {
+  const value = String(identifier || '').trim();
+  if (!value) return null;
+  const rows = await pool.query(
+    `SELECT id, full_name, email, phone FROM users
+      WHERE LOWER(email) = LOWER($1) OR phone = $1
+      LIMIT 1`,
+    [value],
+  );
+  return rows.rows[0] || null;
+}
+
+/** POST /admin/agents — admin directly onboards an existing user as an agent, pre-approved. */
+router.post('/agents', async (req, res, next) => {
+  try {
+    const businessName = String(req.body?.businessName || '').trim();
+    const phone = String(req.body?.phone || '').trim() || null;
+    if (!businessName) return res.status(400).json({ error: 'Business name is required' });
+
+    const user = await findUserByIdentifier(req.body?.identifier);
+    if (!user) return res.status(404).json({ error: 'No user found with that email or phone' });
+
+    const existing = await pool.query('SELECT id FROM agents WHERE user_id = $1', [user.id]);
+    if (existing.rows.length) {
+      return res.status(409).json({ error: 'This user is already registered as an agent' });
+    }
+
+    const inserted = await pool.query(
+      `INSERT INTO agents (user_id, business_name, agent_code, phone, status, approved_by, approved_at)
+       VALUES ($1,$2,$3,$4,'ACTIVE',$5,now())
+       RETURNING *`,
+      [user.id, businessName, generateAgentCode(), phone, req.userId],
+    );
+    res.status(201).json({ agent: inserted.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/agents', async (req, res, next) => {
+  try {
+    const status = String(req.query.status || '').trim().toUpperCase();
+    const params = [];
+    let where = '';
+    if (status) {
+      where = 'WHERE a.status = $1';
+      params.push(status);
+    }
+    const rows = await pool.query(
+      `SELECT a.*, u.full_name AS owner_name, u.email AS owner_email, u.phone AS owner_phone
+         FROM agents a
+         JOIN users u ON u.id = a.user_id
+         ${where}
+        ORDER BY a.created_at DESC
+        LIMIT 200`,
+      params,
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/agents/:id/approve', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `UPDATE agents SET status = 'ACTIVE', approved_by = $1, approved_at = now()
+        WHERE id = $2
+        RETURNING *`,
+      [req.userId, req.params.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ agent: rows.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/agents/:id/deactivate', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `UPDATE agents SET status = 'SUSPENDED' WHERE id = $1 RETURNING *`,
+      [req.params.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ agent: rows.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/agents/:id/commissions', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `SELECT c.*, u.full_name AS related_user_name
+         FROM agent_commissions c
+         LEFT JOIN users u ON u.id = c.related_user_id
+        WHERE c.agent_id = $1
+        ORDER BY c.created_at DESC
+        LIMIT 100`,
+      [req.params.id],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /admin/commissions/summary — commission liability across all agents. */
+router.get('/commissions/summary', async (_req, res, next) => {
+  try {
+    const totals = await pool.query(
+      `SELECT COALESCE(SUM(commission_balance), 0)::float AS total_liability_usd,
+              COUNT(*) FILTER (WHERE status = 'ACTIVE')::int AS active_agent_count
+         FROM agents`,
+    );
+    const byAgent = await pool.query(
+      `SELECT a.id, a.business_name, a.agent_code, a.status, a.commission_balance,
+              u.full_name AS owner_name, u.email AS owner_email,
+              COUNT(c.id)::int AS transaction_count
+         FROM agents a
+         JOIN users u ON u.id = a.user_id
+         LEFT JOIN agent_commissions c ON c.agent_id = a.id
+        GROUP BY a.id, u.full_name, u.email
+        ORDER BY a.commission_balance DESC
+        LIMIT 200`,
+    );
+    res.json({
+      totalLiabilityUsd: totals.rows[0].total_liability_usd,
+      activeAgentCount: totals.rows[0].active_agent_count,
+      agents: byAgent.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /admin/merchants — admin directly onboards an existing user as a merchant, pre-approved. */
+router.post('/merchants', async (req, res, next) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    const businessType = String(req.body?.businessType || '').trim() || null;
+    const phone = String(req.body?.phone || '').trim() || null;
+    if (!name) return res.status(400).json({ error: 'Merchant name is required' });
+
+    const user = await findUserByIdentifier(req.body?.identifier);
+    if (!user) return res.status(404).json({ error: 'No user found with that email or phone' });
+
+    const inserted = await pool.query(
+      `INSERT INTO merchants (owner_id, name, till_number, business_type, phone, status, approved_by, approved_at)
+       VALUES ($1,$2,$3,$4,$5,'ACTIVE',$6,now())
+       RETURNING *`,
+      [user.id, name, generateTillNumber(), businessType, phone, req.userId],
+    );
+    res.status(201).json({ merchant: inserted.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/merchants/:id/approve', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `UPDATE merchants SET status = 'ACTIVE', approved_by = $1, approved_at = now()
+        WHERE id = $2
+        RETURNING *`,
+      [req.userId, req.params.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Merchant not found' });
+    res.json({ merchant: rows.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/merchants/:id/deactivate', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `UPDATE merchants SET status = 'SUSPENDED' WHERE id = $1 RETURNING *`,
+      [req.params.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Merchant not found' });
+    res.json({ merchant: rows.rows[0] });
   } catch (err) {
     next(err);
   }

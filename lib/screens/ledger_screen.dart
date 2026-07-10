@@ -46,7 +46,10 @@ class LedgerScreen extends StatelessWidget {
   Widget _filters() {
     return Container(
       padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(color: BybitPalette.surface2, borderRadius: BorderRadius.circular(100)),
+      decoration: BoxDecoration(
+        color: BybitPalette.surface2,
+        borderRadius: BorderRadius.circular(100),
+      ),
       child: Row(
         children: const [
           Expanded(child: _FilterChip('All', true)),
@@ -64,12 +67,27 @@ class LedgerScreen extends StatelessWidget {
           CircleAvatar(
             radius: 34,
             backgroundColor: BybitPalette.surface2,
-            child: Icon(Icons.receipt_long_rounded, color: BybitPalette.muted, size: 32),
+            child: Icon(
+              Icons.receipt_long_rounded,
+              color: BybitPalette.muted,
+              size: 32,
+            ),
           ),
           SizedBox(height: 16),
-          Text('No wallet history yet', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900)),
+          Text(
+            'No wallet history yet',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           SizedBox(height: 6),
-          Text('Cash in, send, receive, or trade to see activity here.', textAlign: TextAlign.center, style: TextStyle(color: BybitPalette.muted2, fontSize: 14)),
+          Text(
+            'Cash in, send, receive, or trade to see activity here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -88,7 +106,10 @@ class LedgerScreen extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 25,
-                  backgroundColor: balanced ? BybitPalette.green.withOpacity(0.15) : BybitPalette.red.withOpacity(0.15),
+                  backgroundColor:
+                      balanced
+                          ? BybitPalette.green.withOpacity(0.15)
+                          : BybitPalette.red.withOpacity(0.15),
                   child: Icon(
                     balanced ? Icons.check_circle_rounded : Icons.error_rounded,
                     color: balanced ? BybitPalette.green : BybitPalette.red,
@@ -100,13 +121,33 @@ class LedgerScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(transaction.title, style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                      Text(
+                        transaction.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                       const SizedBox(height: 3),
-                      Text('${transaction.id} - ${transaction.rail} - $time', style: const TextStyle(color: BybitPalette.muted2, fontSize: 12)),
+                      Text(
+                        '${transaction.id} - ${transaction.rail} - $time',
+                        style: const TextStyle(
+                          color: BybitPalette.muted2,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                Text(transaction.status, style: const TextStyle(color: BybitPalette.accent, fontSize: 12, fontWeight: FontWeight.w900)),
+                Text(
+                  transaction.status,
+                  style: const TextStyle(
+                    color: BybitPalette.accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -126,20 +167,43 @@ class LedgerScreen extends StatelessWidget {
           Container(
             width: 8,
             height: 8,
-            decoration: BoxDecoration(color: isDebit ? BybitPalette.red : BybitPalette.green, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: isDebit ? BybitPalette.red : BybitPalette.green,
+              shape: BoxShape.circle,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(entry.accountName, style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w800)),
+                Text(
+                  entry.accountName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(entry.memo, style: const TextStyle(color: BybitPalette.muted2, fontSize: 12)),
+                Text(
+                  entry.memo,
+                  style: const TextStyle(
+                    color: BybitPalette.muted2,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
-          Text(entry.amountLabel, style: TextStyle(color: isDebit ? BybitPalette.red : BybitPalette.green, fontSize: 13, fontWeight: FontWeight.w900)),
+          Text(
+            entry.amountLabel,
+            style: TextStyle(
+              color: isDebit ? BybitPalette.red : BybitPalette.green,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );

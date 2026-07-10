@@ -677,6 +677,178 @@ class ApiService {
     throw ApiException(body['error'] as String? ?? 'Withdrawal failed');
   }
 
+  // ── Admin: agents & merchants ──────────────────────────────────
+
+  /// All agents (optionally filtered by status: PENDING, ACTIVE, SUSPENDED).
+  static Future<List<dynamic>?> adminAgents({String? status}) async {
+    if (!hasSession) return null;
+    try {
+      final uri = Uri.parse('$baseUrl/admin/agents').replace(
+        queryParameters:
+            (status != null && status.isNotEmpty) ? {'status': status} : null,
+      );
+      final res = await http
+          .get(uri, headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Admin directly onboards an existing user as a pre-approved agent.
+  static Future<Map<String, dynamic>> adminCreateAgent({
+    required String identifier,
+    required String businessName,
+    String? phone,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/admin/agents'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'identifier': identifier,
+            'businessName': businessName,
+            if (phone != null && phone.isNotEmpty) 'phone': phone,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not create agent');
+  }
+
+  static Future<Map<String, dynamic>> adminApproveAgent(String id) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/admin/agents/$id/approve'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not approve agent');
+  }
+
+  static Future<Map<String, dynamic>> adminDeactivateAgent(String id) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/admin/agents/$id/deactivate'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(
+      body['error'] as String? ?? 'Could not deactivate agent',
+    );
+  }
+
+  static Future<List<dynamic>?> adminAgentCommissions(String agentId) async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/admin/agents/$agentId/commissions'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Commission liability across all agents, sorted by balance descending.
+  static Future<Map<String, dynamic>?> adminCommissionSummary() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/admin/commissions/summary'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// All merchants (optionally filtered by status: PENDING, ACTIVE, SUSPENDED).
+  static Future<List<dynamic>?> adminMerchants({String? status}) async {
+    if (!hasSession) return null;
+    try {
+      final uri = Uri.parse('$baseUrl/admin/merchants').replace(
+        queryParameters:
+            (status != null && status.isNotEmpty) ? {'status': status} : null,
+      );
+      final res = await http
+          .get(uri, headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Admin directly onboards an existing user as a pre-approved merchant.
+  static Future<Map<String, dynamic>> adminCreateMerchant({
+    required String identifier,
+    required String name,
+    String? businessType,
+    String? phone,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/admin/merchants'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'identifier': identifier,
+            'name': name,
+            if (businessType != null && businessType.isNotEmpty)
+              'businessType': businessType,
+            if (phone != null && phone.isNotEmpty) 'phone': phone,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not create merchant');
+  }
+
+  static Future<Map<String, dynamic>> adminApproveMerchant(String id) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/admin/merchants/$id/approve'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(
+      body['error'] as String? ?? 'Could not approve merchant',
+    );
+  }
+
+  static Future<Map<String, dynamic>> adminDeactivateMerchant(String id) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/admin/merchants/$id/deactivate'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(
+      body['error'] as String? ?? 'Could not deactivate merchant',
+    );
+  }
+
   static Future<void> clearSession() async {
     await _prefs.remove(_tokenKey);
   }

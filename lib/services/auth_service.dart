@@ -26,7 +26,8 @@ class AuthService {
 
   static String? get storedPhone => _prefs.getString(_phoneKey);
 
-  static bool get hasAccount => _prefs.containsKey(_emailKey) || _prefs.containsKey(_phoneKey);
+  static bool get hasAccount =>
+      _prefs.containsKey(_emailKey) || _prefs.containsKey(_phoneKey);
 
   static Future<void> registerUser({
     required String fullName,

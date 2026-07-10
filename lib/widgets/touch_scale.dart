@@ -34,13 +34,11 @@ class _TouchScaleState extends State<TouchScale> {
 
   @override
   Widget build(BuildContext context) {
-    final scale = _pressed
-        ? widget.pressedScale
-        : (_hovered ? widget.hoverScale : 1.0);
+    final scale =
+        _pressed ? widget.pressedScale : (_hovered ? widget.hoverScale : 1.0);
     return MouseRegion(
-      cursor: widget.onTap == null
-          ? MouseCursor.defer
-          : SystemMouseCursors.click,
+      cursor:
+          widget.onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
       onEnter: (_) => _setHovered(true),
       onExit: (_) => _setHovered(false),
       child: GestureDetector(

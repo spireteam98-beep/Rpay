@@ -60,9 +60,10 @@ class AccountDetailScreen extends StatelessWidget {
         color: BybitPalette.surface,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: account.type == KashAccountType.crypto
-              ? BybitPalette.accent.withOpacity(0.4)
-              : const Color(0xFF242832),
+          color:
+              account.type == KashAccountType.crypto
+                  ? BybitPalette.accent.withOpacity(0.4)
+                  : const Color(0xFF242832),
         ),
       ),
       child: Column(
@@ -100,10 +101,7 @@ class AccountDetailScreen extends StatelessWidget {
           const SizedBox(height: 18),
           Text(
             account.subtitle,
-            style: const TextStyle(
-              color: BybitPalette.muted2,
-              fontSize: 14,
-            ),
+            style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
           ),
         ],
       ),
@@ -199,7 +197,11 @@ class AccountDetailScreen extends StatelessWidget {
                 color: BybitPalette.surface2,
                 shape: BoxShape.circle,
               ),
-              child: Icon(transaction.icon, color: BybitPalette.accent, size: 19),
+              child: Icon(
+                transaction.icon,
+                color: BybitPalette.accent,
+                size: 19,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

@@ -64,11 +64,11 @@ class KashTransaction {
   });
 
   Map<String, dynamic> toJson() => {
-        'title': title,
-        'subtitle': subtitle,
-        'amount': amount,
-        'icon': kashIconKey(icon),
-      };
+    'title': title,
+    'subtitle': subtitle,
+    'amount': amount,
+    'icon': kashIconKey(icon),
+  };
 
   factory KashTransaction.fromJson(Map<String, dynamic> json) =>
       KashTransaction(

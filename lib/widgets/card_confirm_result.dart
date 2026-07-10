@@ -5,9 +5,9 @@ class CardConfirmResult {
   final String? errorMessage;
 
   const CardConfirmResult.success(this.paymentIntentId)
-      : succeeded = true,
-        errorMessage = null;
+    : succeeded = true,
+      errorMessage = null;
   const CardConfirmResult.failure(this.errorMessage)
-      : succeeded = false,
-        paymentIntentId = null;
+    : succeeded = false,
+      paymentIntentId = null;
 }

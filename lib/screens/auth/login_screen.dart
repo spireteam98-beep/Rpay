@@ -23,9 +23,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _handleSendCode() async {
@@ -51,7 +51,9 @@ class _LoginScreenState extends State<LoginScreen> {
         _showMessage('Could not send a sign-in code. Try again.');
         return;
       }
-      _showMessage('Backend is not reachable. Start the RoyallPay API and try again.');
+      _showMessage(
+        'Backend is not reachable. Start the RoyallPay API and try again.',
+      );
     } on ApiException catch (err) {
       _showMessage(err.message);
     } finally {

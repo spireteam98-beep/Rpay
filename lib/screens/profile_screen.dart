@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/kash_widgets.dart';
+import '../widgets/touch_scale.dart';
+import 'admin_console_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -94,6 +97,16 @@ class ProfileScreen extends StatelessWidget {
                 'Statements',
                 'Wallet and virtual account records',
               ),
+              if (appState.isAdmin)
+                _tile(
+                  Icons.admin_panel_settings_outlined,
+                  'Admin console',
+                  'Ops, AML queue, agents and merchants',
+                  onTap:
+                      () => Navigator.of(
+                        context,
+                      ).push(kashRoute(const AdminConsoleScreen())),
+                ),
             ],
           ),
         ),
@@ -101,50 +114,56 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _tile(IconData icon, String title, String subtitle) {
+  Widget _tile(
+    IconData icon,
+    String title,
+    String subtitle, {
+    VoidCallback? onTap,
+  }) {
+    final card = BybitCard(
+      padding: const EdgeInsets.all(15),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: BybitPalette.surface2,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: BybitPalette.accent, size: 19),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: BybitPalette.muted),
+        ],
+      ),
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: BybitCard(
-        padding: const EdgeInsets.all(15),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: const BoxDecoration(
-                color: BybitPalette.surface2,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: BybitPalette.accent, size: 19),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: BybitPalette.muted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: BybitPalette.muted),
-          ],
-        ),
-      ),
+      child: onTap == null ? card : TouchScale(onTap: onTap, child: card),
     );
   }
 }

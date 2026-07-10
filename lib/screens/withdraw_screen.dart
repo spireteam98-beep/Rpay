@@ -125,7 +125,10 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                     ],
                   ),
                 ),
-                const Icon(Icons.keyboard_arrow_down_rounded, color: BybitPalette.muted),
+                const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: BybitPalette.muted,
+                ),
               ],
             ),
           ),
@@ -279,7 +282,10 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
                   ],
                 ),
               ),
-              const Icon(Icons.keyboard_arrow_down_rounded, color: BybitPalette.muted),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: BybitPalette.muted,
+              ),
             ],
           ),
         ),
@@ -390,10 +396,7 @@ class _WithdrawScreenState extends State<WithdrawScreen> {
               Expanded(
                 child: TextField(
                   controller: _addressController,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.white,
-                  ),
+                  style: const TextStyle(fontSize: 14, color: Colors.white),
                   decoration: const InputDecoration(
                     hintText: 'Enter or paste address',
                     hintStyle: TextStyle(color: BybitPalette.muted),

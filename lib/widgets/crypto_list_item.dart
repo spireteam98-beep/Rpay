@@ -25,10 +25,13 @@ class CryptoListItem extends StatelessWidget {
             _buildNameAndTurnover(),
             _buildPriceInfo(),
             const SizedBox(width: 10),
-            SizedBox(width: 78, child: Align(
-              alignment: Alignment.centerRight,
-              child: _buildChangePill(),
-            )),
+            SizedBox(
+              width: 78,
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _buildChangePill(),
+              ),
+            ),
           ],
         ),
       ),
@@ -45,14 +48,15 @@ class CryptoListItem extends StatelessWidget {
         color: BybitPalette.surface2,
         shape: BoxShape.circle,
       ),
-      child: (iconUrl == null || iconUrl.isEmpty)
-          ? _fallbackIcon()
-          : CachedNetworkImage(
-              imageUrl: iconUrl,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => _fallbackIcon(),
-              errorWidget: (_, __, ___) => _fallbackIcon(),
-            ),
+      child:
+          (iconUrl == null || iconUrl.isEmpty)
+              ? _fallbackIcon()
+              : CachedNetworkImage(
+                imageUrl: iconUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => _fallbackIcon(),
+                errorWidget: (_, __, ___) => _fallbackIcon(),
+              ),
     );
   }
 
@@ -132,10 +136,7 @@ class CryptoListItem extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             crypto.formattedPrice,
-            style: const TextStyle(
-              fontSize: 12,
-              color: BybitPalette.muted,
-            ),
+            style: const TextStyle(fontSize: 12, color: BybitPalette.muted),
           ),
         ],
       ),

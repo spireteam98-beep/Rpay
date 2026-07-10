@@ -46,7 +46,9 @@ class ReceiveScreen extends StatelessWidget {
                     return const Padding(
                       padding: EdgeInsets.symmetric(vertical: 60),
                       child: Center(
-                        child: CircularProgressIndicator(color: BybitPalette.accent),
+                        child: CircularProgressIndicator(
+                          color: BybitPalette.accent,
+                        ),
                       ),
                     );
                   }
@@ -58,11 +60,15 @@ class ReceiveScreen extends StatelessWidget {
                         ApiService.hasSession
                             ? "Couldn't load your deposit address. Pull down to try again."
                             : 'Sign in to see your deposit address.',
-                        style: const TextStyle(color: BybitPalette.muted, fontSize: 13),
+                        style: const TextStyle(
+                          color: BybitPalette.muted,
+                          fontSize: 13,
+                        ),
                       ),
                     );
                   }
-                  final network = data?['network'] as String? ?? 'Sepolia testnet';
+                  final network =
+                      data?['network'] as String? ?? 'Sepolia testnet';
                   return _addressContent(context, address, network);
                 },
               ),
@@ -87,7 +93,11 @@ class ReceiveScreen extends StatelessWidget {
                   color: BybitPalette.accent.withOpacity(0.16),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(Icons.link_rounded, color: BybitPalette.accent, size: 22),
+                child: const Icon(
+                  Icons.link_rounded,
+                  color: BybitPalette.accent,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -121,7 +131,11 @@ class ReceiveScreen extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
               boxShadow: const [
-                BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, 6)),
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
               ],
             ),
             child: QrImageView(
@@ -171,7 +185,11 @@ class ReceiveScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.copy_rounded, color: BybitPalette.accent, size: 20),
+                const Icon(
+                  Icons.copy_rounded,
+                  color: BybitPalette.accent,
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -190,9 +208,15 @@ class ReceiveScreen extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 10),
-              _InfoLine('Send only ETH, and only on Sepolia testnet — assets on other networks or mainnet ETH cannot be recovered.'),
-              _InfoLine('This is a testnet address. Testnet ETH has no real-world value.'),
-              _InfoLine('Deposits appear once the transaction is confirmed on-chain.'),
+              _InfoLine(
+                'Send only ETH, and only on Sepolia testnet — assets on other networks or mainnet ETH cannot be recovered.',
+              ),
+              _InfoLine(
+                'This is a testnet address. Testnet ETH has no real-world value.',
+              ),
+              _InfoLine(
+                'Deposits appear once the transaction is confirmed on-chain.',
+              ),
             ],
           ),
         ),
@@ -211,7 +235,11 @@ class _InfoLine extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8),
       child: Text(
         '•  $text',
-        style: const TextStyle(color: BybitPalette.muted, fontSize: 12.5, height: 1.4),
+        style: const TextStyle(
+          color: BybitPalette.muted,
+          fontSize: 12.5,
+          height: 1.4,
+        ),
       ),
     );
   }

@@ -76,8 +76,8 @@ router.post('/', async (req, res, next) => {
     if (existing) return res.status(409).json({ error: 'You are already registered as an agent' });
 
     const inserted = await pool.query(
-      `INSERT INTO agents (user_id, business_name, agent_code, phone)
-       VALUES ($1,$2,$3,$4)
+      `INSERT INTO agents (user_id, business_name, agent_code, phone, status)
+       VALUES ($1,$2,$3,$4,'PENDING')
        RETURNING *`,
       [req.userId, businessName, agentCode(), phone],
     );

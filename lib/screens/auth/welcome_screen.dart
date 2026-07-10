@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
 import '../../widgets/touch_scale.dart';
@@ -20,13 +21,13 @@ class WelcomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Spacer(),
-              // Logo mark
               Container(
-                width: 72,
-                height: 72,
+                width: 170,
+                height: 170,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: BybitPalette.accent,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
                       color: BybitPalette.accent.withOpacity(0.35),
@@ -35,21 +36,16 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.bolt_rounded,
-                  color: Colors.black,
-                  size: 40,
+                child: Image.asset(
+                  'assets/images/royallpay_official_logo_refined.png',
+                  fit: BoxFit.cover,
                 ),
               ),
-              const SizedBox(height: 28),
-              const Text(
-                'RoyallPay',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                ),
+              const SizedBox(height: 18),
+              SvgPicture.asset(
+                'assets/images/royallpay_wordmark.svg',
+                width: 230,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 10),
               const Text(
@@ -89,7 +85,8 @@ class WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 12),
               _outlinedButton(
                 'Log in',
-                () => Navigator.of(context).push(kashRoute(const LoginScreen())),
+                () =>
+                    Navigator.of(context).push(kashRoute(const LoginScreen())),
               ),
               const SizedBox(height: 24),
             ],

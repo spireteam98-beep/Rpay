@@ -89,18 +89,28 @@ class _TrendingDataScreenState extends State<TrendingDataScreen> {
             child: Container(
               width: 42,
               height: 42,
-              decoration: BoxDecoration(color: Colors.black.withOpacity(0.14), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.14),
+                shape: BoxShape.circle,
+              ),
               child: const Icon(Icons.arrow_back_rounded, color: Colors.black),
             ),
           ),
           const Text(
             'Trending Data',
-            style: TextStyle(color: Colors.black, fontSize: 19, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           Container(
             width: 42,
             height: 42,
-            decoration: BoxDecoration(color: Colors.black.withOpacity(0.14), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.14),
+              shape: BoxShape.circle,
+            ),
             child: const Icon(Icons.info_outline_rounded, color: Colors.black),
           ),
         ],
@@ -116,20 +126,37 @@ class _TrendingDataScreenState extends State<TrendingDataScreen> {
           Container(
             width: 26,
             height: 26,
-            decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: Colors.black,
+              shape: BoxShape.circle,
+            ),
             child: Center(
               child: Text(
-                _crypto.symbol.isEmpty ? '?' : _crypto.symbol.substring(0, 1).toUpperCase(),
-                style: const TextStyle(color: BybitPalette.accent, fontWeight: FontWeight.w900, fontSize: 13),
+                _crypto.symbol.isEmpty
+                    ? '?'
+                    : _crypto.symbol.substring(0, 1).toUpperCase(),
+                style: const TextStyle(
+                  color: BybitPalette.accent,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 10),
           Text(
             _crypto.symbol.toUpperCase(),
-            style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.black, size: 22),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Colors.black,
+            size: 22,
+          ),
         ],
       ),
     );
@@ -192,12 +219,26 @@ class _TrendingDataScreenState extends State<TrendingDataScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900)),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               Container(
                 width: 32,
                 height: 32,
-                decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-                child: const Icon(Icons.ios_share_rounded, color: BybitPalette.muted, size: 15),
+                decoration: const BoxDecoration(
+                  color: BybitPalette.surface2,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.ios_share_rounded,
+                  color: BybitPalette.muted,
+                  size: 15,
+                ),
               ),
             ],
           ),
@@ -205,15 +246,38 @@ class _TrendingDataScreenState extends State<TrendingDataScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(subtitle, style: const TextStyle(color: BybitPalette.muted, fontSize: 12.5)),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: BybitPalette.muted,
+                  fontSize: 12.5,
+                ),
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: BybitPalette.surface2, borderRadius: BorderRadius.circular(100)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: BybitPalette.surface2,
+                  borderRadius: BorderRadius.circular(100),
+                ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('5m', style: TextStyle(color: BybitPalette.muted2, fontSize: 11.5, fontWeight: FontWeight.w700)),
-                    Icon(Icons.keyboard_arrow_down_rounded, color: BybitPalette.muted, size: 14),
+                    Text(
+                      '5m',
+                      style: TextStyle(
+                        color: BybitPalette.muted2,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: BybitPalette.muted,
+                      size: 14,
+                    ),
                   ],
                 ),
               ),
@@ -228,7 +292,11 @@ class _TrendingDataScreenState extends State<TrendingDataScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: CustomPaint(
-                    painter: _CandlestickPainter(candles: candles, minY: minY, maxY: maxY),
+                    painter: _CandlestickPainter(
+                      candles: candles,
+                      minY: minY,
+                      maxY: maxY,
+                    ),
                     size: Size.infinite,
                   ),
                 ),
@@ -241,12 +309,30 @@ class _TrendingDataScreenState extends State<TrendingDataScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
-                Text('09:10', style: TextStyle(color: BybitPalette.muted, fontSize: 10.5)),
-                Text('09:20', style: TextStyle(color: BybitPalette.muted, fontSize: 10.5)),
-                Text('09:35', style: TextStyle(color: BybitPalette.muted, fontSize: 10.5)),
-                Text('09:45', style: TextStyle(color: BybitPalette.muted, fontSize: 10.5)),
-                Text('10:00', style: TextStyle(color: BybitPalette.muted, fontSize: 10.5)),
-                Text('10:10', style: TextStyle(color: BybitPalette.muted, fontSize: 10.5)),
+                Text(
+                  '09:10',
+                  style: TextStyle(color: BybitPalette.muted, fontSize: 10.5),
+                ),
+                Text(
+                  '09:20',
+                  style: TextStyle(color: BybitPalette.muted, fontSize: 10.5),
+                ),
+                Text(
+                  '09:35',
+                  style: TextStyle(color: BybitPalette.muted, fontSize: 10.5),
+                ),
+                Text(
+                  '09:45',
+                  style: TextStyle(color: BybitPalette.muted, fontSize: 10.5),
+                ),
+                Text(
+                  '10:00',
+                  style: TextStyle(color: BybitPalette.muted, fontSize: 10.5),
+                ),
+                Text(
+                  '10:10',
+                  style: TextStyle(color: BybitPalette.muted, fontSize: 10.5),
+                ),
               ],
             ),
           ),
@@ -257,15 +343,25 @@ class _TrendingDataScreenState extends State<TrendingDataScreen> {
 
   Widget _yAxisLabels(double minY, double maxY) {
     final steps = 5;
-    final labels = List.generate(steps, (i) => maxY - (maxY - minY) * i / (steps - 1));
+    final labels = List.generate(
+      steps,
+      (i) => maxY - (maxY - minY) * i / (steps - 1),
+    );
     return SizedBox(
       width: 34,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.end,
-        children: labels.map((v) {
-          return Text(v.toStringAsFixed(1), style: const TextStyle(color: BybitPalette.muted, fontSize: 10.5));
-        }).toList(),
+        children:
+            labels.map((v) {
+              return Text(
+                v.toStringAsFixed(1),
+                style: const TextStyle(
+                  color: BybitPalette.muted,
+                  fontSize: 10.5,
+                ),
+              );
+            }).toList(),
       ),
     );
   }
@@ -314,14 +410,19 @@ class _CandlestickPainter extends CustomPainter {
   final double minY;
   final double maxY;
 
-  const _CandlestickPainter({required this.candles, required this.minY, required this.maxY});
+  const _CandlestickPainter({
+    required this.candles,
+    required this.minY,
+    required this.maxY,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (candles.isEmpty) return;
-    final gridPaint = Paint()
-      ..color = BybitPalette.surface2
-      ..strokeWidth = 1;
+    final gridPaint =
+        Paint()
+          ..color = BybitPalette.surface2
+          ..strokeWidth = 1;
     for (var i = 0; i <= 4; i++) {
       final y = size.height * i / 4;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
@@ -330,7 +431,8 @@ class _CandlestickPainter extends CustomPainter {
     final n = candles.length;
     final slot = size.width / n;
     final bodyWidth = (slot * 0.5).clamp(3.0, 14.0);
-    double yFor(double v) => size.height - ((v - minY) / (maxY - minY)) * size.height;
+    double yFor(double v) =>
+        size.height - ((v - minY) / (maxY - minY)) * size.height;
 
     for (var i = 0; i < n; i++) {
       final c = candles[i];

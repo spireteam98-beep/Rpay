@@ -37,7 +37,10 @@ class CardPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = holderName.trim().isEmpty ? 'YOUR NAME' : holderName.trim().toUpperCase();
+    final name =
+        holderName.trim().isEmpty
+            ? 'YOUR NAME'
+            : holderName.trim().toUpperCase();
     final complete = numberComplete && expiryComplete;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
@@ -80,8 +83,11 @@ class CardPreview extends StatelessWidget {
               ),
               Row(
                 children: [
-                  Icon(Icons.wifi_rounded,
-                      color: Colors.white.withOpacity(0.55), size: 20),
+                  Icon(
+                    Icons.wifi_rounded,
+                    color: Colors.white.withOpacity(0.55),
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     _brandLabel,

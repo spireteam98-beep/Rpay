@@ -262,6 +262,12 @@ async function migrate() {
 
     -- Which agent onboarded this customer, if any (drives onboarding commission).
     ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_agent_id UUID REFERENCES agents(id);
+
+    -- Admin approval workflow: who approved this partner and when.
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES users(id);
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES users(id);
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
   `);
   console.log('[db] schema ready');
 }

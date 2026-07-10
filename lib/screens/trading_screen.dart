@@ -35,8 +35,9 @@ class _TradingScreenState extends State<TradingScreen> {
   Map<String, double> _holdings = {};
   Cryptocurrency _fromCrypto = Cryptocurrency.assets[0];
   Cryptocurrency _toCrypto = Cryptocurrency.assets[1];
-  final TextEditingController _fromAmountController =
-      TextEditingController(text: '1');
+  final TextEditingController _fromAmountController = TextEditingController(
+    text: '1',
+  );
   final TextEditingController _toAmountController = TextEditingController();
   bool _swapping = false;
 
@@ -61,14 +62,21 @@ class _TradingScreenState extends State<TradingScreen> {
     final holdings = <String, double>{};
     for (final holding in (balances?['holdings'] as List? ?? [])) {
       final map = holding as Map<String, dynamic>;
-      holdings[map['asset'] as String] = (map['amount'] as num?)?.toDouble() ?? 0;
+      holdings[map['asset'] as String] =
+          (map['amount'] as num?)?.toDouble() ?? 0;
     }
 
     setState(() {
       _swapCoins = coins;
       _holdings = holdings;
-      _fromCrypto = coins.firstWhere((c) => c.symbol == _fromCrypto.symbol, orElse: () => _fromCrypto);
-      _toCrypto = coins.firstWhere((c) => c.symbol == _toCrypto.symbol, orElse: () => _toCrypto);
+      _fromCrypto = coins.firstWhere(
+        (c) => c.symbol == _fromCrypto.symbol,
+        orElse: () => _fromCrypto,
+      );
+      _toCrypto = coins.firstWhere(
+        (c) => c.symbol == _toCrypto.symbol,
+        orElse: () => _toCrypto,
+      );
       _calculateToAmount();
     });
   }
@@ -136,15 +144,20 @@ class _TradingScreenState extends State<TradingScreen> {
         children: [
           const Text(
             'Trade',
-            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+            ),
           ),
           Row(
             children: [
               _circleIconButton(
                 Icons.tune_rounded,
-                onTap: () => Navigator.of(context).push(
-                  kashRoute(TrendingDataScreen(crypto: _selectedCrypto)),
-                ),
+                onTap:
+                    () => Navigator.of(context).push(
+                      kashRoute(TrendingDataScreen(crypto: _selectedCrypto)),
+                    ),
               ),
               const SizedBox(width: 10),
               _circleIconButton(Icons.more_horiz_rounded, onTap: () {}),
@@ -161,7 +174,10 @@ class _TradingScreenState extends State<TradingScreen> {
       child: Container(
         width: 40,
         height: 40,
-        decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
+        decoration: const BoxDecoration(
+          color: BybitPalette.surface2,
+          shape: BoxShape.circle,
+        ),
         child: Icon(icon, color: Colors.white, size: 19),
       ),
     );
@@ -265,7 +281,11 @@ class _TradingScreenState extends State<TradingScreen> {
                   const SizedBox(width: 8),
                   Text(
                     '${_selectedCrypto.name}/${_selectedCrypto.symbol.toUpperCase()}',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.white),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
                   ),
                 ],
               ),
@@ -282,9 +302,14 @@ class _TradingScreenState extends State<TradingScreen> {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
-                      color: (_selectedCrypto.isPriceUp ? BybitPalette.green : BybitPalette.red)
+                      color: (_selectedCrypto.isPriceUp
+                              ? BybitPalette.green
+                              : BybitPalette.red)
                           .withOpacity(0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
@@ -293,12 +318,18 @@ class _TradingScreenState extends State<TradingScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: _selectedCrypto.isPriceUp ? BybitPalette.green : BybitPalette.red,
+                        color:
+                            _selectedCrypto.isPriceUp
+                                ? BybitPalette.green
+                                : BybitPalette.red,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text('24h Change', style: TextStyle(fontSize: 12, color: BybitPalette.muted)),
+                  const Text(
+                    '24h Change',
+                    style: TextStyle(fontSize: 12, color: BybitPalette.muted),
+                  ),
                 ],
               ),
             ],
@@ -319,11 +350,18 @@ class _TradingScreenState extends State<TradingScreen> {
     return Container(
       width: 24,
       height: 24,
-      decoration: const BoxDecoration(color: BybitPalette.accent, shape: BoxShape.circle),
+      decoration: const BoxDecoration(
+        color: BybitPalette.accent,
+        shape: BoxShape.circle,
+      ),
       child: Center(
         child: Text(
           _selectedCrypto.symbol.substring(0, 1).toUpperCase(),
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14),
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+          ),
         ),
       ),
     );
@@ -333,9 +371,19 @@ class _TradingScreenState extends State<TradingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: BybitPalette.muted)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: BybitPalette.muted),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
       ],
     );
   }
@@ -359,7 +407,8 @@ class _TradingScreenState extends State<TradingScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: isSelected ? BybitPalette.selected : BybitPalette.surface2,
+                color:
+                    isSelected ? BybitPalette.selected : BybitPalette.surface2,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -399,13 +448,20 @@ class _TradingScreenState extends State<TradingScreen> {
           ),
           titlesData: FlTitlesData(
             show: true,
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
-                  const style = TextStyle(color: BybitPalette.muted, fontSize: 10);
+                  const style = TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 10,
+                  );
                   Widget text;
                   switch (value.toInt()) {
                     case 0:
@@ -430,7 +486,11 @@ class _TradingScreenState extends State<TradingScreen> {
                       text = const Text('');
                       break;
                   }
-                  return SideTitleWidget(axisSide: meta.axisSide, space: 8, child: text);
+                  return SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    space: 8,
+                    child: text,
+                  );
                 },
               ),
             ),
@@ -439,10 +499,14 @@ class _TradingScreenState extends State<TradingScreen> {
                 showTitles: true,
                 interval: 1,
                 getTitlesWidget: (value, meta) {
-                  if (value == meta.max || value == meta.min) return Container();
+                  if (value == meta.max || value == meta.min)
+                    return Container();
                   return Text(
                     '\$${value.toInt()}K',
-                    style: const TextStyle(color: BybitPalette.muted, fontSize: 10),
+                    style: const TextStyle(
+                      color: BybitPalette.muted,
+                      fontSize: 10,
+                    ),
                     textAlign: TextAlign.left,
                   );
                 },
@@ -457,9 +521,18 @@ class _TradingScreenState extends State<TradingScreen> {
           lineBarsData: [
             LineChartBarData(
               spots: const [
-                FlSpot(0, 3), FlSpot(1, 2.5), FlSpot(2, 3.1), FlSpot(3, 3.2),
-                FlSpot(4, 2.8), FlSpot(5, 3.5), FlSpot(6, 3.9), FlSpot(7, 3.2),
-                FlSpot(8, 4), FlSpot(9, 3.8), FlSpot(10, 4.2), FlSpot(11, 4.5),
+                FlSpot(0, 3),
+                FlSpot(1, 2.5),
+                FlSpot(2, 3.1),
+                FlSpot(3, 3.2),
+                FlSpot(4, 2.8),
+                FlSpot(5, 3.5),
+                FlSpot(6, 3.9),
+                FlSpot(7, 3.2),
+                FlSpot(8, 4),
+                FlSpot(9, 3.8),
+                FlSpot(10, 4.2),
+                FlSpot(11, 4.5),
               ],
               isCurved: true,
               color: BybitPalette.accent,
@@ -471,7 +544,10 @@ class _TradingScreenState extends State<TradingScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [BybitPalette.accent.withOpacity(0.28), BybitPalette.accent.withOpacity(0.0)],
+                  colors: [
+                    BybitPalette.accent.withOpacity(0.28),
+                    BybitPalette.accent.withOpacity(0.0),
+                  ],
                 ),
               ),
             ),
@@ -479,12 +555,17 @@ class _TradingScreenState extends State<TradingScreen> {
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
               tooltipBgColor: BybitPalette.surface2.withOpacity(0.9),
-              getTooltipItems: (spots) => spots.map((spot) {
-                return LineTooltipItem(
-                  '\$${(spot.y * 1000).toInt()}',
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                );
-              }).toList(),
+              getTooltipItems:
+                  (spots) =>
+                      spots.map((spot) {
+                        return LineTooltipItem(
+                          '\$${(spot.y * 1000).toInt()}',
+                          const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      }).toList(),
             ),
           ),
         ),
@@ -492,7 +573,8 @@ class _TradingScreenState extends State<TradingScreen> {
     );
   }
 
-  static FlLine _getDrawingLine(double value) => const FlLine(color: BybitPalette.surface2, strokeWidth: 1);
+  static FlLine _getDrawingLine(double value) =>
+      const FlLine(color: BybitPalette.surface2, strokeWidth: 1);
 
   Widget _buildSpotTrading() {
     return Padding(
@@ -502,8 +584,11 @@ class _TradingScreenState extends State<TradingScreen> {
         children: [
           _buildBuySellToggle(),
           const SizedBox(height: 20),
-          _buildAmountInput('Amount to ${_isBuying ? 'buy' : 'sell'} (USD)', 'USD',
-              controller: _usdAmountController),
+          _buildAmountInput(
+            'Amount to ${_isBuying ? 'buy' : 'sell'} (USD)',
+            'USD',
+            controller: _usdAmountController,
+          ),
           const SizedBox(height: 16),
           _buildTotalSection(),
           const SizedBox(height: 24),
@@ -516,7 +601,10 @@ class _TradingScreenState extends State<TradingScreen> {
   Widget _buildBuySellToggle() {
     return Container(
       padding: const EdgeInsets.all(5),
-      decoration: BoxDecoration(color: BybitPalette.surface2, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: BybitPalette.surface2,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Row(
         children: [
           Expanded(
@@ -576,11 +664,18 @@ class _TradingScreenState extends State<TradingScreen> {
     );
   }
 
-  Widget _buildAmountInput(String label, String currency, {TextEditingController? controller}) {
+  Widget _buildAmountInput(
+    String label,
+    String currency, {
+    TextEditingController? controller,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: BybitPalette.muted, fontSize: 14)),
+        Text(
+          label,
+          style: const TextStyle(color: BybitPalette.muted, fontSize: 14),
+        ),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
@@ -590,14 +685,26 @@ class _TradingScreenState extends State<TradingScreen> {
             hintStyle: const TextStyle(color: BybitPalette.muted),
             filled: true,
             fillColor: BybitPalette.input,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: BybitPalette.accent, width: 1.4),
+              borderSide: const BorderSide(
+                color: BybitPalette.accent,
+                width: 1.4,
+              ),
             ),
             suffixText: currency,
-            suffixStyle: const TextStyle(color: BybitPalette.muted, fontWeight: FontWeight.bold),
+            suffixStyle: const TextStyle(
+              color: BybitPalette.muted,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
@@ -609,7 +716,10 @@ class _TradingScreenState extends State<TradingScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Total', style: TextStyle(color: BybitPalette.muted, fontSize: 14)),
+        const Text(
+          'Total',
+          style: TextStyle(color: BybitPalette.muted, fontSize: 14),
+        ),
         const SizedBox(height: 8),
         Container(
           width: double.infinity,
@@ -622,8 +732,18 @@ class _TradingScreenState extends State<TradingScreen> {
           child: const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('0.00', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              Text('USDT', style: TextStyle(color: BybitPalette.muted, fontSize: 16)),
+              Text(
+                '0.00',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'USDT',
+                style: TextStyle(color: BybitPalette.muted, fontSize: 16),
+              ),
             ],
           ),
         ),
@@ -644,7 +764,9 @@ class _TradingScreenState extends State<TradingScreen> {
           borderRadius: BorderRadius.circular(100),
         ),
         child: Text(
-          _placingOrder ? 'Placing order…' : (_isBuying ? 'Buy $symbol' : 'Sell $symbol'),
+          _placingOrder
+              ? 'Placing order…'
+              : (_isBuying ? 'Buy $symbol' : 'Sell $symbol'),
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w900,
@@ -662,7 +784,9 @@ class _TradingScreenState extends State<TradingScreen> {
       return;
     }
     if (!ApiService.hasSession) {
-      _showSnack('Live trading needs the backend: run run_backend.bat, then sign up or log in.');
+      _showSnack(
+        'Live trading needs the backend: run run_backend.bat, then sign up or log in.',
+      );
       return;
     }
 
@@ -675,7 +799,10 @@ class _TradingScreenState extends State<TradingScreen> {
       );
       final qty = (fill['qty'] as num).toDouble();
       final price = (fill['price'] as num).toDouble();
-      final mode = fill['executionMode'] == 'external-market' ? 'Binance testnet' : 'internal fill @ live price';
+      final mode =
+          fill['executionMode'] == 'external-market'
+              ? 'Binance testnet'
+              : 'internal fill @ live price';
       _usdAmountController.clear();
       _showSnack(
         '${_isBuying ? 'Bought' : 'Sold'} ${qty.toStringAsFixed(6)} '
@@ -692,7 +819,9 @@ class _TradingScreenState extends State<TradingScreen> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   // ── Swap tab ─────────────────────────────────────────────────────
@@ -717,7 +846,10 @@ class _TradingScreenState extends State<TradingScreen> {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(color: BybitPalette.surface2, borderRadius: BorderRadius.circular(100)),
+      decoration: BoxDecoration(
+        color: BybitPalette.surface2,
+        borderRadius: BorderRadius.circular(100),
+      ),
       child: Row(
         children: List.generate(_swapSubTabs.length, (i) {
           return Expanded(child: _swapSubTabItem(_swapSubTabs[i], i));
@@ -777,8 +909,14 @@ class _TradingScreenState extends State<TradingScreen> {
               child: Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-                child: const Icon(Icons.swap_vert_rounded, color: BybitPalette.accent),
+                decoration: const BoxDecoration(
+                  color: BybitPalette.surface2,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.swap_vert_rounded,
+                  color: BybitPalette.accent,
+                ),
               ),
             ),
           ),
@@ -807,25 +945,50 @@ class _TradingScreenState extends State<TradingScreen> {
     required VoidCallback? onChanged,
   }) {
     final available = _holdings[crypto.symbol] ?? 0;
-    final usdValue = (double.tryParse(controller.text) ?? 0) * crypto.currentPrice;
+    final usdValue =
+        (double.tryParse(controller.text) ?? 0) * crypto.currentPrice;
     return BybitCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(label, style: const TextStyle(color: BybitPalette.muted, fontSize: 13, fontWeight: FontWeight.w700)),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: BybitPalette.muted,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(width: 6),
-              const Text('· Ethereum', style: TextStyle(color: BybitPalette.muted, fontSize: 12)),
+              const Text(
+                '· Ethereum',
+                style: TextStyle(color: BybitPalette.muted, fontSize: 12),
+              ),
               const Spacer(),
-              const Icon(Icons.account_balance_wallet_outlined, size: 13, color: BybitPalette.muted),
+              const Icon(
+                Icons.account_balance_wallet_outlined,
+                size: 13,
+                color: BybitPalette.muted,
+              ),
               const SizedBox(width: 4),
-              Text(available.toStringAsFixed(available == available.toInt() ? 0 : 4),
-                  style: const TextStyle(color: BybitPalette.muted, fontSize: 12)),
+              Text(
+                available.toStringAsFixed(
+                  available == available.toInt() ? 0 : 4,
+                ),
+                style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
+              ),
               if (label == 'From') ...[
                 const SizedBox(width: 8),
-                const Text('Add funds',
-                    style: TextStyle(color: BybitPalette.accent, fontSize: 12, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Add funds',
+                  style: TextStyle(
+                    color: BybitPalette.accent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ],
             ],
           ),
@@ -843,8 +1006,14 @@ class _TradingScreenState extends State<TradingScreen> {
                       controller: controller,
                       readOnly: readOnly,
                       textAlign: TextAlign.end,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
                       decoration: const InputDecoration(
                         hintText: '0',
                         hintStyle: TextStyle(color: BybitPalette.muted),
@@ -857,7 +1026,10 @@ class _TradingScreenState extends State<TradingScreen> {
                     const SizedBox(height: 2),
                     Text(
                       '\$${usdValue.toStringAsFixed(usdValue < 1 ? 5 : 2)}',
-                      style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
+                      style: const TextStyle(
+                        color: BybitPalette.muted,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -874,25 +1046,45 @@ class _TradingScreenState extends State<TradingScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(color: BybitPalette.surface2, borderRadius: BorderRadius.circular(100)),
+        decoration: BoxDecoration(
+          color: BybitPalette.surface2,
+          borderRadius: BorderRadius.circular(100),
+        ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 22,
               height: 22,
-              decoration: const BoxDecoration(color: BybitPalette.accent, shape: BoxShape.circle),
+              decoration: const BoxDecoration(
+                color: BybitPalette.accent,
+                shape: BoxShape.circle,
+              ),
               child: Center(
                 child: Text(
                   crypto.symbol.substring(0, 1).toUpperCase(),
-                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 11),
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 11,
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 6),
-            Text(crypto.symbol.toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 18),
+            Text(
+              crypto.symbol.toUpperCase(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
           ],
         ),
       ),
@@ -904,9 +1096,10 @@ class _TradingScreenState extends State<TradingScreen> {
     final available = _holdings[_fromCrypto.symbol] ?? 0;
     final insufficient = fromQty > 0 && fromQty > available;
     return BybitPrimaryButton(
-      label: _swapping
-          ? 'Swapping…'
-          : insufficient
+      label:
+          _swapping
+              ? 'Swapping…'
+              : insufficient
               ? 'Insufficient balance of ${_fromCrypto.symbol}'
               : 'Swap',
       enabled: !_swapping,
@@ -928,50 +1121,88 @@ class _TradingScreenState extends State<TradingScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: BybitPalette.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       isScrollControlled: true,
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
       builder: (sheetContext) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 12),
-              Text(isFrom ? 'Select source token' : 'Select destination token',
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white)),
+              Text(
+                isFrom ? 'Select source token' : 'Select destination token',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
               const SizedBox(height: 8),
               Flexible(
                 child: ListView(
                   shrinkWrap: true,
-                  children: _swapCoins.where((c) {
-                    return isFrom ? c.symbol != _toCrypto.symbol : c.symbol != _fromCrypto.symbol;
-                  }).map((crypto) {
-                    return ListTile(
-                      leading: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-                        child: Center(
-                          child: Text(crypto.symbol.substring(0, 1).toUpperCase(),
-                              style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
-                        ),
-                      ),
-                      title: Text(crypto.name, style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white)),
-                      subtitle: Text(crypto.symbol.toUpperCase(), style: const TextStyle(color: BybitPalette.muted)),
-                      trailing: Text(crypto.formattedPrice, style: const TextStyle(color: Colors.white)),
-                      onTap: () {
-                        setState(() {
-                          if (isFrom) {
-                            _fromCrypto = crypto;
-                          } else {
-                            _toCrypto = crypto;
-                          }
-                          _calculateToAmount();
-                        });
-                        Navigator.pop(sheetContext);
-                      },
-                    );
-                  }).toList(),
+                  children:
+                      _swapCoins
+                          .where((c) {
+                            return isFrom
+                                ? c.symbol != _toCrypto.symbol
+                                : c.symbol != _fromCrypto.symbol;
+                          })
+                          .map((crypto) {
+                            return ListTile(
+                              leading: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  color: BybitPalette.surface2,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    crypto.symbol.substring(0, 1).toUpperCase(),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                crypto.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              subtitle: Text(
+                                crypto.symbol.toUpperCase(),
+                                style: const TextStyle(
+                                  color: BybitPalette.muted,
+                                ),
+                              ),
+                              trailing: Text(
+                                crypto.formattedPrice,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              onTap: () {
+                                setState(() {
+                                  if (isFrom) {
+                                    _fromCrypto = crypto;
+                                  } else {
+                                    _toCrypto = crypto;
+                                  }
+                                  _calculateToAmount();
+                                });
+                                Navigator.pop(sheetContext);
+                              },
+                            );
+                          })
+                          .toList(),
                 ),
               ),
               const SizedBox(height: 12),
@@ -985,56 +1216,85 @@ class _TradingScreenState extends State<TradingScreen> {
   void _showSwapConfirmation() {
     showDialog(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: BybitPalette.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Confirm Swap',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.white)),
-              const SizedBox(height: 20),
-              _confirmRow('You Pay', '${_fromAmountController.text} ${_fromCrypto.symbol.toUpperCase()}'),
-              const SizedBox(height: 12),
-              _confirmRow('You Receive (est.)', '${_toAmountController.text} ${_toCrypto.symbol.toUpperCase()}'),
-              const SizedBox(height: 20),
-              Row(
+      builder:
+          (dialogContext) => Dialog(
+            backgroundColor: BybitPalette.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: BybitPalette.surface2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+                  const Text(
+                    'Confirm Swap',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(dialogContext).pop();
-                        _executeSwap();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: BybitPalette.accent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                  const SizedBox(height: 20),
+                  _confirmRow(
+                    'You Pay',
+                    '${_fromAmountController.text} ${_fromCrypto.symbol.toUpperCase()}',
+                  ),
+                  const SizedBox(height: 12),
+                  _confirmRow(
+                    'You Receive (est.)',
+                    '${_toAmountController.text} ${_toCrypto.symbol.toUpperCase()}',
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: BybitPalette.surface2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ),
                       ),
-                      child: const Text('Confirm',
-                          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop();
+                            _executeSwap();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: BybitPalette.accent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(100),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text(
+                            'Confirm',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
@@ -1042,8 +1302,18 @@ class _TradingScreenState extends State<TradingScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(color: BybitPalette.muted, fontSize: 14)),
-        Text(value, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800)),
+        Text(
+          label,
+          style: const TextStyle(color: BybitPalette.muted, fontSize: 14),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ],
     );
   }
@@ -1071,7 +1341,9 @@ class _TradingScreenState extends State<TradingScreen> {
       final qtyReceived = (buyFill['qty'] as num?)?.toDouble() ?? 0;
       setState(() => _swapping = false);
       await _loadSwapMarket();
-      _showSnack('Swapped for ${qtyReceived.toStringAsFixed(6)} ${_toCrypto.symbol.toUpperCase()}');
+      _showSnack(
+        'Swapped for ${qtyReceived.toStringAsFixed(6)} ${_toCrypto.symbol.toUpperCase()}',
+      );
     } on ApiException catch (err) {
       if (!mounted) return;
       setState(() => _swapping = false);
@@ -1096,12 +1368,25 @@ class _TradingScreenState extends State<TradingScreen> {
             Container(
               width: 52,
               height: 52,
-              decoration: const BoxDecoration(color: BybitPalette.surface2, shape: BoxShape.circle),
-              child: const Icon(Icons.hourglass_top_rounded, color: BybitPalette.accent, size: 24),
+              decoration: const BoxDecoration(
+                color: BybitPalette.surface2,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.hourglass_top_rounded,
+                color: BybitPalette.accent,
+                size: 24,
+              ),
             ),
             const SizedBox(height: 14),
-            Text('$label is coming soon',
-                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800)),
+            Text(
+              '$label is coming soon',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             const SizedBox(height: 6),
             const Text(
               'This is part of the RoyallPay Phase 2 roadmap.',

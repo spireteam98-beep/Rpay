@@ -40,26 +40,27 @@ class PrimaryButton extends StatelessWidget {
                       ? Border.all(color: const Color(0x33FFFFFF), width: 1.2)
                       : null,
             ),
-            child: isLoading
-                ? SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.4,
-                      valueColor: AlwaysStoppedAnimation(
-                        outlined ? AppTheme.textWhite : AppTheme.onLime,
+            child:
+                isLoading
+                    ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        valueColor: AlwaysStoppedAnimation(
+                          outlined ? AppTheme.textWhite : AppTheme.onLime,
+                        ),
+                      ),
+                    )
+                    : Text(
+                      label,
+                      style: TextStyle(
+                        color: outlined ? AppTheme.textWhite : AppTheme.onLime,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                       ),
                     ),
-                  )
-                : Text(
-                    label,
-                    style: TextStyle(
-                      color: outlined ? AppTheme.textWhite : AppTheme.onLime,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
           ),
         ),
       ),

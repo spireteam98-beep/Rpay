@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
-import 'home_screen.dart';
+import 'home_dashboard_screen.dart';
 import 'market_screen.dart';
 import 'trading_screen.dart';
 import 'wallet_screen.dart';
@@ -22,7 +22,7 @@ class _MainNavigationState extends State<MainNavigation> {
     const WalletScreen(),
     const MarketScreen(),
     const TradingScreen(),
-    const HomeScreen(),
+    const HomeDashboardScreen(),
   ];
 
   @override
@@ -40,10 +40,20 @@ class _MainNavigationState extends State<MainNavigation> {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: BybitPalette.surface,
-          border: Border(top: BorderSide(color: Color(0xFF292C32))),
+        margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+        decoration: BoxDecoration(
+          color: const Color(0xF20B0C0E),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF1F2227)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0xB3000000),
+              blurRadius: 22,
+              offset: Offset(0, -8),
+            ),
+          ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) {

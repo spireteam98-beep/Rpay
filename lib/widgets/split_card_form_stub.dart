@@ -39,7 +39,8 @@ class SplitCardFormState extends State<SplitCardForm> {
 
   void _notifyComplete() {
     widget.onCompleteChanged(
-      _details?.complete == true && widget.nameController.text.trim().isNotEmpty,
+      _details?.complete == true &&
+          widget.nameController.text.trim().isNotEmpty,
     );
   }
 
@@ -50,12 +51,13 @@ class SplitCardFormState extends State<SplitCardForm> {
       children: [
         AnimatedBuilder(
           animation: widget.nameController,
-          builder: (context, _) => CardPreview(
-            holderName: widget.nameController.text,
-            brand: _brand,
-            numberComplete: _details?.complete == true,
-            expiryComplete: _details?.complete == true,
-          ),
+          builder:
+              (context, _) => CardPreview(
+                holderName: widget.nameController.text,
+                brand: _brand,
+                numberComplete: _details?.complete == true,
+                expiryComplete: _details?.complete == true,
+              ),
         ),
         const SizedBox(height: 18),
         Container(
@@ -165,7 +167,9 @@ class SplitCardFormState extends State<SplitCardForm> {
       );
     } on StripeException catch (err) {
       return CardConfirmResult.failure(
-        err.error.localizedMessage ?? err.error.message ?? 'Your card was declined.',
+        err.error.localizedMessage ??
+            err.error.message ??
+            'Your card was declined.',
       );
     }
   }

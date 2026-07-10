@@ -92,31 +92,35 @@ class SplitCardFormState extends State<SplitCardForm> {
       _options(placeholder: '1234 1234 1234 1234').jsify(),
     );
     _expiryElement = _elements.create('cardExpiry', _options().jsify());
-    _cvcElement = _elements.create('cardCvc', _options(placeholder: 'CVC').jsify());
+    _cvcElement = _elements.create(
+      'cardCvc',
+      _options(placeholder: 'CVC').jsify(),
+    );
 
     widget.nameController.addListener(_notifyComplete);
     _mountWhenConnected();
   }
 
   web.HTMLDivElement _registerDiv(String viewType, String id) {
-    final div = web.HTMLDivElement()
-      ..id = id
-      ..style.border = 'none';
+    final div =
+        web.HTMLDivElement()
+          ..id = id
+          ..style.border = 'none';
     ui.platformViewRegistry.registerViewFactory(viewType, (int _) => div);
     return div;
   }
 
   Map<String, dynamic> _options({String? placeholder}) => {
-        'style': {
-          'base': {
-            'color': _cssColor(Colors.white),
-            'fontSize': '15px',
-            '::placeholder': {'color': _cssColor(BybitPalette.muted)},
-          },
-          'invalid': {'color': _cssColor(BybitPalette.red)},
-        },
-        if (placeholder != null) 'placeholder': placeholder,
-      };
+    'style': {
+      'base': {
+        'color': _cssColor(Colors.white),
+        'fontSize': '15px',
+        '::placeholder': {'color': _cssColor(BybitPalette.muted)},
+      },
+      'invalid': {'color': _cssColor(BybitPalette.red)},
+    },
+    if (placeholder != null) 'placeholder': placeholder,
+  };
 
   String _cssColor(Color color) {
     final argb = color.toARGB32();
@@ -126,7 +130,9 @@ class SplitCardFormState extends State<SplitCardForm> {
 
   void _mountWhenConnected() {
     if (!mounted) return;
-    if (_numberDiv.isConnected && _expiryDiv.isConnected && _cvcDiv.isConnected) {
+    if (_numberDiv.isConnected &&
+        _expiryDiv.isConnected &&
+        _cvcDiv.isConnected) {
       _numberElement
         ..mount(_numberDiv)
         ..onChange(_onNumberChange);
@@ -137,7 +143,9 @@ class SplitCardFormState extends State<SplitCardForm> {
         ..mount(_cvcDiv)
         ..onChange((e) => _onChange(e, (v) => _cvcComplete = v));
     } else {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _mountWhenConnected());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _mountWhenConnected(),
+      );
     }
   }
 
@@ -201,12 +209,13 @@ class SplitCardFormState extends State<SplitCardForm> {
       children: [
         AnimatedBuilder(
           animation: widget.nameController,
-          builder: (context, _) => CardPreview(
-            holderName: widget.nameController.text,
-            brand: _brand,
-            numberComplete: _numberComplete,
-            expiryComplete: _expiryComplete,
-          ),
+          builder:
+              (context, _) => CardPreview(
+                holderName: widget.nameController.text,
+                brand: _brand,
+                numberComplete: _numberComplete,
+                expiryComplete: _expiryComplete,
+              ),
         ),
         const SizedBox(height: 18),
         Container(
@@ -260,13 +269,13 @@ class SplitCardFormState extends State<SplitCardForm> {
   }
 
   Widget _fieldLabel(String text) => Text(
-        text,
-        style: const TextStyle(
-          color: BybitPalette.muted,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-        ),
-      );
+    text,
+    style: const TextStyle(
+      color: BybitPalette.muted,
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+    ),
+  );
 
   Widget _fieldBox({required double height, required String viewType}) {
     return Container(

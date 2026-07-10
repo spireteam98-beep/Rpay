@@ -32,9 +32,9 @@ class Cryptocurrency {
   bool get isPriceUp => priceChangePercentage24h >= 0;
 
   String get formattedPrice => NumberFormat.currency(
-        symbol: '\$',
-        decimalDigits: currentPrice < 1 ? 4 : 2,
-      ).format(currentPrice);
+    symbol: '\$',
+    decimalDigits: currentPrice < 1 ? 4 : 2,
+  ).format(currentPrice);
 
   String get formattedPriceChange {
     final sign = isPriceUp ? '+' : '';
@@ -46,11 +46,36 @@ class Cryptocurrency {
   /// it's the quote asset, not something users buy/sell). `id`/`symbol`
   /// match the asset code the `/trade` endpoints expect.
   static const List<Cryptocurrency> assets = [
-    Cryptocurrency(id: 'BTC', name: 'Bitcoin', symbol: 'BTC', image: 'assets/icons/btc.png'),
-    Cryptocurrency(id: 'ETH', name: 'Ethereum', symbol: 'ETH', image: 'assets/icons/eth.png'),
-    Cryptocurrency(id: 'BNB', name: 'BNB', symbol: 'BNB', image: 'assets/icons/bnb.png'),
-    Cryptocurrency(id: 'SOL', name: 'Solana', symbol: 'SOL', image: 'assets/icons/sol.png'),
-    Cryptocurrency(id: 'ADA', name: 'Cardano', symbol: 'ADA', image: 'assets/icons/ada.png'),
+    Cryptocurrency(
+      id: 'BTC',
+      name: 'Bitcoin',
+      symbol: 'BTC',
+      image: 'assets/icons/btc.png',
+    ),
+    Cryptocurrency(
+      id: 'ETH',
+      name: 'Ethereum',
+      symbol: 'ETH',
+      image: 'assets/icons/eth.png',
+    ),
+    Cryptocurrency(
+      id: 'BNB',
+      name: 'BNB',
+      symbol: 'BNB',
+      image: 'assets/icons/bnb.png',
+    ),
+    Cryptocurrency(
+      id: 'SOL',
+      name: 'Solana',
+      symbol: 'SOL',
+      image: 'assets/icons/sol.png',
+    ),
+    Cryptocurrency(
+      id: 'ADA',
+      name: 'Cardano',
+      symbol: 'ADA',
+      image: 'assets/icons/ada.png',
+    ),
   ];
 
   /// Merges live prices (the `assets` map from `ApiService.market()`, keyed

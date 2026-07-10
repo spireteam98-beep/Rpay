@@ -188,6 +188,8 @@ class _AgentScreenState extends State<AgentScreen> {
   Widget _dashboard(Map<String, dynamic> agent) {
     final code = agent['agent_code'] as String? ?? '';
     final balance = (agent['commission_balance'] as num?)?.toDouble() ?? 0;
+    final status = agent['status'] as String? ?? 'PENDING';
+    final isActive = status == 'ACTIVE';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -205,6 +207,34 @@ class _AgentScreenState extends State<AgentScreen> {
           'Share your agent code so new customers get credit to your account.',
           style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
         ),
+        if (!isActive) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: (status == 'SUSPENDED'
+                      ? BybitPalette.red
+                      : BybitPalette.accent)
+                  .withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              status == 'SUSPENDED'
+                  ? 'Your agent account has been deactivated by an admin. Contact support for help.'
+                  : 'Your agent account is pending admin approval. Assisted deposits and withdrawals will unlock once approved.',
+              style: TextStyle(
+                color:
+                    status == 'SUSPENDED'
+                        ? BybitPalette.red
+                        : BybitPalette.accent,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 20),
         TouchScale(
           onTap: () {
@@ -281,25 +311,26 @@ class _AgentScreenState extends State<AgentScreen> {
           ),
         ),
         const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: _AssistButton(
-                icon: Icons.south_rounded,
-                label: 'Assist deposit',
-                onTap: () => _assist(isDeposit: true),
+        if (isActive)
+          Row(
+            children: [
+              Expanded(
+                child: _AssistButton(
+                  icon: Icons.south_rounded,
+                  label: 'Assist deposit',
+                  onTap: () => _assist(isDeposit: true),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _AssistButton(
-                icon: Icons.north_rounded,
-                label: 'Assist withdrawal',
-                onTap: () => _assist(isDeposit: false),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _AssistButton(
+                  icon: Icons.north_rounded,
+                  label: 'Assist withdrawal',
+                  onTap: () => _assist(isDeposit: false),
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         const SizedBox(height: 28),
         const Text(
           'Recent commissions',

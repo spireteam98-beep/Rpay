@@ -28,13 +28,16 @@ class _MarketScreenState extends State<MarketScreen> {
       case 'Top':
         return coins..sort((a, b) => b.volume24h.compareTo(a.volume24h));
       case 'Hot':
-        return coins..sort((a, b) => b.priceChangePercentage24h
-            .abs()
-            .compareTo(a.priceChangePercentage24h.abs()));
+        return coins..sort(
+          (a, b) => b.priceChangePercentage24h.abs().compareTo(
+            a.priceChangePercentage24h.abs(),
+          ),
+        );
       case 'Gainers':
-        return coins.where((c) => c.isPriceUp).toList()
-          ..sort((a, b) => b.priceChangePercentage24h
-              .compareTo(a.priceChangePercentage24h));
+        return coins.where((c) => c.isPriceUp).toList()..sort(
+          (a, b) =>
+              b.priceChangePercentage24h.compareTo(a.priceChangePercentage24h),
+        );
       case 'New':
       case 'Favourites':
       default:
@@ -86,7 +89,10 @@ class _MarketScreenState extends State<MarketScreen> {
             children: [
               _circleIconButton(Icons.card_giftcard_rounded, onTap: () {}),
               const SizedBox(width: 10),
-              _circleIconButton(Icons.chat_bubble_outline_rounded, onTap: () {}),
+              _circleIconButton(
+                Icons.chat_bubble_outline_rounded,
+                onTap: () {},
+              ),
             ],
           ),
         ],
@@ -139,10 +145,7 @@ class _MarketScreenState extends State<MarketScreen> {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          _segmentOption('Exchang', 0),
-          _segmentOption('Wallet', 1),
-        ],
+        children: [_segmentOption('Exchang', 0), _segmentOption('Wallet', 1)],
       ),
     );
   }
@@ -178,12 +181,13 @@ class _MarketScreenState extends State<MarketScreen> {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
-        children: _tabs.map((label) {
-          return Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: _categoryTab(label),
-          );
-        }).toList(),
+        children:
+            _tabs.map((label) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: _categoryTab(label),
+              );
+            }).toList(),
       ),
     );
   }
@@ -238,9 +242,10 @@ class _MarketScreenState extends State<MarketScreen> {
             padding: const EdgeInsets.only(bottom: 2),
             child: CryptoListItem(
               crypto: crypto,
-              onTap: () => Navigator.of(context).push(
-                kashRoute(BuyScreen(selectedCrypto: crypto)),
-              ),
+              onTap:
+                  () => Navigator.of(
+                    context,
+                  ).push(kashRoute(BuyScreen(selectedCrypto: crypto))),
             ),
           );
         }),
@@ -253,10 +258,7 @@ class _MarketScreenState extends State<MarketScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
       child: Row(
         children: [
-          Expanded(
-            flex: 4,
-            child: _headerLabel('Name / Turnover'),
-          ),
+          Expanded(flex: 4, child: _headerLabel('Name / Turnover')),
           Expanded(
             flex: 3,
             child: Align(
@@ -289,7 +291,11 @@ class _MarketScreenState extends State<MarketScreen> {
           ),
         ),
         const SizedBox(width: 3),
-        const Icon(Icons.unfold_more_rounded, size: 14, color: BybitPalette.muted),
+        const Icon(
+          Icons.unfold_more_rounded,
+          size: 14,
+          color: BybitPalette.muted,
+        ),
       ],
     );
   }

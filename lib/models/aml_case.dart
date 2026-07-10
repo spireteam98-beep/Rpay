@@ -29,29 +29,29 @@ class AmlCase {
   }
 
   AmlCase copyWith({String? status}) => AmlCase(
-        id: id,
-        createdAt: createdAt,
-        kind: kind,
-        subject: subject,
-        details: details,
-        status: status ?? this.status,
-      );
+    id: id,
+    createdAt: createdAt,
+    kind: kind,
+    subject: subject,
+    details: details,
+    status: status ?? this.status,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'createdAt': createdAt.toIso8601String(),
-        'kind': kind.index,
-        'subject': subject,
-        'details': details,
-        'status': status,
-      };
+    'id': id,
+    'createdAt': createdAt.toIso8601String(),
+    'kind': kind.index,
+    'subject': subject,
+    'details': details,
+    'status': status,
+  };
 
   factory AmlCase.fromJson(Map<String, dynamic> json) => AmlCase(
-        id: json['id'] as String,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        kind: AmlCaseKind.values[json['kind'] as int],
-        subject: json['subject'] as String,
-        details: json['details'] as String,
-        status: json['status'] as String,
-      );
+    id: json['id'] as String,
+    createdAt: DateTime.parse(json['createdAt'] as String),
+    kind: AmlCaseKind.values[json['kind'] as int],
+    subject: json['subject'] as String,
+    details: json['details'] as String,
+    status: json['status'] as String,
+  );
 }

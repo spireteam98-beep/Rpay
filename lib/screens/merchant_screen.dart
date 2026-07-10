@@ -150,6 +150,8 @@ class _MerchantScreenState extends State<MerchantScreen> {
   Widget _dashboard(Map<String, dynamic> merchant) {
     final till = merchant['till_number'] as String? ?? '';
     final name = merchant['name'] as String? ?? '';
+    final status = merchant['status'] as String? ?? 'PENDING';
+    final isActive = status == 'ACTIVE';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -167,6 +169,34 @@ class _MerchantScreenState extends State<MerchantScreen> {
           'Share your QR or till number to get paid instantly.',
           style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
         ),
+        if (!isActive) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: (status == 'SUSPENDED'
+                      ? BybitPalette.red
+                      : BybitPalette.accent)
+                  .withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              status == 'SUSPENDED'
+                  ? 'Your merchant account has been deactivated by an admin. Contact support for help.'
+                  : 'Your merchant account is pending admin approval. Your till cannot receive payments until approved.',
+              style: TextStyle(
+                color:
+                    status == 'SUSPENDED'
+                        ? BybitPalette.red
+                        : BybitPalette.accent,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         Center(
           child: Container(

@@ -41,8 +41,8 @@ router.post('/', async (req, res, next) => {
     const phone = String(req.body?.phone || '').trim() || null;
     if (!name) return res.status(400).json({ error: 'Merchant name is required' });
     const inserted = await pool.query(
-      `INSERT INTO merchants (owner_id, name, till_number, business_type, phone)
-       VALUES ($1,$2,$3,$4,$5)
+      `INSERT INTO merchants (owner_id, name, till_number, business_type, phone, status)
+       VALUES ($1,$2,$3,$4,$5,'PENDING')
        RETURNING id, name, till_number, business_type, phone, status, created_at`,
       [req.userId, name, tillNumber(), businessType, phone],
     );

@@ -4,6 +4,7 @@ import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
+import 'admin_partners_screen.dart';
 import 'aml_queue_screen.dart';
 import 'ledger_screen.dart';
 
@@ -13,9 +14,10 @@ class AdminConsoleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<KashAppState>();
-    final balancedCount = appState.ledgerTransactions
-        .where((transaction) => transaction.isBalanced)
-        .length;
+    final balancedCount =
+        appState.ledgerTransactions
+            .where((transaction) => transaction.isBalanced)
+            .length;
     return Scaffold(
       backgroundColor: BybitPalette.bg,
       appBar: AppBar(
@@ -86,13 +88,23 @@ class AdminConsoleScreen extends StatelessWidget {
               children: [
                 Expanded(child: _metric('KYC tier', appState.kycTier)),
                 const SizedBox(width: 10),
-                Expanded(child: _metric('Ledger', '$balancedCount/${appState.ledgerTransactions.length} balanced')),
+                Expanded(
+                  child: _metric(
+                    'Ledger',
+                    '$balancedCount/${appState.ledgerTransactions.length} balanced',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _metric('Phone', appState.phoneVerified ? 'Verified' : 'Pending')),
+                Expanded(
+                  child: _metric(
+                    'Phone',
+                    appState.phoneVerified ? 'Verified' : 'Pending',
+                  ),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _metric(
@@ -121,7 +133,17 @@ class AdminConsoleScreen extends StatelessWidget {
               appState.openAmlCases == 0
                   ? 'No open sanctions, velocity or limit cases'
                   : '${appState.openAmlCases} case(s) awaiting review',
-              () => Navigator.of(context).push(kashRoute(const AmlQueueScreen())),
+              () =>
+                  Navigator.of(context).push(kashRoute(const AmlQueueScreen())),
+            ),
+            _opsTile(
+              context,
+              Icons.groups_2_outlined,
+              'Agents & Merchants',
+              'Create, approve, deactivate and commissions',
+              () => Navigator.of(
+                context,
+              ).push(kashRoute(const AdminPartnersScreen())),
             ),
             _opsTile(
               context,
@@ -138,7 +160,9 @@ class AdminConsoleScreen extends StatelessWidget {
               () {
                 appState.resetSandbox();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sandbox reset to opening state.')),
+                  const SnackBar(
+                    content: Text('Sandbox reset to opening state.'),
+                  ),
                 );
               },
             ),
@@ -153,7 +177,10 @@ class AdminConsoleScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: BybitPalette.muted, fontSize: 12)),
+          Text(
+            label,
+            style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
+          ),
           const SizedBox(height: 8),
           Text(
             value,
@@ -208,12 +235,18 @@ class AdminConsoleScreen extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       subtitle,
-                      style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
+                      style: const TextStyle(
+                        color: BybitPalette.muted,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: BybitPalette.muted),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: BybitPalette.muted,
+              ),
             ],
           ),
         ),
