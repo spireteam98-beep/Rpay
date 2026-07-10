@@ -43,11 +43,26 @@ class PaymentMethodForm extends StatefulWidget {
   )
   onCredited;
 
+  /// When set, the amount field is hidden and this value is charged
+  /// instead — for screens (like Buy) that collect the amount in their
+  /// own UI above this form.
+  final double? fixedAmount;
+
+  /// Hide the built-in M-Pesa/Card/Waafi picker so a caller can render its
+  /// own gateway selector and drive [gateway] externally instead.
+  final bool showGatewaySelector;
+
+  /// Externally-controlled gateway, used when [showGatewaySelector] is false.
+  final String? gateway;
+
   const PaymentMethodForm({
     super.key,
     this.initialAmountText = '',
     required this.submitLabel,
     required this.onCredited,
+    this.fixedAmount,
+    this.showGatewaySelector = true,
+    this.gateway,
   });
 
   @override
@@ -55,7 +70,7 @@ class PaymentMethodForm extends StatefulWidget {
 }
 
 class PaymentMethodFormState extends State<PaymentMethodForm> {
-  String _gateway = 'PAYSTACK';
+  late String _gateway;
   late final TextEditingController _amountController;
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _cardHolderController = TextEditingController();
@@ -67,7 +82,21 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
   @override
   void initState() {
     super.initState();
-    _amountController = TextEditingController(text: widget.initialAmountText);
+    _gateway = widget.gateway ?? 'PAYSTACK';
+    _amountController = TextEditingController(
+      text: widget.fixedAmount?.toStringAsFixed(2) ?? widget.initialAmountText,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant PaymentMethodForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.gateway != null && widget.gateway != _gateway) {
+      setState(() => _gateway = widget.gateway!);
+    }
+    if (widget.fixedAmount != null && widget.fixedAmount != oldWidget.fixedAmount) {
+      _amountController.text = widget.fixedAmount!.toStringAsFixed(2);
+    }
   }
 
   @override
@@ -108,16 +137,19 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _gatewaySelector(),
-        const SizedBox(height: 20),
-        BybitTextField(
-          label: 'Amount ($_currency)',
-          hint: '0.00',
-          icon: Icons.payments_outlined,
-          keyboardType: TextInputType.number,
-          controller: _amountController,
-          onChanged: (_) => setState(() {}),
-        ),
+        if (widget.showGatewaySelector) ...[
+          _gatewaySelector(),
+          const SizedBox(height: 20),
+        ],
+        if (widget.fixedAmount == null)
+          BybitTextField(
+            label: 'Amount ($_currency)',
+            hint: '0.00',
+            icon: Icons.payments_outlined,
+            keyboardType: TextInputType.number,
+            controller: _amountController,
+            onChanged: (_) => setState(() {}),
+          ),
         if (_gateway == 'WAAFI' || _gateway == 'PAYSTACK') ...[
           const SizedBox(height: 18),
           BybitTextField(
@@ -290,7 +322,9 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
   }
 
   Future<void> _submit() async {
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    final amount = widget.fixedAmount ??
+        double.tryParse(_amountController.text.trim()) ??
+        0;
     final phone = _phoneController.text.trim();
     if (amount <= 0) {
       _showSnack('Enter an amount greater than 0');

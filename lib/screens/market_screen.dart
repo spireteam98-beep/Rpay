@@ -114,7 +114,7 @@ class _MarketScreenState extends State<MarketScreen> {
       height: 214,
       width: double.infinity,
       child: ClipPath(
-        clipper: _WaveHeaderClipper(),
+        clipper: const BybitWaveClipper(),
         child: Container(
           color: BybitPalette.accent,
           padding: const EdgeInsets.fromLTRB(20, 92, 20, 20),
@@ -293,32 +293,4 @@ class _MarketScreenState extends State<MarketScreen> {
       ],
     );
   }
-}
-
-/// Dips inward at the top-center (peaking near the left/right edges) and
-/// rounds off into the black content below — the "scoop" header shape from
-/// the reference design.
-class _WaveHeaderClipper extends CustomClipper<Path> {
-  const _WaveHeaderClipper();
-
-  @override
-  Path getClip(Size size) {
-    final w = size.width;
-    final h = size.height;
-    const bottomRadius = 32.0;
-    final dip = h * 0.34;
-
-    return Path()
-      ..moveTo(0, 0)
-      ..quadraticBezierTo(w * 0.25, dip * 0.92, w * 0.5, dip)
-      ..quadraticBezierTo(w * 0.75, dip * 0.92, w, 0)
-      ..lineTo(w, h - bottomRadius)
-      ..quadraticBezierTo(w, h, w - bottomRadius, h)
-      ..lineTo(bottomRadius, h)
-      ..quadraticBezierTo(0, h, 0, h - bottomRadius)
-      ..close();
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/cryptocurrency.dart';
 import '../services/api_service.dart';
@@ -23,14 +24,31 @@ class BuyScreen extends StatefulWidget {
 }
 
 class _BuyScreenState extends State<BuyScreen> {
+  static const _gateways = [
+    ('PAYSTACK', 'M-Pesa by Paystack', Icons.phone_iphone_rounded),
+    ('STRIPE', 'Card by Stripe', Icons.credit_card_rounded),
+    ('WAAFI', 'Waafi Somali wallet', Icons.account_balance_wallet_rounded),
+  ];
+
   List<Cryptocurrency> _coins = Cryptocurrency.assets;
   late Cryptocurrency _selectedCrypto;
+  bool _amountMode = true; // true = enter USD amount, false = enter quantity
+  String _gateway = 'PAYSTACK';
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _qtyController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _selectedCrypto = widget.selectedCrypto ?? Cryptocurrency.assets[1]; // ETH
     _loadMarket();
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _qtyController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMarket() async {
@@ -48,109 +66,399 @@ class _BuyScreenState extends State<BuyScreen> {
     });
   }
 
+  double get _usdAmount {
+    if (_amountMode) return double.tryParse(_amountController.text) ?? 0;
+    final qty = double.tryParse(_qtyController.text) ?? 0;
+    return qty * _selectedCrypto.currentPrice;
+  }
+
+  double get _qtyReceived {
+    if (_selectedCrypto.currentPrice <= 0) return 0;
+    if (!_amountMode) return double.tryParse(_qtyController.text) ?? 0;
+    final usd = double.tryParse(_amountController.text) ?? 0;
+    return usd / _selectedCrypto.currentPrice;
+  }
+
+  String get _gatewayLabel =>
+      _gateways.firstWhere((g) => g.$1 == _gateway).$2;
+  IconData get _gatewayIcon =>
+      _gateways.firstWhere((g) => g.$1 == _gateway).$3;
+
+  String get _processingTime => switch (_gateway) {
+        'STRIPE' => 'Instant',
+        _ => 'A few minutes',
+      };
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: BybitPalette.bg,
-      appBar: const BybitSubHeader('Buy Crypto'),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 10, 24, 30),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Buy crypto',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.6,
+        bottom: false,
+        child: Column(
+          children: [
+            _header(context),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
+                child: Column(
+                  children: [
+                    _amountCard(),
+                    const SizedBox(height: 16),
+                    _paymentMethodRow(),
+                    const SizedBox(height: 16),
+                    _infoCard(),
+                    const SizedBox(height: 20),
+                    PaymentMethodForm(
+                      submitLabel: 'Buy ${_selectedCrypto.symbol}',
+                      fixedAmount: _usdAmount,
+                      showGatewaySelector: false,
+                      gateway: _gateway,
+                      onCredited: _buyWith,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Pick an asset and pay with Card, M-Pesa or Waafi — it lands straight in your custody wallet.',
-                style: TextStyle(color: BybitPalette.muted2, fontSize: 14, height: 1.35),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 20, 0),
+          child: Row(
+            children: [
+              TouchScale(
+                onTap: () => Navigator.of(context).maybePop(),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: BybitPalette.surface2,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                ),
               ),
-              const SizedBox(height: 24),
-              _cryptoSelector(),
-              const SizedBox(height: 18),
-              BybitCard(
-                padding: const EdgeInsets.all(18),
-                child: PaymentMethodForm(
-                  initialAmountText: '',
-                  submitLabel: 'Buy ${_selectedCrypto.symbol}',
-                  onCredited: _buyWith,
+              Expanded(
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: const BoxDecoration(
+                          color: BybitPalette.surface2,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            _selectedCrypto.symbol.isEmpty
+                                ? '?'
+                                : _selectedCrypto.symbol.substring(0, 1),
+                            style: const TextStyle(
+                              color: BybitPalette.accent,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Buy ${_selectedCrypto.symbol}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 42),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 116,
+          width: double.infinity,
+          child: ClipPath(
+            clipper: const BybitWaveClipper(),
+            child: Container(
+              color: BybitPalette.accent,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.only(top: 44),
+              child: _unitPricePill(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _unitPricePill() {
+    return TouchScale(
+      onTap: _showCryptoPicker,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Unit price ',
+              style: TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+            Text(
+              _selectedCrypto.formattedPrice,
+              style: const TextStyle(
+                color: BybitPalette.accent,
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _amountCard() {
+    return BybitCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: BybitPalette.surface2,
+              borderRadius: BorderRadius.circular(100),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _amountModeTab('Amount', true),
+                _amountModeTab('Quantity', false),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  key: ValueKey(_amountMode),
+                  controller: _amountMode ? _amountController : _qtyController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '0.00',
+                    hintStyle: TextStyle(color: BybitPalette.muted),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              Text(
+                _amountMode ? 'USD' : _selectedCrypto.symbol,
+                style: const TextStyle(color: BybitPalette.muted, fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 10),
+              const Text('|', style: TextStyle(color: BybitPalette.surface2, fontSize: 16)),
+              const SizedBox(width: 10),
+              const Text(
+                'Max',
+                style: TextStyle(color: BybitPalette.accent, fontSize: 14, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Divider(color: BybitPalette.surface2, height: 1),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'You receive',
+                style: TextStyle(color: BybitPalette.muted, fontSize: 13.5),
+              ),
+              Text(
+                '${_qtyReceived.toStringAsFixed(6)} ${_selectedCrypto.symbol.toUpperCase()}',
+                style: const TextStyle(
+                  color: BybitPalette.muted2,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _amountModeTab(String label, bool mode) {
+    final selected = _amountMode == mode;
+    return TouchScale(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _amountMode = mode);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? BybitPalette.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.black : BybitPalette.muted,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
     );
   }
 
-  Widget _cryptoSelector() {
+  Widget _paymentMethodRow() {
     return TouchScale(
-      onTap: _showCryptoPicker,
+      onTap: _showGatewayPicker,
       child: BybitCard(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(15),
         child: Row(
           children: [
             Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: (_selectedCrypto.isPriceUp
-                        ? BybitPalette.green
-                        : BybitPalette.red)
-                    .withOpacity(0.16),
+              width: 42,
+              height: 42,
+              decoration: const BoxDecoration(
+                color: BybitPalette.surface2,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.currency_bitcoin_rounded,
-                color: _selectedCrypto.isPriceUp
-                    ? BybitPalette.green
-                    : BybitPalette.red,
-                size: 24,
-              ),
+              child: Icon(_gatewayIcon, color: Colors.white, size: 19),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Asset',
+                    'Payment method',
                     style: TextStyle(color: BybitPalette.muted, fontSize: 12),
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '${_selectedCrypto.name} (${_selectedCrypto.symbol})',
+                    _gatewayLabel,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 15,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
             ),
-            Text(
-              _selectedCrypto.formattedPrice,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.keyboard_arrow_down_rounded, color: BybitPalette.muted),
+            const Icon(Icons.chevron_right_rounded, color: BybitPalette.muted),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _infoCard() {
+    return BybitCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Payment info',
+            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900),
+          ),
+          BybitInfoLine('Processing time', _processingTime),
+          const BybitInfoLine('Rail', 'RoyallPay custody'),
+          const BybitInfoLine('Status', 'Ready'),
+        ],
+      ),
+    );
+  }
+
+  void _showGatewayPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: BybitPalette.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              const Text(
+                'Select payment method',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              ..._gateways.map((gateway) {
+                return ListTile(
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: const BoxDecoration(
+                      color: BybitPalette.surface2,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(gateway.$3, color: Colors.white),
+                  ),
+                  title: Text(
+                    gateway.$2,
+                    style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.white),
+                  ),
+                  trailing: gateway.$1 == _gateway
+                      ? const Icon(Icons.check_circle_rounded, color: BybitPalette.accent)
+                      : null,
+                  onTap: () {
+                    setState(() => _gateway = gateway.$1);
+                    Navigator.of(sheetContext).pop();
+                  },
+                );
+              }),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
     );
   }
 

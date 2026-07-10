@@ -18,6 +18,34 @@ class BybitPalette {
   static const red = Color(0xFFFF4D57);
 }
 
+/// Dips inward at the top-center (peaking near the left/right edges) and
+/// rounds off into the black content below — the lime "scoop" header shape
+/// shared by Markets, Buy and Trade.
+class BybitWaveClipper extends CustomClipper<Path> {
+  const BybitWaveClipper();
+
+  @override
+  Path getClip(Size size) {
+    final w = size.width;
+    final h = size.height;
+    const bottomRadius = 32.0;
+    final dip = h * 0.34;
+
+    return Path()
+      ..moveTo(0, 0)
+      ..quadraticBezierTo(w * 0.25, dip * 0.92, w * 0.5, dip)
+      ..quadraticBezierTo(w * 0.75, dip * 0.92, w, 0)
+      ..lineTo(w, h - bottomRadius)
+      ..quadraticBezierTo(w, h, w - bottomRadius, h)
+      ..lineTo(bottomRadius, h)
+      ..quadraticBezierTo(0, h, 0, h - bottomRadius)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
 class BybitScreen extends StatelessWidget {
   final Widget child;
   final bool includeStatusBar;

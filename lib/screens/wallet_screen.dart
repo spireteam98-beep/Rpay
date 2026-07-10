@@ -22,56 +22,126 @@ class WalletScreen extends StatefulWidget {
 
 class _WalletScreenState extends State<WalletScreen> {
   int _modeIndex = 0;
+  int _networkModeIndex = 1; // 0 = Exchange, 1 = WEB3
 
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<KashAppState>();
     return Scaffold(
       backgroundColor: BybitPalette.bg,
-      appBar: AppBar(
-        backgroundColor: BybitPalette.bg,
-        elevation: 0,
-        centerTitle: false,
-        title: const Text(
-          'Wallet',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-          ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _titleRow(context),
+            _waveHeader(),
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const BybitSearchBar(),
+                    _balanceCard(context, appState),
+                    _onChainCustodyCard(),
+                    _walletModeTabs(),
+                    if (_modeIndex == 0) ...[
+                      _accountTabs(context, appState.accounts),
+                      _sectionTitle('Coins'),
+                      _assetsList(),
+                    ] else
+                      _modePlaceholder(_modeIndex == 1 ? 'Funding' : 'Earn'),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          _appBarAction(
-            Icons.history_rounded,
-            () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
+      ),
+    );
+  }
+
+  Widget _titleRow(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Wallet',
+            style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900),
           ),
-          const SizedBox(width: 8),
-          _appBarAction(
-            Icons.qr_code_scanner_rounded,
-            () =>
-                Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+          Row(
+            children: [
+              _appBarAction(
+                Icons.history_rounded,
+                () => Navigator.of(context).push(kashRoute(const LedgerScreen())),
+              ),
+              const SizedBox(width: 10),
+              _appBarAction(
+                Icons.qr_code_scanner_rounded,
+                () => Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
         ],
       ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const BybitTopBar(),
-            const BybitSearchBar(),
-            _balanceCard(context, appState),
-            _onChainCustodyCard(),
-            _walletModeTabs(),
-            if (_modeIndex == 0) ...[
-              _accountTabs(context, appState.accounts),
-              _sectionTitle('Coins'),
-              _assetsList(),
-            ] else
-              _modePlaceholder(_modeIndex == 1 ? 'Funding' : 'Earn'),
-          ],
+    );
+  }
+
+  Widget _waveHeader() {
+    return SizedBox(
+      height: 108,
+      width: double.infinity,
+      child: ClipPath(
+        clipper: const BybitWaveClipper(),
+        child: Container(
+          color: BybitPalette.accent,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.only(top: 40),
+          child: _networkModeSegment(),
+        ),
+      ),
+    );
+  }
+
+  Widget _networkModeSegment() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(100)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _networkModeOption('Exchange', 0),
+          _networkModeOption('WEB3', 1),
+        ],
+      ),
+    );
+  }
+
+  Widget _networkModeOption(String label, int index) {
+    final selected = _networkModeIndex == index;
+    return TouchScale(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _networkModeIndex = index);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.black : Colors.white70,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
         ),
       ),
     );
