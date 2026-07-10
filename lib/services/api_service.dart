@@ -33,9 +33,9 @@ class ApiService {
   static bool get hasSession => token != null && token!.isNotEmpty;
 
   static Map<String, String> _headers({bool authed = false}) => {
-        'Content-Type': 'application/json',
-        if (authed && token != null) 'Authorization': 'Bearer $token',
-      };
+    'Content-Type': 'application/json',
+    if (authed && token != null) 'Authorization': 'Bearer $token',
+  };
 
   /// True when the backend answers /health.
   static Future<bool> isUp() async {
@@ -55,7 +55,9 @@ class ApiService {
   /// cold-start wait on the first real request entirely.
   static void warmUp() {
     unawaited(
-      http.get(Uri.parse('$baseUrl/health')).timeout(
+      http
+          .get(Uri.parse('$baseUrl/health'))
+          .timeout(
             const Duration(seconds: 60),
             onTimeout: () => http.Response('', 0),
           ),
@@ -111,9 +113,11 @@ class ApiService {
       // The backend reports email-delivery failures under `warning` (a
       // failed send isn't really a request "error") — check that first so
       // the real reason surfaces instead of a generic fallback message.
-      throw ApiException(body['warning'] as String? ??
-          body['error'] as String? ??
-          'Could not send sign-in code');
+      throw ApiException(
+        body['warning'] as String? ??
+            body['error'] as String? ??
+            'Could not send sign-in code',
+      );
     } on ApiException {
       rethrow;
     } catch (_) {
@@ -140,7 +144,9 @@ class ApiService {
         await _prefs.setString(_tokenKey, body['token'] as String);
         return true;
       }
-      throw ApiException(body['error'] as String? ?? 'Incorrect or expired code');
+      throw ApiException(
+        body['error'] as String? ?? 'Incorrect or expired code',
+      );
     } on ApiException {
       rethrow;
     } catch (_) {
@@ -153,7 +159,10 @@ class ApiService {
     if (!hasSession) return null;
     try {
       final res = await http
-          .get(Uri.parse('$baseUrl/wallet/summary'), headers: _headers(authed: true))
+          .get(
+            Uri.parse('$baseUrl/wallet/summary'),
+            headers: _headers(authed: true),
+          )
           .timeout(_timeout);
       if (res.statusCode != 200) return null;
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -167,7 +176,10 @@ class ApiService {
     if (!hasSession) return null;
     try {
       final res = await http
-          .get(Uri.parse('$baseUrl/wallet/hybrid'), headers: _headers(authed: true))
+          .get(
+            Uri.parse('$baseUrl/wallet/hybrid'),
+            headers: _headers(authed: true),
+          )
           .timeout(_timeout);
       if (res.statusCode != 200) return null;
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -182,10 +194,65 @@ class ApiService {
     if (!hasSession) return null;
     try {
       final res = await http
-          .get(Uri.parse('$baseUrl/banking/account'), headers: _headers(authed: true))
+          .get(
+            Uri.parse('$baseUrl/banking/account'),
+            headers: _headers(authed: true),
+          )
           .timeout(_timeout);
       if (res.statusCode != 200) return null;
       return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Current authenticated profile and compliance state.
+  static Future<Map<String, dynamic>?> me() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/auth/me'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Real RoyallPay user-to-user transfer.
+  static Future<Map<String, dynamic>> createP2pTransfer({
+    required String recipient,
+    required String currency,
+    required double amount,
+    String? memo,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/transfers'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'recipient': recipient,
+            'currency': currency.toUpperCase(),
+            'amount': amount,
+            if (memo != null && memo.isNotEmpty) 'memo': memo,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Transfer failed');
+  }
+
+  /// Real ledger history from the backend.
+  static Future<List<dynamic>?> ledgerTransactions() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/ledger'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
     } catch (_) {
       return null;
     }
@@ -233,7 +300,8 @@ class ApiService {
             'gateway': gateway,
             'currency': currency,
             'amount': amount,
-            if (AuthService.storedEmail != null) 'email': AuthService.storedEmail,
+            if (AuthService.storedEmail != null)
+              'email': AuthService.storedEmail,
             if (phone != null && phone.isNotEmpty) 'phone': phone,
           }),
         )
@@ -258,7 +326,9 @@ class ApiService {
         .timeout(_timeout);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode == 200) return body;
-    throw ApiException(body['error'] as String? ?? 'Top-up verification failed');
+    throw ApiException(
+      body['error'] as String? ?? 'Top-up verification failed',
+    );
   }
 
   /// Queue a mobile-money payout; backend immediately holds the KES balance.
@@ -312,7 +382,9 @@ class ApiService {
             body: jsonEncode({'code': code}),
           )
           .timeout(_timeout);
-    } catch (_) {/* offline — sandbox mode */}
+    } catch (_) {
+      /* offline — sandbox mode */
+    }
   }
 
   /// Sends a 6-digit verification code to the user's email.
@@ -326,9 +398,11 @@ class ApiService {
         .timeout(_timeout);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode == 200) return body['sent'] == true;
-    throw ApiException(body['warning'] as String? ??
-        body['error'] as String? ??
-        'Email code request failed');
+    throw ApiException(
+      body['warning'] as String? ??
+          body['error'] as String? ??
+          'Email code request failed',
+    );
   }
 
   /// Verifies the 6-digit email OTP.
@@ -353,7 +427,9 @@ class ApiService {
       await http
           .post(Uri.parse('$baseUrl/auth/kyc'), headers: _headers(authed: true))
           .timeout(_timeout);
-    } catch (_) {/* offline — sandbox mode */}
+    } catch (_) {
+      /* offline — sandbox mode */
+    }
   }
 
   // ── Trading (real market data; testnet/internal execution) ─────
@@ -376,8 +452,10 @@ class ApiService {
     if (!hasSession) return null;
     try {
       final res = await http
-          .get(Uri.parse('$baseUrl/trade/balances'),
-              headers: _headers(authed: true))
+          .get(
+            Uri.parse('$baseUrl/trade/balances'),
+            headers: _headers(authed: true),
+          )
           .timeout(_timeout);
       if (res.statusCode != 200) return null;
       return jsonDecode(res.body) as Map<String, dynamic>;

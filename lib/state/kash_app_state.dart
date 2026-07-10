@@ -45,9 +45,13 @@ class KashAppState extends ChangeNotifier {
   final NumberFormat _money = NumberFormat.currency(symbol: '\$');
   // Static metadata (title/icon/rails) from kashAccounts, zeroed out —
   // real balances arrive via syncFromBackend() once there's a session.
-  List<KashAccount> _accounts = kashAccounts
-      .map((account) => account.copyWith(balanceUsd: 0, transactions: const []))
-      .toList();
+  List<KashAccount> _accounts =
+      kashAccounts
+          .map(
+            (account) =>
+                account.copyWith(balanceUsd: 0, transactions: const []),
+          )
+          .toList();
   String _profileName = 'Mohamed Ali';
   String _phoneNumber = '+252 61 000 0000';
   bool _phoneVerified = false;
@@ -75,45 +79,66 @@ class KashAppState extends ChangeNotifier {
   /// transaction history / transfers alone; this only fixes the balances.
   Future<void> syncFromBackend() async {
     if (!ApiService.hasSession) return;
+    final me = await ApiService.me();
     final hybrid = await ApiService.hybridWallet();
     final bank = await ApiService.bankAccount();
-    if (hybrid == null && bank == null) return;
+    final backendLedger = await ApiService.ledgerTransactions();
+    if (me == null && hybrid == null && bank == null && backendLedger == null) {
+      return;
+    }
 
-    _accounts = _accounts.map((account) {
-      switch (account.type) {
-        case KashAccountType.crypto:
-          if (hybrid == null) return account;
-          final crypto = hybrid['crypto'] as Map<String, dynamic>?;
-          final totalUsd = (crypto?['totalUsd'] as num?)?.toDouble() ?? 0;
-          final depositAddress = crypto?['depositAddress'] as String?;
-          return account.copyWith(
-            balanceUsd: totalUsd,
-            status: (depositAddress == null || depositAddress.isEmpty)
-                ? account.status
-                : 'Deposit address $depositAddress',
-          );
-        case KashAccountType.mobileMoney:
-          if (hybrid == null) return account;
-          final fiat = hybrid['fiat'] as Map<String, dynamic>?;
-          final usd = (fiat?['USD'] as num?)?.toDouble() ?? 0;
-          final kes = (fiat?['KES'] as num?)?.toDouble() ?? 0;
-          final kesPerUsd = (fiat?['kesPerUsd'] as num?)?.toDouble() ?? 0;
-          final kesAsUsd = kesPerUsd > 0 ? kes / kesPerUsd : 0;
-          return account.copyWith(balanceUsd: usd + kesAsUsd);
-        case KashAccountType.bank:
-          if (bank == null) return account;
-          final accountInfo = bank['account'] as Map<String, dynamic>?;
-          final accountNumber = accountInfo?['account_number'] as String?;
-          // No banking balance concept yet (Phase 5 per the roadmap) — a
-          // real account number with a $0 balance is accurate, not a bug.
-          return account.copyWith(
-            balanceUsd: 0,
-            status: (accountNumber == null || accountNumber.isEmpty)
-                ? account.status
-                : 'Account $accountNumber · IBAN pending EMI phase',
-          );
-      }
-    }).toList();
+    if (me != null) {
+      _profileName = me['full_name'] as String? ?? _profileName;
+      _phoneNumber = me['phone'] as String? ?? _phoneNumber;
+      _phoneVerified = me['phone_verified'] == true;
+      final kycTier = me['kyc_tier'];
+      _kycSubmitted = kycTier is num ? kycTier >= 2 : _kycSubmitted;
+    }
+
+    _accounts =
+        _accounts.map((account) {
+          switch (account.type) {
+            case KashAccountType.crypto:
+              if (hybrid == null) return account;
+              final crypto = hybrid['crypto'] as Map<String, dynamic>?;
+              final totalUsd = (crypto?['totalUsd'] as num?)?.toDouble() ?? 0;
+              final depositAddress = crypto?['depositAddress'] as String?;
+              return account.copyWith(
+                balanceUsd: totalUsd,
+                status:
+                    (depositAddress == null || depositAddress.isEmpty)
+                        ? account.status
+                        : 'Deposit address $depositAddress',
+              );
+            case KashAccountType.mobileMoney:
+              if (hybrid == null) return account;
+              final fiat = hybrid['fiat'] as Map<String, dynamic>?;
+              final usd = (fiat?['USD'] as num?)?.toDouble() ?? 0;
+              final kes = (fiat?['KES'] as num?)?.toDouble() ?? 0;
+              final kesPerUsd = (fiat?['kesPerUsd'] as num?)?.toDouble() ?? 0;
+              final kesAsUsd = kesPerUsd > 0 ? kes / kesPerUsd : 0;
+              return account.copyWith(balanceUsd: usd + kesAsUsd);
+            case KashAccountType.bank:
+              if (bank == null) return account;
+              final accountInfo = bank['account'] as Map<String, dynamic>?;
+              final accountNumber = accountInfo?['account_number'] as String?;
+              // No banking balance concept yet (Phase 5 per the roadmap) — a
+              // real account number with a $0 balance is accurate, not a bug.
+              return account.copyWith(
+                balanceUsd: 0,
+                status:
+                    (accountNumber == null || accountNumber.isEmpty)
+                        ? account.status
+                        : 'Account $accountNumber · IBAN pending EMI phase',
+              );
+          }
+        }).toList();
+
+    if (backendLedger != null) {
+      _ledgerTransactions
+        ..clear()
+        ..addAll(_parseBackendLedger(backendLedger));
+    }
 
     _persist();
     notifyListeners();
@@ -175,87 +200,41 @@ class KashAppState extends ChangeNotifier {
   }
 
   // ── Money movement ──────────────────────────────────────────────
-  TransferResult submitCashIn({
-    required KashAccountType destinationType,
-    required String rail,
-    required double amount,
-  }) {
-    if (amount <= 0) {
-      return const TransferResult.failure('Enter an amount greater than 0.');
-    }
-
-    final destination = accountByType(destinationType);
-    final transactionId = _nextTransactionId();
-    final postedAt = DateTime.now();
-    final transaction = KashTransaction(
-      title: '$rail cash-in',
-      subtitle: 'Domestic wallet funding',
-      amount: '+${_money.format(amount)}',
-      icon: Icons.add_card_rounded,
-    );
-
-    _accounts =
-        _accounts.map((account) {
-          if (account.type != destinationType) return account;
-          return account.copyWith(
-            balanceUsd: account.balanceUsd + amount,
-            transactions: [transaction, ...account.transactions],
-          );
-        }).toList();
-
-    _ledgerTransactions.insert(
-      0,
-      LedgerTransaction(
-        id: transactionId,
-        postedAt: postedAt,
-        title: '$rail cash-in',
-        rail: rail,
-        status: 'Posted',
-        entries: [
-          LedgerEntry(
-            id: '$transactionId-1',
-            transactionId: transactionId,
-            postedAt: postedAt,
-            accountType: destinationType,
-            direction: LedgerDirection.credit,
-            amountUsd: amount,
-            accountName: destination.title,
-            memo: 'Customer wallet liability increased',
-          ),
-          LedgerEntry(
-            id: '$transactionId-2',
-            transactionId: transactionId,
-            postedAt: postedAt,
-            accountType: destinationType,
-            direction: LedgerDirection.debit,
-            amountUsd: amount,
-            accountName: '$rail clearing',
-            memo: 'Sandbox cash-in receivable',
-          ),
-        ],
-      ),
-    );
-
-    _persist();
-    notifyListeners();
-    return TransferResult.success(
-      '${_money.format(amount)} added through $rail.',
-      transactionId: transactionId,
-    );
-  }
-
-  TransferResult submitTransfer({
+  Future<TransferResult> submitTransfer({
     required KashAccountType sourceType,
     required String rail,
     required String recipient,
     required double amount,
-  }) {
+  }) async {
     if (amount <= 0) {
       return const TransferResult.failure('Enter an amount greater than 0.');
     }
 
     if (recipient.trim().isEmpty) {
       return const TransferResult.failure('Add a recipient before review.');
+    }
+
+    if (ApiService.hasSession && rail == 'RoyallPay user') {
+      try {
+        final response = await ApiService.createP2pTransfer(
+          recipient: recipient.trim(),
+          currency: sourceType == KashAccountType.mobileMoney ? 'KES' : 'USD',
+          amount: amount,
+          memo: 'Hybrid wallet transfer',
+        );
+        final transfer = response['transfer'] as Map<String, dynamic>?;
+        await syncFromBackend();
+        return TransferResult.success(
+          '${_money.format(amount)} sent through RoyallPay.',
+          transactionId: transfer?['id']?.toString(),
+        );
+      } on ApiException catch (err) {
+        return TransferResult.failure(err.message);
+      } catch (_) {
+        return const TransferResult.failure(
+          'Could not reach the live transfer service. Try again.',
+        );
+      }
     }
 
     // ── Compliance checks (Phase 1) ──────────────────────────────
@@ -399,6 +378,61 @@ class KashAppState extends ChangeNotifier {
     }
   }
 
+  List<LedgerTransaction> _parseBackendLedger(List<dynamic> rows) {
+    return rows.map((row) {
+      final tx = Map<String, dynamic>.from(row as Map);
+      final id = tx['id'].toString();
+      final postedAt =
+          DateTime.tryParse(tx['posted_at']?.toString() ?? '') ??
+          DateTime.now();
+      final entries =
+          ((tx['entries'] as List?) ?? []).asMap().entries.map((entry) {
+            final value = Map<String, dynamic>.from(entry.value as Map);
+            final direction = value['direction']?.toString().toLowerCase();
+            final accountName = value['account_name']?.toString() ?? 'Ledger';
+            return LedgerEntry(
+              id: '$id-${entry.key + 1}',
+              transactionId: id,
+              postedAt: postedAt,
+              accountType: _accountTypeFor(accountName, tx['rail']?.toString()),
+              direction:
+                  direction == 'debit'
+                      ? LedgerDirection.debit
+                      : LedgerDirection.credit,
+              amountUsd:
+                  (value['amount_usd'] as num?)?.toDouble() ??
+                  double.tryParse(value['amount_usd']?.toString() ?? '') ??
+                  0,
+              accountName: accountName,
+              memo: value['memo']?.toString() ?? '',
+            );
+          }).toList();
+      return LedgerTransaction(
+        id: id,
+        postedAt: postedAt,
+        title: tx['title']?.toString() ?? 'Ledger transaction',
+        rail: tx['rail']?.toString() ?? 'RoyallPay',
+        status: tx['status']?.toString() ?? 'Posted',
+        entries: entries,
+      );
+    }).toList();
+  }
+
+  KashAccountType _accountTypeFor(String accountName, String? rail) {
+    final value = '${accountName.toLowerCase()} ${rail?.toLowerCase() ?? ''}';
+    if (value.contains('crypto') ||
+        value.contains('custody') ||
+        value.contains('btc') ||
+        value.contains('eth') ||
+        value.contains('usdt')) {
+      return KashAccountType.crypto;
+    }
+    if (value.contains('bank') || value.contains('virtual')) {
+      return KashAccountType.bank;
+    }
+    return KashAccountType.mobileMoney;
+  }
+
   // ── AML ─────────────────────────────────────────────────────────
   void clearAmlCase(String id) {
     final index = _amlCases.indexWhere((amlCase) => amlCase.id == id);
@@ -450,19 +484,24 @@ class KashAppState extends ChangeNotifier {
       'ledgerSequence': _ledgerSequence,
       'spentToday': _spentToday,
       'spentDate': _spentDate,
-      'accounts': _accounts
-          .map((account) => {
-                'type': account.type.index,
-                'balanceUsd': account.balanceUsd,
-                'status': account.status,
-                'transactions': account.transactions
-                    .map((transaction) => transaction.toJson())
-                    .toList(),
-              })
-          .toList(),
-      'ledger': _ledgerTransactions
-          .map((transaction) => transaction.toJson())
-          .toList(),
+      'accounts':
+          _accounts
+              .map(
+                (account) => {
+                  'type': account.type.index,
+                  'balanceUsd': account.balanceUsd,
+                  'status': account.status,
+                  'transactions':
+                      account.transactions
+                          .map((transaction) => transaction.toJson())
+                          .toList(),
+                },
+              )
+              .toList(),
+      'ledger':
+          _ledgerTransactions
+              .map((transaction) => transaction.toJson())
+              .toList(),
       'amlCases': _amlCases.map((amlCase) => amlCase.toJson()).toList(),
     };
     AuthService.prefs.setString(_stateKey, jsonEncode(state));
@@ -482,34 +521,47 @@ class KashAppState extends ChangeNotifier {
       _spentDate = state['spentDate'] as String? ?? '';
 
       final storedAccounts = (state['accounts'] as List?) ?? [];
-      _accounts = kashAccounts.map((template) {
-        final match = storedAccounts.cast<Map>().firstWhere(
+      _accounts =
+          kashAccounts.map((template) {
+            final match = storedAccounts.cast<Map>().firstWhere(
               (stored) => stored['type'] == template.type.index,
               orElse: () => const {},
             );
-        if (match.isEmpty) {
-          return template.copyWith(balanceUsd: 0, transactions: const []);
-        }
-        return template.copyWith(
-          balanceUsd: (match['balanceUsd'] as num?)?.toDouble() ?? 0,
-          status: match['status'] as String? ?? template.status,
-          transactions: ((match['transactions'] as List?) ?? [])
-              .map((transaction) => KashTransaction.fromJson(
-                  Map<String, dynamic>.from(transaction as Map)))
-              .toList(),
-        );
-      }).toList();
+            if (match.isEmpty) {
+              return template.copyWith(balanceUsd: 0, transactions: const []);
+            }
+            return template.copyWith(
+              balanceUsd: (match['balanceUsd'] as num?)?.toDouble() ?? 0,
+              status: match['status'] as String? ?? template.status,
+              transactions:
+                  ((match['transactions'] as List?) ?? [])
+                      .map(
+                        (transaction) => KashTransaction.fromJson(
+                          Map<String, dynamic>.from(transaction as Map),
+                        ),
+                      )
+                      .toList(),
+            );
+          }).toList();
 
       _ledgerTransactions
         ..clear()
-        ..addAll(((state['ledger'] as List?) ?? []).map((transaction) =>
-            LedgerTransaction.fromJson(
-                Map<String, dynamic>.from(transaction as Map))));
+        ..addAll(
+          ((state['ledger'] as List?) ?? []).map(
+            (transaction) => LedgerTransaction.fromJson(
+              Map<String, dynamic>.from(transaction as Map),
+            ),
+          ),
+        );
 
       _amlCases
         ..clear()
-        ..addAll(((state['amlCases'] as List?) ?? []).map((amlCase) =>
-            AmlCase.fromJson(Map<String, dynamic>.from(amlCase as Map))));
+        ..addAll(
+          ((state['amlCases'] as List?) ?? []).map(
+            (amlCase) =>
+                AmlCase.fromJson(Map<String, dynamic>.from(amlCase as Map)),
+          ),
+        );
 
       return _ledgerTransactions.isNotEmpty;
     } catch (_) {
@@ -520,9 +572,10 @@ class KashAppState extends ChangeNotifier {
   /// Wipes persisted money state (used by Ops console for pilot resets).
   void resetSandbox() {
     AuthService.prefs.remove(_stateKey);
-    _accounts = List<KashAccount>.from(kashAccounts).map((account) {
-      return account.copyWith(balanceUsd: 0, transactions: const []);
-    }).toList();
+    _accounts =
+        List<KashAccount>.from(kashAccounts).map((account) {
+          return account.copyWith(balanceUsd: 0, transactions: const []);
+        }).toList();
     _ledgerTransactions.clear();
     _amlCases.clear();
     _spentToday = 0;

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/kash_account.dart';
@@ -36,7 +34,11 @@ class CashInScreen extends StatelessWidget {
               const SizedBox(height: 8),
               const Text(
                 'Cash in with card, M-Pesa or Waafi, then trade or transfer from your Web3 wallet.',
-                style: TextStyle(color: BybitPalette.muted2, fontSize: 15, height: 1.35),
+                style: TextStyle(
+                  color: BybitPalette.muted2,
+                  fontSize: 15,
+                  height: 1.35,
+                ),
               ),
               const SizedBox(height: 24),
               BybitCard(
@@ -59,7 +61,10 @@ class CashInScreen extends StatelessWidget {
                         children: [
                           const Text(
                             'Destination wallet',
-                            style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
+                            style: TextStyle(
+                              color: BybitPalette.muted2,
+                              fontSize: 13,
+                            ),
                           ),
                           const SizedBox(height: 5),
                           Text(
@@ -92,12 +97,8 @@ class CashInScreen extends StatelessWidget {
                   submitLabel: 'Cash in now',
                   onCredited: (amount, currency, gateway, gatewayLabel) async {
                     final amountUsd = currency == 'KES' ? amount / 130 : amount;
-                    appState.submitCashIn(
-                      destinationType: KashAccountType.mobileMoney,
-                      rail: gatewayLabel,
-                      amount: amountUsd,
-                    );
-                    unawaited(appState.syncFromBackend());
+                    await appState.syncFromBackend();
+                    if (!context.mounted) return;
                     await _showDone(
                       context,
                       'Cash in complete',
@@ -135,46 +136,56 @@ class CashInScreen extends StatelessWidget {
   Future<void> _showDone(BuildContext context, String title, String message) {
     return showDialog<void>(
       context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: BybitPalette.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircleAvatar(
-                radius: 38,
-                backgroundColor: BybitPalette.accent,
-                child: Icon(Icons.check_rounded, color: Colors.black, size: 38),
+      builder:
+          (dialogContext) => Dialog(
+            backgroundColor: BybitPalette.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircleAvatar(
+                    radius: 38,
+                    backgroundColor: BybitPalette.accent,
+                    child: Icon(
+                      Icons.check_rounded,
+                      color: Colors.black,
+                      size: 38,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: BybitPalette.muted2,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  BybitPrimaryButton(
+                    label: 'Done',
+                    onTap: () {
+                      Navigator.of(dialogContext).pop();
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(height: 18),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
-              ),
-              const SizedBox(height: 22),
-              BybitPrimaryButton(
-                label: 'Done',
-                onTap: () {
-                  Navigator.of(dialogContext).pop();
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 }
