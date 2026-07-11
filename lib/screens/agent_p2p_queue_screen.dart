@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
+import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 
 /// Agent-side queue for P2P buy orders: review the customer's payment
@@ -98,10 +99,9 @@ class _AgentP2pQueueScreenState extends State<AgentP2pQueueScreen> {
             Expanded(
               child:
                   _loading
-                      ? const Center(
-                        child: CircularProgressIndicator(
-                          color: BybitPalette.accent,
-                        ),
+                      ? const SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(24, 0, 24, 28),
+                        child: BybitSkeletonList(count: 3),
                       )
                       : RefreshIndicator(
                         color: BybitPalette.accent,
@@ -126,9 +126,14 @@ class _AgentP2pQueueScreenState extends State<AgentP2pQueueScreen> {
                                 ),
                               )
                             else
-                              ..._orders.map(
-                                (raw) => _orderCard(
-                                  Map<String, dynamic>.from(raw as Map),
+                              ..._orders.asMap().entries.map(
+                                (entry) => StaggeredFadeIn(
+                                  index: entry.key,
+                                  child: _orderCard(
+                                    Map<String, dynamic>.from(
+                                      entry.value as Map,
+                                    ),
+                                  ),
                                 ),
                               ),
                           ],
@@ -270,15 +275,11 @@ class _AgentP2pOrderReviewScreenState
     try {
       await ApiService.confirmP2pOrder(widget.orderId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Crypto released to the customer.')),
-      );
+      BybitToast.success(context, 'Crypto released to the customer.');
       Navigator.of(context).pop();
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _acting = false);
     }
@@ -295,9 +296,7 @@ class _AgentP2pOrderReviewScreenState
       Navigator.of(context).pop();
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _acting = false);
     }

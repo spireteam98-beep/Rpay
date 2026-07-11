@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
+import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 import 'agent_network_screen.dart';
 import 'agent_p2p_queue_screen.dart';
@@ -50,9 +51,7 @@ class _AgentScreenState extends State<AgentScreen> {
   Future<void> _register() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Enter your business name')));
+      BybitToast.error(context, 'Enter your business name');
       return;
     }
     setState(() => _submitting = true);
@@ -67,9 +66,7 @@ class _AgentScreenState extends State<AgentScreen> {
       });
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -102,22 +99,17 @@ class _AgentScreenState extends State<AgentScreen> {
           (response[isDeposit ? 'credited' : 'debited'] as Map)['customerName']
               as String? ??
           'customer';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isDeposit
-                ? '${result.amount.toStringAsFixed(2)} ${result.currency} credited to $customerName'
-                : '${result.amount.toStringAsFixed(2)} ${result.currency} debited from $customerName',
-          ),
-        ),
+      BybitToast.success(
+        context,
+        isDeposit
+            ? '${result.amount.toStringAsFixed(2)} ${result.currency} credited to $customerName'
+            : '${result.amount.toStringAsFixed(2)} ${result.currency} debited from $customerName',
       );
       await _load();
       setState(() {});
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     }
   }
 
@@ -251,12 +243,7 @@ class _AgentScreenState extends State<AgentScreen> {
         TouchScale(
           onTap: () {
             Clipboard.setData(ClipboardData(text: code));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Agent code copied'),
-                backgroundColor: BybitPalette.surface2,
-              ),
-            );
+            BybitToast.show(context, 'Agent code copied');
           },
           child: Container(
             width: double.infinity,
@@ -439,12 +426,7 @@ class _AgentScreenState extends State<AgentScreen> {
           future: ApiService.agentCommissions(),
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 30),
-                child: Center(
-                  child: CircularProgressIndicator(color: BybitPalette.accent),
-                ),
-              );
+              return const BybitSkeletonList(count: 3);
             }
             final commissions = snapshot.data ?? const [];
             if (commissions.isEmpty) {
@@ -457,8 +439,11 @@ class _AgentScreenState extends State<AgentScreen> {
             }
             return Column(
               children:
-                  commissions.map((raw) {
-                    final commission = Map<String, dynamic>.from(raw as Map);
+                  commissions.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final commission = Map<String, dynamic>.from(
+                      entry.value as Map,
+                    );
                     final kind = commission['kind'] as String? ?? '';
                     final relatedUser =
                         commission['related_user_name'] as String?;
@@ -470,69 +455,72 @@ class _AgentScreenState extends State<AgentScreen> {
                           commission['created_at'] as String? ?? '',
                         ) ??
                         DateTime.now();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: BybitCard(
-                        padding: const EdgeInsets.all(15),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: BybitPalette.surface2,
-                                shape: BoxShape.circle,
+                    return StaggeredFadeIn(
+                      index: index,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: BybitCard(
+                          padding: const EdgeInsets.all(15),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(
+                                  color: BybitPalette.surface2,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  kind == 'deposit'
+                                      ? Icons.south_rounded
+                                      : kind == 'withdrawal'
+                                      ? Icons.north_rounded
+                                      : Icons.group_add_outlined,
+                                  color: BybitPalette.accent,
+                                  size: 20,
+                                ),
                               ),
-                              child: Icon(
-                                kind == 'deposit'
-                                    ? Icons.south_rounded
-                                    : kind == 'withdrawal'
-                                    ? Icons.north_rounded
-                                    : Icons.group_add_outlined,
-                                color: BybitPalette.accent,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    kind == 'onboarding'
-                                        ? 'Customer onboarding${relatedUser != null ? ' — $relatedUser' : ''}'
-                                        : '${kind[0].toUpperCase()}${kind.substring(1)}${relatedUser != null ? ' — $relatedUser' : ''}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      kind == 'onboarding'
+                                          ? 'Customer onboarding${relatedUser != null ? ' — $relatedUser' : ''}'
+                                          : '${kind[0].toUpperCase()}${kind.substring(1)}${relatedUser != null ? ' — $relatedUser' : ''}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    DateFormat(
-                                      'MMM d, HH:mm',
-                                    ).format(createdAt),
-                                    style: const TextStyle(
-                                      color: BybitPalette.muted,
-                                      fontSize: 11.5,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      DateFormat(
+                                        'MMM d, HH:mm',
+                                      ).format(createdAt),
+                                      style: const TextStyle(
+                                        color: BybitPalette.muted,
+                                        fontSize: 11.5,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            Text(
-                              '+${amount.toStringAsFixed(2)} $currency',
-                              style: const TextStyle(
-                                color: BybitPalette.green,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
+                              Text(
+                                '+${amount.toStringAsFixed(2)} $currency',
+                                style: const TextStyle(
+                                  color: BybitPalette.green,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );

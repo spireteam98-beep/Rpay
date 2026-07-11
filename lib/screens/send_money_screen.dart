@@ -299,11 +299,55 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
 
   Future<void> _confirm(KashAppState appState, KashAccount source) async {
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    final recipient = _recipientController.text.trim();
+    if (recipient.isEmpty || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a recipient and a positive amount'),
+          backgroundColor: BybitPalette.surface2,
+        ),
+      );
+      return;
+    }
+
+    final fee = appState.transferFee(_rail);
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder:
+          (_) => _PaymentConfirmationSheet(
+            recipient: recipient,
+            amount: amount,
+            currency: source.currency,
+            source: source,
+            fee: fee,
+          ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final verified = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => const _SecurityVerificationSheet(),
+    );
+    if (verified != true || !mounted) return;
+
+    await _submitTransfer(appState, source, recipient, amount);
+  }
+
+  Future<void> _submitTransfer(
+    KashAppState appState,
+    KashAccount source,
+    String recipient,
+    double amount,
+  ) async {
     setState(() => _submitting = true);
     final result = await appState.submitTransfer(
       sourceType: source.type,
       rail: _rail,
-      recipient: _recipientController.text,
+      recipient: recipient,
       amount: amount,
     );
     if (!mounted) return;
@@ -371,6 +415,430 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
               ),
             ),
           ),
+    );
+  }
+}
+
+/// Review step before a transfer goes out — recipient, amount, and funding
+/// source, matching the confirm-before-you-send pattern most wallet apps
+/// use so a mistyped recipient or amount gets caught before the PIN step.
+class _PaymentConfirmationSheet extends StatefulWidget {
+  final String recipient;
+  final double amount;
+  final String currency;
+  final KashAccount source;
+  final double fee;
+
+  const _PaymentConfirmationSheet({
+    required this.recipient,
+    required this.amount,
+    required this.currency,
+    required this.source,
+    required this.fee,
+  });
+
+  @override
+  State<_PaymentConfirmationSheet> createState() =>
+      _PaymentConfirmationSheetState();
+}
+
+class _PaymentConfirmationSheetState extends State<_PaymentConfirmationSheet> {
+  bool _combined = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        decoration: const BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Payment Confirmation',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                TouchScale(
+                  onTap: () => Navigator.of(context).pop(false),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: const BoxDecoration(
+                      color: BybitPalette.surface2,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: BybitPalette.muted2,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Send to',
+              style: TextStyle(
+                color: BybitPalette.muted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: BybitPalette.surface2,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.recipient,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    'Note: RoyallPay transfer',
+                    style: TextStyle(color: BybitPalette.muted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            const Text(
+              'Amount',
+              style: TextStyle(
+                color: BybitPalette.muted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'Recipient receives',
+                  style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '\$${widget.amount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.fee == 0
+                          ? 'No fee'
+                          : 'Fee \$${widget.fee.toStringAsFixed(2)} included',
+                      style: const TextStyle(
+                        color: BybitPalette.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 22),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Pay with',
+                  style: TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Row(
+                  children: [
+                    const Text(
+                      'Combined',
+                      style: TextStyle(
+                        color: BybitPalette.muted2,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Switch(
+                      value: _combined,
+                      onChanged: (v) => setState(() => _combined = v),
+                      activeThumbColor: Colors.black,
+                      activeTrackColor: BybitPalette.accent,
+                      inactiveThumbColor: BybitPalette.muted,
+                      inactiveTrackColor: BybitPalette.surface2,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            _payWithRow('Deduct From', widget.source.title),
+            const SizedBox(height: 10),
+            _payWithRow('Currency', widget.currency),
+            const SizedBox(height: 24),
+            BybitPrimaryButton(
+              label: 'Confirm',
+              onTap: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _payWithRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: BybitPalette.muted2, fontSize: 13.5),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Final gate before a transfer actually fires — a 6-digit transaction PIN,
+/// same shape as the payment confirmation step every major wallet app uses.
+class _SecurityVerificationSheet extends StatefulWidget {
+  const _SecurityVerificationSheet();
+
+  @override
+  State<_SecurityVerificationSheet> createState() =>
+      _SecurityVerificationSheetState();
+}
+
+class _SecurityVerificationSheetState
+    extends State<_SecurityVerificationSheet> {
+  static const _pinLength = 6;
+  String _pin = '';
+
+  void _tapDigit(String digit) {
+    if (_pin.length >= _pinLength) return;
+    setState(() => _pin += digit);
+    if (_pin.length == _pinLength) {
+      Future.delayed(const Duration(milliseconds: 180), _submit);
+    }
+  }
+
+  void _backspace() {
+    if (_pin.isEmpty) return;
+    setState(() => _pin = _pin.substring(0, _pin.length - 1));
+  }
+
+  void _submit() {
+    if (!mounted || _pin.length != _pinLength) return;
+    Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        decoration: const BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Security Verification',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                TouchScale(
+                  onTap: () => Navigator.of(context).pop(false),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: const BoxDecoration(
+                      color: BybitPalette.surface2,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: BybitPalette.muted2,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Transaction PIN',
+              style: TextStyle(
+                color: BybitPalette.muted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: List.generate(_pinLength, (index) {
+                final filled = index < _pin.length;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Container(
+                    width: 42,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: BybitPalette.input,
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          filled
+                              ? Border.all(color: BybitPalette.accent)
+                              : null,
+                    ),
+                    child:
+                        filled
+                            ? const Icon(
+                              Icons.circle,
+                              color: Colors.white,
+                              size: 12,
+                            )
+                            : null,
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 24),
+            BybitPrimaryButton(
+              label: 'Confirm',
+              enabled: _pin.length == _pinLength,
+              onTap: _submit,
+            ),
+            const SizedBox(height: 14),
+            const Center(
+              child: Text(
+                'Having problems with verification?',
+                style: TextStyle(
+                  color: BybitPalette.accent,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            _keypad(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _keypad() {
+    const rows = [
+      ['1', '2', '3'],
+      ['4', '5', '6'],
+      ['7', '8', '9'],
+      ['', '0', 'del'],
+    ];
+    return Column(
+      children:
+          rows.map((row) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children:
+                    row.map((key) {
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          child: _keypadButton(key),
+                        ),
+                      );
+                    }).toList(),
+              ),
+            );
+          }).toList(),
+    );
+  }
+
+  Widget _keypadButton(String key) {
+    if (key.isEmpty) return const SizedBox(height: 52);
+    final isDelete = key == 'del';
+    return TouchScale(
+      onTap: isDelete ? _backspace : () => _tapDigit(key),
+      child: Container(
+        height: 52,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: BybitPalette.surface2,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child:
+            isDelete
+                ? const Icon(
+                  Icons.backspace_outlined,
+                  color: BybitPalette.muted2,
+                  size: 20,
+                )
+                : Text(
+                  key,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 
 /// Business onboarding + the merchant's till number, QR code and recent
@@ -53,9 +54,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
   Future<void> _register() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Enter your business name')));
+      BybitToast.error(context, 'Enter your business name');
       return;
     }
     setState(() => _submitting = true);
@@ -70,9 +69,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
       });
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -232,12 +229,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
         TouchScale(
           onTap: () {
             Clipboard.setData(ClipboardData(text: till));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Till number copied'),
-                backgroundColor: BybitPalette.surface2,
-              ),
-            );
+            BybitToast.show(context, 'Till number copied');
           },
           child: Container(
             width: double.infinity,
@@ -283,12 +275,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
           future: ApiService.merchantPayments(merchant['id'] as String),
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 30),
-                child: Center(
-                  child: CircularProgressIndicator(color: BybitPalette.accent),
-                ),
-              );
+              return const BybitSkeletonList(count: 3);
             }
             final payments = snapshot.data ?? const [];
             if (payments.isEmpty) {
@@ -301,8 +288,11 @@ class _MerchantScreenState extends State<MerchantScreen> {
             }
             return Column(
               children:
-                  payments.map((raw) {
-                    final payment = Map<String, dynamic>.from(raw as Map);
+                  payments.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final payment = Map<String, dynamic>.from(
+                      entry.value as Map,
+                    );
                     final payer =
                         payment['payer_name'] as String? ?? 'Customer';
                     final amount = (payment['amount'] as num?)?.toDouble() ?? 0;
@@ -312,61 +302,64 @@ class _MerchantScreenState extends State<MerchantScreen> {
                           payment['created_at'] as String? ?? '',
                         ) ??
                         DateTime.now();
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: BybitCard(
-                        padding: const EdgeInsets.all(15),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: BybitPalette.surface2,
-                                shape: BoxShape.circle,
+                    return StaggeredFadeIn(
+                      index: index,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: BybitCard(
+                          padding: const EdgeInsets.all(15),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(
+                                  color: BybitPalette.surface2,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.south_west_rounded,
+                                  color: BybitPalette.green,
+                                  size: 20,
+                                ),
                               ),
-                              child: const Icon(
-                                Icons.south_west_rounded,
-                                color: BybitPalette.green,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    payer,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w800,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      payer,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    DateFormat(
-                                      'MMM d, HH:mm',
-                                    ).format(createdAt),
-                                    style: const TextStyle(
-                                      color: BybitPalette.muted,
-                                      fontSize: 11.5,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      DateFormat(
+                                        'MMM d, HH:mm',
+                                      ).format(createdAt),
+                                      style: const TextStyle(
+                                        color: BybitPalette.muted,
+                                        fontSize: 11.5,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            Text(
-                              '+${amount.toStringAsFixed(2)} $currency',
-                              style: const TextStyle(
-                                color: BybitPalette.green,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
+                              Text(
+                                '+${amount.toStringAsFixed(2)} $currency',
+                                style: const TextStyle(
+                                  color: BybitPalette.green,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );

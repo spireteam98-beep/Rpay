@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
+import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 import 'p2p_order_detail_screen.dart';
 
@@ -71,8 +72,9 @@ class _P2pBuyScreenState extends State<P2pBuyScreen> {
       body: SafeArea(
         child:
             _loading
-                ? const Center(
-                  child: CircularProgressIndicator(color: BybitPalette.accent),
+                ? const SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(24, 8, 24, 100),
+                  child: BybitSkeletonList(count: 3),
                 )
                 : RefreshIndicator(
                   color: BybitPalette.accent,
@@ -123,9 +125,13 @@ class _P2pBuyScreenState extends State<P2pBuyScreen> {
                           ),
                         )
                       else
-                        ..._orders.map(
-                          (raw) =>
-                              _orderCard(Map<String, dynamic>.from(raw as Map)),
+                        ..._orders.asMap().entries.map(
+                          (entry) => StaggeredFadeIn(
+                            index: entry.key,
+                            child: _orderCard(
+                              Map<String, dynamic>.from(entry.value as Map),
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -266,15 +272,11 @@ class _NewOrderSheetState extends State<_NewOrderSheet> {
   Future<void> _submit() async {
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
     if (amount <= 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Enter a positive amount')));
+      BybitToast.error(context, 'Enter a positive amount');
       return;
     }
     if (_agentId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No agents are available right now')),
-      );
+      BybitToast.error(context, 'No agents are available right now');
       return;
     }
     setState(() => _submitting = true);
@@ -290,9 +292,7 @@ class _NewOrderSheetState extends State<_NewOrderSheet> {
       Navigator.of(context).pop(orderId);
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

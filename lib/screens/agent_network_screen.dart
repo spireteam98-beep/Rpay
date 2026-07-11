@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
-import '../widgets/touch_scale.dart';
+import '../widgets/polish.dart';
 
 const _tierLabels = {
   'SUPER_AGENT': 'Super Agent',
@@ -205,8 +205,11 @@ class _AgentNetworkScreenState extends State<AgentNetworkScreen> {
           ),
         )
       else
-        ...recruits.map(
-          (raw) => _recruitCard(Map<String, dynamic>.from(raw as Map)),
+        ...recruits.asMap().entries.map(
+          (entry) => StaggeredFadeIn(
+            index: entry.key,
+            child: _recruitCard(Map<String, dynamic>.from(entry.value as Map)),
+          ),
         ),
     ];
   }
@@ -309,10 +312,9 @@ class _RecruitSheetState extends State<_RecruitSheet> {
     final identifier = _identifierController.text.trim();
     final businessName = _businessNameController.text.trim();
     if (identifier.isEmpty || businessName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Enter the recruit's email/phone and a business name"),
-        ),
+      BybitToast.error(
+        context,
+        "Enter the recruit's email/phone and a business name",
       );
       return;
     }
@@ -328,9 +330,7 @@ class _RecruitSheetState extends State<_RecruitSheet> {
       Navigator.of(context).pop();
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

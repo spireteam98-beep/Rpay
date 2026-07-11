@@ -103,6 +103,16 @@ const config = {
   // Sole super-admin account — auto-promoted to role='admin' on every boot
   // (see db.js migrate()) so the Admin Portal is only ever visible to them.
   adminEmail: (process.env.ADMIN_EMAIL || 'reysdaaud@gmail.com').trim().toLowerCase(),
+
+  // RoyallPay Mobile Agent — the "brain" behind the dedicated-phone
+  // automation app in ../RQ. Not required for the wallet API to run; the
+  // /mobile-agent routes just error clearly if this is unset.
+  anthropicApiKey: (process.env.ANTHROPIC_API_KEY || '').trim(),
+  anthropicModel: (process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5').trim(),
+  // Shared secret the phone app sends as X-Agent-Key — this endpoint isn't
+  // tied to a wallet user login, so this is what stops a stranger who finds
+  // the URL from burning through the Anthropic quota.
+  mobileAgentSharedSecret: (process.env.MOBILE_AGENT_SHARED_SECRET || '').trim(),
 };
 
 if (config.network !== 'testnet' && config.network !== 'mainnet') {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 import 'agent_network_screen.dart' show TierBadge;
 
@@ -195,9 +196,7 @@ class _AgentsTabState extends State<_AgentsTab> {
       await _load();
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _busy.remove(agentId));
     }
@@ -230,8 +229,9 @@ class _AgentsTabState extends State<_AgentsTab> {
         onRefresh: _load,
         child:
             _loading
-                ? const Center(
-                  child: CircularProgressIndicator(color: BybitPalette.accent),
+                ? const SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 90),
+                  child: BybitSkeletonList(count: 3),
                 )
                 : ListView(
                   physics: const AlwaysScrollableScrollPhysics(
@@ -260,9 +260,13 @@ class _AgentsTabState extends State<_AgentsTab> {
                         ),
                       )
                     else
-                      ..._agents.map(
-                        (raw) =>
-                            _agentCard(Map<String, dynamic>.from(raw as Map)),
+                      ..._agents.asMap().entries.map(
+                        (entry) => StaggeredFadeIn(
+                          index: entry.key,
+                          child: _agentCard(
+                            Map<String, dynamic>.from(entry.value as Map),
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -516,10 +520,9 @@ class _CreateAgentSheetState extends State<_CreateAgentSheet> {
     final identifier = _identifierController.text.trim();
     final businessName = _businessNameController.text.trim();
     if (identifier.isEmpty || businessName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter the user\'s email/phone and a business name'),
-        ),
+      BybitToast.error(
+        context,
+        "Enter the user's email/phone and a business name",
       );
       return;
     }
@@ -537,9 +540,7 @@ class _CreateAgentSheetState extends State<_CreateAgentSheet> {
       Navigator.of(context).pop();
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -735,9 +736,7 @@ class _MerchantsTabState extends State<_MerchantsTab> {
       await _load();
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _busy.remove(merchantId));
     }
@@ -770,8 +769,9 @@ class _MerchantsTabState extends State<_MerchantsTab> {
         onRefresh: _load,
         child:
             _loading
-                ? const Center(
-                  child: CircularProgressIndicator(color: BybitPalette.accent),
+                ? const SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 90),
+                  child: BybitSkeletonList(count: 3),
                 )
                 : ListView(
                   physics: const AlwaysScrollableScrollPhysics(
@@ -798,9 +798,12 @@ class _MerchantsTabState extends State<_MerchantsTab> {
                         ),
                       )
                     else
-                      ..._merchants.map(
-                        (raw) => _merchantCard(
-                          Map<String, dynamic>.from(raw as Map),
+                      ..._merchants.asMap().entries.map(
+                        (entry) => StaggeredFadeIn(
+                          index: entry.key,
+                          child: _merchantCard(
+                            Map<String, dynamic>.from(entry.value as Map),
+                          ),
                         ),
                       ),
                   ],
@@ -947,10 +950,9 @@ class _CreateMerchantSheetState extends State<_CreateMerchantSheet> {
     final identifier = _identifierController.text.trim();
     final name = _nameController.text.trim();
     if (identifier.isEmpty || name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter the user\'s email/phone and a business name'),
-        ),
+      BybitToast.error(
+        context,
+        "Enter the user's email/phone and a business name",
       );
       return;
     }
@@ -967,9 +969,7 @@ class _CreateMerchantSheetState extends State<_CreateMerchantSheet> {
       Navigator.of(context).pop();
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

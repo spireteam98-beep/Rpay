@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
 import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 
 /// A single P2P order: payment instructions while waiting for the customer
@@ -67,16 +68,13 @@ class _P2pOrderDetailScreenState extends State<P2pOrderDetailScreen> {
       );
       await _load();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Proof submitted — the agent will review it shortly.'),
-        ),
+      BybitToast.success(
+        context,
+        'Proof submitted — the agent will review it shortly.',
       );
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -89,9 +87,7 @@ class _P2pOrderDetailScreenState extends State<P2pOrderDetailScreen> {
       await _load();
     } on ApiException catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err.message)));
+      BybitToast.error(context, err.message);
     } finally {
       if (mounted) setState(() => _cancelling = false);
     }
@@ -195,12 +191,7 @@ class _P2pOrderDetailScreenState extends State<P2pOrderDetailScreen> {
                   TouchScale(
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: agentPhone));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Agent phone copied'),
-                          backgroundColor: BybitPalette.surface2,
-                        ),
-                      );
+                      BybitToast.show(context, 'Agent phone copied');
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
