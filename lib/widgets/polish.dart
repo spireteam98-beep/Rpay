@@ -1,5 +1,98 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'bybit_wallet_ui.dart';
+import 'touch_scale.dart';
+
+const kSupportEmail = 'support@royallpay.com';
+
+/// A lightweight "contact support" dialog reused wherever a screen needs a
+/// support action without a full disputes/ticketing backend behind it.
+Future<void> showSupportDialog(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder:
+        (dialogContext) => Dialog(
+          backgroundColor: BybitPalette.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircleAvatar(
+                  radius: 32,
+                  backgroundColor: BybitPalette.surface2,
+                  child: Icon(
+                    Icons.support_agent_rounded,
+                    color: BybitPalette.accent,
+                    size: 30,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Need help?',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Reach the support team for disputes, card issues, or anything else — we typically reply within a business day.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
+                ),
+                const SizedBox(height: 18),
+                TouchScale(
+                  onTap: () {
+                    Clipboard.setData(const ClipboardData(text: kSupportEmail));
+                    BybitToast.show(dialogContext, 'Support email copied');
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: BybitPalette.surface2,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            kSupportEmail,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.copy_rounded,
+                          color: BybitPalette.accent,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                BybitPrimaryButton(
+                  label: 'Done',
+                  onTap: () => Navigator.of(dialogContext).pop(),
+                ),
+              ],
+            ),
+          ),
+        ),
+  );
+}
 
 /// Shared motion/feedback primitives layered on top of [TouchScale] and
 /// [BybitCard] — skeleton loading instead of a bare spinner, a staggered

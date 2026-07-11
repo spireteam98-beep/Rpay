@@ -352,12 +352,58 @@ router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT id, full_name, email, phone, kyc_tier, phone_verified, eth_address,
-              usd_balance, kes_balance, role, email_verified, created_at
+              usd_balance, kes_balance, role, email_verified, created_at,
+              (pin_hash IS NOT NULL) AS has_pin
          FROM users WHERE id = $1`,
       [req.userId],
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/pin — set the 6-digit transaction PIN checked before a
+ * transfer goes through. If a PIN already exists, the caller must supply
+ * the current one to change it; first-time set needs no `currentPin`.
+ */
+router.post('/pin', requireAuth, async (req, res, next) => {
+  try {
+    const pin = String(req.body?.pin || '').trim();
+    const currentPin = String(req.body?.currentPin || '').trim();
+    if (!/^\d{6}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be exactly 6 digits' });
+    }
+
+    const existing = (
+      await pool.query('SELECT pin_hash FROM users WHERE id = $1', [req.userId])
+    ).rows[0];
+    if (existing?.pin_hash) {
+      const ok = currentPin && (await bcrypt.compare(currentPin, existing.pin_hash));
+      if (!ok) return res.status(401).json({ error: 'Current PIN is incorrect' });
+    }
+
+    const hash = await bcrypt.hash(pin, 10);
+    await pool.query('UPDATE users SET pin_hash = $1 WHERE id = $2', [hash, req.userId]);
+    res.json({ set: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /auth/pin/verify — check a PIN against the stored hash. */
+router.post('/pin/verify', requireAuth, async (req, res, next) => {
+  try {
+    const pin = String(req.body?.pin || '').trim();
+    const user = (
+      await pool.query('SELECT pin_hash FROM users WHERE id = $1', [req.userId])
+    ).rows[0];
+    if (!user?.pin_hash) return res.json({ verified: false, hasPin: false });
+
+    const verified = await bcrypt.compare(pin, user.pin_hash);
+    res.json({ verified, hasPin: true });
   } catch (err) {
     next(err);
   }

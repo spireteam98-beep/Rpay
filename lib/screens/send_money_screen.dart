@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/kash_account.dart';
+import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/touch_scale.dart';
@@ -655,10 +656,15 @@ class _SecurityVerificationSheetState
     extends State<_SecurityVerificationSheet> {
   static const _pinLength = 6;
   String _pin = '';
+  bool _verifying = false;
+  String? _error;
 
   void _tapDigit(String digit) {
     if (_pin.length >= _pinLength) return;
-    setState(() => _pin += digit);
+    setState(() {
+      _pin += digit;
+      _error = null;
+    });
     if (_pin.length == _pinLength) {
       Future.delayed(const Duration(milliseconds: 180), _submit);
     }
@@ -666,12 +672,52 @@ class _SecurityVerificationSheetState
 
   void _backspace() {
     if (_pin.isEmpty) return;
-    setState(() => _pin = _pin.substring(0, _pin.length - 1));
+    setState(() {
+      _pin = _pin.substring(0, _pin.length - 1);
+      _error = null;
+    });
   }
 
-  void _submit() {
+  /// Checks the PIN against the real backend hash. The very first time a
+  /// user enters a PIN here (no PIN set yet), those same 6 digits become
+  /// their PIN — no separate mandatory setup screen blocking a first send.
+  Future<void> _submit() async {
     if (!mounted || _pin.length != _pinLength) return;
-    Navigator.of(context).pop(true);
+    if (!ApiService.hasSession) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+
+    final appState = context.read<KashAppState>();
+    setState(() => _verifying = true);
+    try {
+      if (!appState.hasPin) {
+        await ApiService.setPin(pin: _pin);
+        appState.markPinSet();
+        if (!mounted) return;
+        Navigator.of(context).pop(true);
+        return;
+      }
+
+      final verified = await ApiService.verifyPin(_pin);
+      if (!mounted) return;
+      if (verified) {
+        Navigator.of(context).pop(true);
+      } else {
+        setState(() {
+          _pin = '';
+          _verifying = false;
+          _error = 'Incorrect PIN — try again';
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _pin = '';
+        _verifying = false;
+        _error = 'Could not verify PIN — try again';
+      });
+    }
   }
 
   @override
@@ -758,10 +804,21 @@ class _SecurityVerificationSheetState
                 );
               }),
             ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: const TextStyle(
+                  color: BybitPalette.red,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 24),
             BybitPrimaryButton(
-              label: 'Confirm',
-              enabled: _pin.length == _pinLength,
+              label: _verifying ? 'Verifying...' : 'Confirm',
+              enabled: _pin.length == _pinLength && !_verifying,
               onTap: _submit,
             ),
             const SizedBox(height: 14),

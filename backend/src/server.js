@@ -21,6 +21,7 @@ app.use('/mobile-money', require('./routes/mobileMoney'));
 app.use('/payments', require('./routes/payments'));
 app.use('/transfers', require('./routes/transfers'));
 app.use('/merchants', require('./routes/merchants'));
+app.use('/bills', require('./routes/bills'));
 app.use('/agents', require('./routes/agents'));
 app.use('/p2p', require('./routes/p2p'));
 app.use('/mobile-agent', require('./routes/mobileAgent'));

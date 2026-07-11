@@ -56,6 +56,12 @@ class KashAppState extends ChangeNotifier {
   String _phoneNumber = '+252 61 000 0000';
   bool _phoneVerified = false;
   bool _kycSubmitted = false;
+  bool _hasPin = false;
+  bool _biometricEnabled = false;
+  bool _trustedDevice = true;
+  bool _notifyPush = true;
+  bool _notifySms = true;
+  bool _notifyEmail = false;
   String _role = 'user';
   int _ledgerSequence = 1004;
   final List<LedgerTransaction> _ledgerTransactions = [];
@@ -95,6 +101,7 @@ class KashAppState extends ChangeNotifier {
       final kycTier = me['kyc_tier'];
       _kycSubmitted = kycTier is num ? kycTier >= 2 : _kycSubmitted;
       _role = me['role'] as String? ?? _role;
+      _hasPin = me['has_pin'] == true;
     }
 
     _accounts =
@@ -160,6 +167,12 @@ class KashAppState extends ChangeNotifier {
   String get phoneNumber => _phoneNumber;
   bool get phoneVerified => _phoneVerified;
   bool get kycSubmitted => _kycSubmitted;
+  bool get hasPin => _hasPin;
+  bool get biometricEnabled => _biometricEnabled;
+  bool get trustedDevice => _trustedDevice;
+  bool get notifyPush => _notifyPush;
+  bool get notifySms => _notifySms;
+  bool get notifyEmail => _notifyEmail;
   bool get isAdmin => _role == 'admin';
   String get firstName => _profileName.split(' ').first;
   KycTier get tier => _kycSubmitted ? KycTier.full : KycTier.tier1;
@@ -198,6 +211,32 @@ class KashAppState extends ChangeNotifier {
 
   void submitKyc({required bool fullVerification}) {
     _kycSubmitted = fullVerification;
+    _persist();
+    notifyListeners();
+  }
+
+  void markPinSet() {
+    _hasPin = true;
+    _persist();
+    notifyListeners();
+  }
+
+  void setBiometricEnabled(bool value) {
+    _biometricEnabled = value;
+    _persist();
+    notifyListeners();
+  }
+
+  void setTrustedDevice(bool value) {
+    _trustedDevice = value;
+    _persist();
+    notifyListeners();
+  }
+
+  void setNotificationPrefs({bool? push, bool? sms, bool? email}) {
+    if (push != null) _notifyPush = push;
+    if (sms != null) _notifySms = sms;
+    if (email != null) _notifyEmail = email;
     _persist();
     notifyListeners();
   }
@@ -484,6 +523,12 @@ class KashAppState extends ChangeNotifier {
       'phoneNumber': _phoneNumber,
       'phoneVerified': _phoneVerified,
       'kycSubmitted': _kycSubmitted,
+      'hasPin': _hasPin,
+      'biometricEnabled': _biometricEnabled,
+      'trustedDevice': _trustedDevice,
+      'notifyPush': _notifyPush,
+      'notifySms': _notifySms,
+      'notifyEmail': _notifyEmail,
       'role': _role,
       'ledgerSequence': _ledgerSequence,
       'spentToday': _spentToday,
@@ -520,6 +565,12 @@ class KashAppState extends ChangeNotifier {
       _phoneNumber = state['phoneNumber'] as String? ?? _phoneNumber;
       _phoneVerified = state['phoneVerified'] as bool? ?? false;
       _kycSubmitted = state['kycSubmitted'] as bool? ?? false;
+      _hasPin = state['hasPin'] as bool? ?? false;
+      _biometricEnabled = state['biometricEnabled'] as bool? ?? false;
+      _trustedDevice = state['trustedDevice'] as bool? ?? true;
+      _notifyPush = state['notifyPush'] as bool? ?? true;
+      _notifySms = state['notifySms'] as bool? ?? true;
+      _notifyEmail = state['notifyEmail'] as bool? ?? false;
       _role = state['role'] as String? ?? 'user';
       _ledgerSequence = state['ledgerSequence'] as int? ?? 1004;
       _spentToday = (state['spentToday'] as num?)?.toDouble() ?? 0;

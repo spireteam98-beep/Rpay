@@ -5,6 +5,9 @@ import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
 import 'admin_console_screen.dart';
+import 'kyc_limits_screen.dart';
+import 'security_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -74,6 +77,10 @@ class ProfileScreen extends StatelessWidget {
                 appState.kycSubmitted
                     ? 'Full KYC submitted for review'
                     : 'Tier 1 active, full verification pending',
+                onTap:
+                    () => Navigator.of(
+                      context,
+                    ).push(kashRoute(const KycLimitsScreen())),
               ),
               _tile(
                 Icons.sms_outlined,
@@ -90,12 +97,27 @@ class ProfileScreen extends StatelessWidget {
               _tile(
                 Icons.lock_outline_rounded,
                 'Security',
-                'Password, OTP and biometrics later',
+                appState.hasPin
+                    ? 'Transaction PIN active'
+                    : 'Set a transaction PIN, biometrics, device trust',
+                onTap:
+                    () => Navigator.of(
+                      context,
+                    ).push(kashRoute(const SecurityScreen())),
               ),
               _tile(
                 Icons.receipt_long_outlined,
                 'Statements',
                 'Wallet and virtual account records',
+              ),
+              _tile(
+                Icons.settings_outlined,
+                'Settings',
+                'Personal details, accounts, notifications, support',
+                onTap:
+                    () => Navigator.of(
+                      context,
+                    ).push(kashRoute(const SettingsScreen())),
               ),
               if (appState.isAdmin)
                 _tile(

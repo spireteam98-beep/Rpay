@@ -1084,6 +1084,79 @@ class ApiService {
     throw ApiException(body['error'] as String? ?? 'Could not reject order');
   }
 
+  // ── Pay bills ────────────────────────────────────────────────────
+
+  /// Pays a biller (KPLC, water, DSTV, etc.) directly from the wallet.
+  static Future<Map<String, dynamic>> payBill({
+    required String billerName,
+    required String accountNumber,
+    required String currency,
+    required double amount,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/bills/pay'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'billerName': billerName,
+            'accountNumber': accountNumber,
+            'currency': currency.toUpperCase(),
+            'amount': amount,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Payment failed');
+  }
+
+  static Future<List<dynamic>?> myBillPayments() async {
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/bills/me'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ── Security / PIN ──────────────────────────────────────────────
+
+  /// Sets or changes the 6-digit transaction PIN. [currentPin] is required
+  /// only when a PIN is already set.
+  static Future<void> setPin({required String pin, String? currentPin}) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/pin'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'pin': pin,
+            if (currentPin != null) 'currentPin': currentPin,
+          }),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    throw ApiException(body['error'] as String? ?? 'Could not set PIN');
+  }
+
+  /// Verifies a PIN against the stored hash. Returns false if no PIN has
+  /// been set yet (callers should treat that as "set it now").
+  static Future<bool> verifyPin(String pin) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/pin/verify'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'pin': pin}),
+        )
+        .timeout(_timeout);
+    if (res.statusCode != 200) return false;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['verified'] == true;
+  }
+
   static Future<void> clearSession() async {
     await _prefs.remove(_tokenKey);
   }

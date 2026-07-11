@@ -322,6 +322,29 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_agents_parent ON agents(parent_agent_id);
   `);
 
+  // Pay Bills: generic biller/account-number payment, debited from the
+  // user's wallet like a merchant till payment but with no merchant record
+  // on the other side — settles to a clearing account instead.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bill_payments (
+      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id        UUID NOT NULL REFERENCES users(id),
+      biller_name    TEXT NOT NULL,
+      account_number TEXT NOT NULL,
+      currency       TEXT NOT NULL CHECK (currency IN ('KES','USD')),
+      amount         NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+      status         TEXT NOT NULL DEFAULT 'COMPLETED',
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_bill_payments_user ON bill_payments(user_id, created_at DESC);
+  `);
+
+  // Security: transaction PIN, checked for real before a transfer is
+  // allowed to go through (see auth.js POST /auth/pin and /auth/pin/verify).
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT;
+  `);
+
   // Sole super-admin: keep this the only account with role='admin'. Runs
   // every boot so it's self-healing across environments/DB resets.
   await pool.query(

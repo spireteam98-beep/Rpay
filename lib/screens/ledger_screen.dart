@@ -4,6 +4,9 @@ import 'package:provider/provider.dart';
 import '../models/ledger_entry.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/kash_widgets.dart';
+import '../widgets/touch_scale.dart';
+import 'transaction_detail_screen.dart';
 
 class LedgerScreen extends StatelessWidget {
   const LedgerScreen({super.key});
@@ -36,7 +39,12 @@ class LedgerScreen extends StatelessWidget {
             const SizedBox(height: 22),
             _filters(),
             const SizedBox(height: 18),
-            if (ledger.isEmpty) _emptyState() else ...ledger.map(_ledgerBatch),
+            if (ledger.isEmpty)
+              _emptyState()
+            else
+              ...ledger.map(
+                (transaction) => _ledgerBatch(context, transaction),
+              ),
           ],
         ),
       ),
@@ -93,66 +101,74 @@ class LedgerScreen extends StatelessWidget {
     );
   }
 
-  Widget _ledgerBatch(LedgerTransaction transaction) {
+  Widget _ledgerBatch(BuildContext context, LedgerTransaction transaction) {
     final time = DateFormat('MMM d, HH:mm').format(transaction.postedAt);
     final balanced = transaction.isBalanced;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: BybitCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor:
-                      balanced
-                          ? BybitPalette.green.withOpacity(0.15)
-                          : BybitPalette.red.withOpacity(0.15),
-                  child: Icon(
-                    balanced ? Icons.check_circle_rounded : Icons.error_rounded,
-                    color: balanced ? BybitPalette.green : BybitPalette.red,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        transaction.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        '${transaction.id} - ${transaction.rail} - $time',
-                        style: const TextStyle(
-                          color: BybitPalette.muted2,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  transaction.status,
-                  style: const TextStyle(
-                    color: BybitPalette.accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+      child: TouchScale(
+        onTap:
+            () => Navigator.of(context).push(
+              kashRoute(TransactionDetailScreen(transaction: transaction)),
             ),
-            const SizedBox(height: 12),
-            ...transaction.entries.map(_entryRow),
-          ],
+        child: BybitCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor:
+                        balanced
+                            ? BybitPalette.green.withOpacity(0.15)
+                            : BybitPalette.red.withOpacity(0.15),
+                    child: Icon(
+                      balanced
+                          ? Icons.check_circle_rounded
+                          : Icons.error_rounded,
+                      color: balanced ? BybitPalette.green : BybitPalette.red,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          transaction.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${transaction.id} - ${transaction.rail} - $time',
+                          style: const TextStyle(
+                            color: BybitPalette.muted2,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    transaction.status,
+                    style: const TextStyle(
+                      color: BybitPalette.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...transaction.entries.map(_entryRow),
+            ],
+          ),
         ),
       ),
     );

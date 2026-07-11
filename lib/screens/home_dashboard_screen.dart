@@ -6,6 +6,7 @@ import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
 import 'agent_screen.dart';
+import 'bill_pay_screen.dart';
 import 'buy_screen.dart';
 import 'cash_in_screen.dart';
 import 'ledger_screen.dart';
@@ -274,6 +275,11 @@ class HomeDashboardScreen extends StatelessWidget {
         const LedgerScreen(),
       ),
       _DashAction(Icons.storefront_rounded, 'Merchant', const MerchantScreen()),
+      _DashAction(
+        Icons.receipt_long_rounded,
+        'Pay Bills',
+        const BillPayScreen(),
+      ),
       _DashAction(Icons.sync_rounded, 'Convert', const SwapScreen()),
       _DashAction(
         Icons.handshake_outlined,
