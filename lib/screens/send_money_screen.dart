@@ -6,6 +6,33 @@ import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/touch_scale.dart';
 
+/// Mobile money providers offered on the "Mobile money" rail: display name,
+/// icon, brand-ish accent color, and a recipient-number hint per provider.
+const List<(String, IconData, Color, String)> _mobileMoneyProviders = [
+  (
+    'EVC Plus',
+    Icons.phone_iphone_rounded,
+    Color(0xFF00A651),
+    '+252 61 000 0000',
+  ),
+  ('Zaad', Icons.sim_card_rounded, Color(0xFFEE3224), '+252 63 000 0000'),
+  (
+    'Sahal',
+    Icons.account_balance_wallet_rounded,
+    Color(0xFF1565C0),
+    '+252 90 000 0000',
+  ),
+  ('M-Pesa', Icons.smartphone_rounded, Color(0xFF4CAF50), '+254 7XX XXX XXX'),
+  ('Waafi', Icons.contactless_rounded, Color(0xFFFF6B35), '+252 61 000 0000'),
+  (
+    'MTN',
+    Icons.signal_cellular_alt_rounded,
+    Color(0xFFFFCC00),
+    '+234 8XX XXX XXXX',
+  ),
+  ('Paytm', Icons.qr_code_2_rounded, Color(0xFF00BAF2), '+91 98XXX XXXXX'),
+];
+
 class SendMoneyScreen extends StatefulWidget {
   final KashAccount? sourceAccount;
 
@@ -18,6 +45,7 @@ class SendMoneyScreen extends StatefulWidget {
 class _SendMoneyScreenState extends State<SendMoneyScreen> {
   late KashAccountType _sourceType;
   String _rail = 'Crypto address';
+  String _mobileMoneyProvider = _mobileMoneyProviders.first.$1;
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _amountController = TextEditingController(
     text: '0.00',
@@ -73,9 +101,25 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
               _sourceSelector(appState.accounts),
               const SizedBox(height: 16),
               _railSelector(),
+              if (_rail == 'Mobile money') ...[
+                const SizedBox(height: 18),
+                const Text(
+                  'Choose provider',
+                  style: TextStyle(
+                    color: BybitPalette.muted2,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _mobileMoneyGrid(),
+              ],
               const SizedBox(height: 16),
               _inputCard(
-                label: 'Recipient address',
+                label:
+                    _rail == 'Mobile money'
+                        ? '$_mobileMoneyProvider number'
+                        : 'Recipient address',
                 hint: _recipientHint,
                 icon: Icons.qr_code_scanner_rounded,
                 controller: _recipientController,
@@ -106,7 +150,9 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   String get _recipientHint {
     switch (_rail) {
       case 'Mobile money':
-        return '+252 61 000 0000';
+        return _mobileMoneyProviders
+            .firstWhere((p) => p.$1 == _mobileMoneyProvider)
+            .$4;
       case 'Crypto address':
         return '0x... or wallet address';
       case 'Bank account':
@@ -181,12 +227,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   }
 
   Widget _railSelector() {
-    final rails = [
-      'Crypto address',
-      'RoyallPay user',
-      'Mobile money',
-      'Bank account',
-    ];
+    final rails = ['Crypto address', 'Wayaki', 'Mobile money', 'Bank account'];
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -213,6 +254,67 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                     fontSize: 13,
                     fontWeight: FontWeight.w900,
                   ),
+                ),
+              ),
+            );
+          }).toList(),
+    );
+  }
+
+  Widget _mobileMoneyGrid() {
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 0.92,
+      children:
+          _mobileMoneyProviders.map((provider) {
+            final (name, icon, color, _) = provider;
+            final selected = name == _mobileMoneyProvider;
+            return TouchScale(
+              onTap: () => setState(() => _mobileMoneyProvider = name),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 6,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      selected ? BybitPalette.selected : BybitPalette.surface2,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: selected ? BybitPalette.accent : Colors.transparent,
+                    width: 1.6,
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.18),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: color, size: 19),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected ? Colors.white : BybitPalette.muted,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -279,7 +381,10 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
               fontWeight: FontWeight.w900,
             ),
           ),
-          BybitInfoLine('Route', '${source.title} -> $_rail'),
+          BybitInfoLine(
+            'Route',
+            '${source.title} -> ${_rail == 'Mobile money' ? _mobileMoneyProvider : _rail}',
+          ),
           BybitInfoLine(
             'Speed',
             _rail == 'Crypto address' ? 'Network dependent' : 'Instant sandbox',
@@ -523,7 +628,7 @@ class _PaymentConfirmationSheetState extends State<_PaymentConfirmationSheet> {
                   ),
                   const SizedBox(height: 3),
                   const Text(
-                    'Note: RoyallPay transfer',
+                    'Note: Wayaki transfer',
                     style: TextStyle(color: BybitPalette.muted, fontSize: 12),
                   ),
                 ],

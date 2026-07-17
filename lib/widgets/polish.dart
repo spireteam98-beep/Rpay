@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'bybit_wallet_ui.dart';
 import 'touch_scale.dart';
 
-const kSupportEmail = 'support@royallpay.com';
+const kSupportEmail = 'support@wayaki.com';
 
 /// A lightweight "contact support" dialog reused wherever a screen needs a
 /// support action without a full disputes/ticketing backend behind it.

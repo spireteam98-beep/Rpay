@@ -359,7 +359,7 @@ class _RecruitSheetState extends State<_RecruitSheet> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'They must already have a RoyallPay account. They go active immediately and start earning right away.',
+            'They must already have a Wayaki account. They go active immediately and start earning right away.',
             style: TextStyle(
               color: BybitPalette.muted2,
               fontSize: 13,

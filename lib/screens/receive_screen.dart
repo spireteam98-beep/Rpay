@@ -6,7 +6,7 @@ import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/touch_scale.dart';
 
 /// Real custody deposit address + QR code — the counterpart to Buy/Cash-in.
-/// RoyallPay currently derives one ETH address per user (Sepolia testnet),
+/// Wayaki currently derives one ETH address per user (Sepolia testnet),
 /// so unlike a multi-chain exchange there's no coin/network picker here;
 /// showing a selector for assets that don't exist would just be decorative.
 class ReceiveScreen extends StatelessWidget {

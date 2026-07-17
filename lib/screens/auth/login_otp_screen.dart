@@ -92,7 +92,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       }
       setState(() => _verifying = false);
       _showMessage(
-        'Backend is not reachable. Start the RoyallPay API and try again.',
+        'Backend is not reachable. Start the Wayaki API and try again.',
       );
     } on ApiException catch (err) {
       if (!mounted) return;

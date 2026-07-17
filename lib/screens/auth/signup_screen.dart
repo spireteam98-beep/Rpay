@@ -66,7 +66,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     if (ethAddress == null) {
       _showMessage(
-        'Backend is not reachable. Start the RoyallPay API and try again.',
+        'Backend is not reachable. Start the Wayaki API and try again.',
       );
       return;
     }
@@ -99,7 +99,7 @@ class _SignupScreenState extends State<SignupScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Join RoyallPay',
+                'Join Wayaki',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 28,

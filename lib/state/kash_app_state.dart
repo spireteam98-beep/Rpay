@@ -256,7 +256,7 @@ class KashAppState extends ChangeNotifier {
       return const TransferResult.failure('Add a recipient before review.');
     }
 
-    if (ApiService.hasSession && rail == 'RoyallPay user') {
+    if (ApiService.hasSession && rail == 'Wayaki') {
       try {
         final response = await ApiService.createP2pTransfer(
           recipient: recipient.trim(),
@@ -267,7 +267,7 @@ class KashAppState extends ChangeNotifier {
         final transfer = response['transfer'] as Map<String, dynamic>?;
         await syncFromBackend();
         return TransferResult.success(
-          '${_money.format(amount)} sent through RoyallPay.',
+          '${_money.format(amount)} sent through Wayaki.',
           transactionId: transfer?['id']?.toString(),
         );
       } on ApiException catch (err) {
@@ -409,7 +409,7 @@ class KashAppState extends ChangeNotifier {
 
   double transferFee(String rail) {
     switch (rail) {
-      case 'RoyallPay user':
+      case 'Wayaki':
         return 0;
       case 'Crypto address':
         return 1.25;
@@ -453,7 +453,7 @@ class KashAppState extends ChangeNotifier {
         id: id,
         postedAt: postedAt,
         title: tx['title']?.toString() ?? 'Ledger transaction',
-        rail: tx['rail']?.toString() ?? 'RoyallPay',
+        rail: tx['rail']?.toString() ?? 'Wayaki',
         status: tx['status']?.toString() ?? 'Posted',
         entries: entries,
       );

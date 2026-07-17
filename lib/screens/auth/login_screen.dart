@@ -52,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       _showMessage(
-        'Backend is not reachable. Start the RoyallPay API and try again.',
+        'Backend is not reachable. Start the Wayaki API and try again.',
       );
     } on ApiException catch (err) {
       _showMessage(err.message);

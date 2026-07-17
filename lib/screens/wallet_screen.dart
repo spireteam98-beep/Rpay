@@ -15,7 +15,6 @@ import 'ledger_screen.dart';
 import 'profile_screen.dart';
 import 'receive_screen.dart';
 import 'send_money_screen.dart';
-import 'wayaki_wallet_suite_screen.dart';
 
 class WalletScreen extends StatefulWidget {
   const WalletScreen({Key? key}) : super(key: key);
@@ -40,70 +39,10 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               _topBalanceCard(context, appState),
               const SizedBox(height: 20),
-              _wayakiWalletEntry(context),
-              const SizedBox(height: 16),
               _onChainCustodyCard(),
               _peopleRow(context, appState),
               _accountTabs(context, appState.accounts),
               _recentActivityCard(context, appState),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _wayakiWalletEntry(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: TouchScale(
-        onTap:
-            () => Navigator.of(
-              context,
-            ).push(kashRoute(const WayakiWalletSuiteScreen())),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(18, 17, 16, 17),
-          decoration: BoxDecoration(
-            color: BybitPalette.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: BybitPalette.accent.withOpacity(0.28)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    _WayakiInlineWordmark(),
-                    SizedBox(height: 7),
-                    Text(
-                      'Wallet screens, cards, bill pay and settings',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: BybitPalette.muted,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(
-                  color: BybitPalette.accent,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.black,
-                  size: 22,
-                ),
-              ),
             ],
           ),
         ),
@@ -711,7 +650,7 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  /// Live on-chain custody card — appears when the RoyallPay backend is
+  /// Live on-chain custody card — appears when the Wayaki backend is
   /// running and the user has a real API session. Renders nothing in
   /// pure-sandbox mode, so the demo never breaks.
   Widget _onChainCustodyCard() {
@@ -975,40 +914,6 @@ class _BybitMiniIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Icon(icon, color: color, size: 23),
-    );
-  }
-}
-
-class _WayakiInlineWordmark extends StatelessWidget {
-  const _WayakiInlineWordmark();
-
-  @override
-  Widget build(BuildContext context) {
-    return RichText(
-      text: const TextSpan(
-        children: [
-          TextSpan(
-            text: r'\W',
-            style: TextStyle(
-              color: BybitPalette.accent,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1.8,
-              height: 1,
-            ),
-          ),
-          TextSpan(
-            text: 'ayaki',
-            style: TextStyle(
-              color: BybitPalette.accent,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
-              height: 1,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -569,7 +569,7 @@ class _CreateAgentSheetState extends State<_CreateAgentSheet> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Onboard an existing RoyallPay user as a pre-approved agent.',
+            'Onboard an existing Wayaki user as a pre-approved agent.',
             style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
           ),
           const SizedBox(height: 20),
@@ -998,7 +998,7 @@ class _CreateMerchantSheetState extends State<_CreateMerchantSheet> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Onboard an existing RoyallPay user as a pre-approved merchant.',
+            'Onboard an existing Wayaki user as a pre-approved merchant.',
             style: TextStyle(color: BybitPalette.muted2, fontSize: 13),
           ),
           const SizedBox(height: 20),

@@ -97,7 +97,7 @@ class _P2pBuyScreenState extends State<P2pBuyScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Send KES or USD to a RoyallPay agent, upload proof of payment, and they release the crypto to your wallet once confirmed.',
+                        'Send KES or USD to a Wayaki agent, upload proof of payment, and they release the crypto to your wallet once confirmed.',
                         style: TextStyle(
                           color: BybitPalette.muted2,
                           fontSize: 13.5,

@@ -11,7 +11,7 @@ import '../widgets/touch_scale.dart';
 /// payments received — the software side of merchant payment acceptance.
 /// (Physical POS terminal distribution is a hardware/ops process outside
 /// this app; the QR code below already works as a software POS: any
-/// RoyallPay user pays it straight from their wallet.)
+/// Wayaki user pays it straight from their wallet.)
 class MerchantScreen extends StatefulWidget {
   const MerchantScreen({super.key});
 
@@ -210,7 +210,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
               ],
             ),
             child: QrImageView(
-              data: 'royallpay:pay?till=$till',
+              data: 'wayaki:pay?till=$till',
               size: 220,
               backgroundColor: Colors.white,
             ),

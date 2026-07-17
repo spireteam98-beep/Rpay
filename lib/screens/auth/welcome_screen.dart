@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
 import '../../widgets/touch_scale.dart';
@@ -15,82 +14,71 @@ class WelcomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: BybitPalette.bg,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Spacer(),
-              Container(
-                width: 170,
-                height: 170,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: BybitPalette.accent,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: BybitPalette.accent.withOpacity(0.35),
-                      blurRadius: 40,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Spacer(),
+                      Image.asset(
+                        'assets/images/wayaki_logo.png',
+                        width: 260,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'All your money. One app.',
+                        style: TextStyle(
+                          color: BybitPalette.accent,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _valueRow(
+                        Icons.currency_bitcoin_rounded,
+                        'Crypto wallet — buy, sell & swap safely',
+                      ),
+                      _valueRow(
+                        Icons.phone_iphone_rounded,
+                        'Mobile money — EVC Plus, Zaad, Sahal, M-Pesa',
+                      ),
+                      _valueRow(
+                        Icons.account_balance_rounded,
+                        'Bank account — receive money globally (IBAN soon)',
+                      ),
+                      _valueRow(
+                        Icons.storefront_rounded,
+                        'Pay anyone — person, merchant or bank',
+                      ),
+                      const Spacer(),
+                      BybitPrimaryButton(
+                        label: 'Create account',
+                        onTap:
+                            () => Navigator.of(
+                              context,
+                            ).push(kashRoute(const SignupScreen())),
+                      ),
+                      const SizedBox(height: 12),
+                      _outlinedButton(
+                        'Log in',
+                        () => Navigator.of(
+                          context,
+                        ).push(kashRoute(const LoginScreen())),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
                 ),
-                child: Image.asset(
-                  'assets/images/royallpay_official_logo_refined.png',
-                  fit: BoxFit.cover,
-                ),
               ),
-              const SizedBox(height: 18),
-              SvgPicture.asset(
-                'assets/images/royallpay_wordmark.svg',
-                width: 230,
-                fit: BoxFit.contain,
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'All your money. One app.',
-                style: TextStyle(
-                  color: BybitPalette.accent,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 24),
-              _valueRow(
-                Icons.currency_bitcoin_rounded,
-                'Crypto wallet — buy, sell & swap safely',
-              ),
-              _valueRow(
-                Icons.phone_iphone_rounded,
-                'Mobile money — EVC Plus, Zaad, Sahal, M-Pesa',
-              ),
-              _valueRow(
-                Icons.account_balance_rounded,
-                'Bank account — receive money globally (IBAN soon)',
-              ),
-              _valueRow(
-                Icons.storefront_rounded,
-                'Pay anyone — person, merchant or bank',
-              ),
-              const Spacer(),
-              BybitPrimaryButton(
-                label: 'Create account',
-                onTap:
-                    () => Navigator.of(
-                      context,
-                    ).push(kashRoute(const SignupScreen())),
-              ),
-              const SizedBox(height: 12),
-              _outlinedButton(
-                'Log in',
-                () =>
-                    Navigator.of(context).push(kashRoute(const LoginScreen())),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

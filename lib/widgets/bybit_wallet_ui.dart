@@ -13,7 +13,7 @@ class BybitPalette {
   static const muted = Color(0xFF80848D);
   static const muted2 = Color(0xFF777B84);
 
-  /// RoyallPay's signature neon-lime brand accent (matches [AppTheme.primaryColor]).
+  /// Wayaki's signature neon-lime brand accent (matches [AppTheme.primaryColor]).
   static const accent = Color(0xFFDDF716);
   static const green = Color(0xFF20C997);
   static const red = Color(0xFFFF4D57);

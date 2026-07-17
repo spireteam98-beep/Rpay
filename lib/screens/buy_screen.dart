@@ -427,7 +427,7 @@ class _BuyScreenState extends State<BuyScreen> {
             ),
           ),
           BybitInfoLine('Processing time', _processingTime),
-          const BybitInfoLine('Rail', 'RoyallPay custody'),
+          const BybitInfoLine('Rail', 'Wayaki custody'),
           const BybitInfoLine('Status', 'Ready'),
         ],
       ),

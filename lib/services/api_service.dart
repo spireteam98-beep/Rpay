@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_service.dart';
 
-/// Bridge to the RoyallPay backend (backend/ folder — Node + Postgres).
+/// Bridge to the Wayaki backend (backend/ folder — Node + Postgres).
 /// This app requires a live backend session and does not use local sandbox-only mode.
 class ApiService {
   /// Backend URL, overridable at build time with `--dart-define=API_BASE_URL=`.
@@ -223,7 +223,7 @@ class ApiService {
     }
   }
 
-  /// Real RoyallPay user-to-user transfer.
+  /// Real Wayaki user-to-user transfer.
   static Future<Map<String, dynamic>> createP2pTransfer({
     required String recipient,
     required String currency,
@@ -579,7 +579,7 @@ class ApiService {
 
   // ── Agent ────────────────────────────────────────────────────────
 
-  /// Registers the current user as a RoyallPay agent.
+  /// Registers the current user as a Wayaki agent.
   static Future<Map<String, dynamic>> registerAgent({
     required String businessName,
     String? phone,

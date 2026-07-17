@@ -42,7 +42,7 @@ class CryptoExchangeApp extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return MaterialApp(
-            title: 'RoyallPay',
+            title: 'Wayaki',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
             home: const Scaffold(
@@ -61,7 +61,7 @@ class CryptoExchangeApp extends StatelessWidget {
                 phoneNumber: AuthService.storedPhone,
               ),
           child: MaterialApp(
-            title: 'RoyallPay',
+            title: 'Wayaki',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
             home:

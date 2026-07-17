@@ -1389,7 +1389,7 @@ class _TradingScreenState extends State<TradingScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'This is part of the RoyallPay Phase 2 roadmap.',
+              'This is part of the Wayaki Phase 2 roadmap.',
               textAlign: TextAlign.center,
               style: TextStyle(color: BybitPalette.muted, fontSize: 12.5),
             ),
