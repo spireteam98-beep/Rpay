@@ -8,7 +8,7 @@ Copy-paste source for the App Store Connect "App Information" and "Version" page
 |---|---|
 | App name | Wayaki |
 | Subtitle (30 chars) | Crypto, Wallet & Bank in One |
-| Bundle ID | **[CONFIRM]** — currently `com.cryptoexchange.cryptoExchangeApp`, a leftover from the app's original template name. Should be changed to something like `com.wayaki.app` before you create the App Store Connect record — see note below. |
+| Bundle ID | `com.wayaki.app` (fixed — was a `com.cryptoexchange.*` template leftover) |
 | Primary category | Finance |
 | Secondary category | Business |
 | Copyright | © 2026 Wayaki. All rights reserved. **[CONFIRM legal entity name]** |
@@ -83,13 +83,16 @@ Recommended answers based on what the app actually collects (see `web/privacy.ht
 | Device ID / crash data | Yes | Yes | No |
 | Customer support content | Yes | Yes | No |
 
-Apple will also ask about **Account Deletion** (Guideline 5.1.1(v)) — see the flag below.
+Apple will also ask about **Account Deletion** (Guideline 5.1.1(v)) — answer "Yes, users can delete their account" (Settings → Delete account, see below).
+
+## Account Deletion (Guideline 5.1.1(v))
+
+Implemented: Settings → Delete account, with a confirmation dialog, calls `POST /auth/delete-account`, and signs the user out. The backend sets a `deletion_requested_at` timestamp and blocks that account from signing in again immediately; financial/KYC records are retained for the compliance period described in the Privacy Policy rather than hard-deleted on the spot (this matches how most regulated fintech apps satisfy the guideline — Apple's requirement is that the request be initiated in-app, not that data vanish instantly).
 
 ---
 
-## Before you submit — flags from reviewing the codebase
+## Before you submit — remaining flags
 
-1. **Bundle identifier is still a template placeholder** (`com.cryptoexchange.cryptoExchangeApp` in `ios/Runner.xcodeproj` and `com.cryptoexchange.crypto_exchange_app` in `android/app/build.gradle.kts`). This needs to become the real production identifier (e.g. `com.wayaki.app`) before you create the App Store Connect app record — changing it later means a new App Store Connect listing, not an update to an existing one.
-2. **No in-app account deletion.** Apple requires (Guideline 5.1.1(v)) that any app supporting account creation also let users delete their account from within the app, not just by emailing support. Right now `web/support.html` documents an email-based deletion process, which is a stopgap, not a substitute — this is likely to trigger a rejection.
-3. **wayaki.com isn't live yet from what I can tell.** The Privacy Policy and Support URLs above only work once `wayaki.com` is registered, DNS-pointed at your Vercel project, and the site is deployed — App Store review will click these links.
-4. **Support inbox** — `support@wayaki.com` needs to actually exist and be monitored; App Store reviewers do test it.
+1. **wayaki.com isn't live yet from what I can tell.** The Privacy Policy and Support URLs above only work once `wayaki.com` is registered, DNS-pointed at your Vercel project, and the site is deployed — App Store review will click these links. The app's welcome screen now links to `/privacy.html` and `/support.html` directly (verified working), so they're also reachable without signing in once the domain is live.
+2. **Support inbox** — `support@wayaki.com` needs to actually exist and be monitored; App Store reviewers do test it.
+3. **Illustrative sample data** — the Wallet screen's "Recent Activities" falls back to Starbucks/Netflix/Spotify/Amazon-branded sample transactions when a user has no real history yet. Real transactions always take priority, but using third-party brand logos/names in sample data is worth a legal look before shipping — it's a trademark question, not something I changed.
