@@ -644,6 +644,6 @@ class KashAppState extends ChangeNotifier {
 
   String _nextTransactionId() {
     _ledgerSequence++;
-    return 'KFL-${_ledgerSequence.toString().padLeft(6, '0')}';
+    return 'WYK-${_ledgerSequence.toString().padLeft(6, '0')}';
   }
 }

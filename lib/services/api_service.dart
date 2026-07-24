@@ -423,6 +423,21 @@ class ApiService {
     throw ApiException(body['error'] as String? ?? 'Email verification failed');
   }
 
+  /// Submits an in-app account deletion request (App Store Guideline
+  /// 5.1.1(v)) — the backend blocks future sign-in immediately.
+  static Future<void> deleteAccount() async {
+    if (!hasSession) return;
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/delete-account'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    throw ApiException(body['error'] as String? ?? 'Account deletion failed');
+  }
+
   /// KYC approval on the backend (raises tier to Full KYC).
   static Future<void> submitKyc() async {
     if (!hasSession) return;

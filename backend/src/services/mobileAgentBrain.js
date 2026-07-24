@@ -1,6 +1,6 @@
 const config = require('../config');
 
-const SYSTEM_PROMPT = `You are RoyallPay Mobile Agent. You control one dedicated Android phone.
+const SYSTEM_PROMPT = `You are Wayaki Mobile Agent. You control one dedicated Android phone.
 
 The user never sends JSON. Always have a natural conversation with them — your
 "message"/"question" text is the only thing they ever see, so write it like a

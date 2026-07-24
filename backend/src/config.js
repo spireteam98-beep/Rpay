@@ -64,12 +64,12 @@ const config = {
   emailProvider: (process.env.EMAIL_PROVIDER || 'resend').trim(),
   resendApiUrl: (process.env.RESEND_API_URL || 'https://api.resend.com/emails').trim(),
   resendApiKey: (process.env.RESEND_API_KEY || '').trim(),
-  emailFrom: (process.env.EMAIL_FROM || 'RoyallPay <noreply@royallpay.com>').trim(),
+  emailFrom: (process.env.EMAIL_FROM || 'Wayaki <noreply@wayaki.com>').trim(),
   emailOtpTtlMinutes: Number(process.env.EMAIL_OTP_TTL_MINUTES || '10'),
   paymentSandbox: (process.env.PAYMENT_SANDBOX || 'false').toLowerCase() === 'true',
   appPaymentReturnUrl: (
     process.env.APP_PAYMENT_RETURN_URL ||
-    'https://www.mohamedroyal.com/payment-success'
+    'https://wayaki.com/payment-success'
   ).trim(),
   stripeSecretKey: (process.env.STRIPE_SECRET_KEY || '').trim(),
   paystackSecretKey: (process.env.PAYSTACK_SECRET_KEY || '').trim(),
@@ -104,7 +104,7 @@ const config = {
   // (see db.js migrate()) so the Admin Portal is only ever visible to them.
   adminEmail: (process.env.ADMIN_EMAIL || 'reysdaaud@gmail.com').trim().toLowerCase(),
 
-  // RoyallPay Mobile Agent — the "brain" behind the dedicated-phone
+  // Wayaki Mobile Agent — the "brain" behind the dedicated-phone
   // automation app in ../RQ. Not required for the wallet API to run; the
   // /mobile-agent routes just error clearly if this is unset.
   anthropicApiKey: (process.env.ANTHROPIC_API_KEY || '').trim(),

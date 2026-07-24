@@ -1,7 +1,7 @@
 {
-  "name": "royallpay-api",
+  "name": "wayaki-api",
   "version": "0.1.0",
-  "description": "RoyallPay backend — auth, ledger, custodial crypto (testnet-first)",
+  "description": "Wayaki backend — auth, ledger, custodial crypto (testnet-first)",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

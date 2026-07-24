@@ -1,5 +1,5 @@
-name: crypto_exchange_app
-description: "A cryptocurrency exchange app UI similar to OKX and Binance."
+name: wayaki
+description: "Wayaki — crypto wallet, mobile money and virtual bank account in one app."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

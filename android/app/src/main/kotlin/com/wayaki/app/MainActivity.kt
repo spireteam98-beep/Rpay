@@ -1,4 +1,4 @@
-package com.cryptoexchange.crypto_exchange_app
+package com.wayaki.app
 
 import io.flutter.embedding.android.FlutterActivity
 

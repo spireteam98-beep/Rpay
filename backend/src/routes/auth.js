@@ -22,7 +22,7 @@ function isEmail(value) {
 }
 
 function accountNumber(userId) {
-  return `KF${String(userId).replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+  return `WY${String(userId).replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 }
 
 /**
@@ -134,11 +134,14 @@ router.post('/login', async (req, res, next) => {
     const { email, password } = req.body || {};
     const cleanEmail = normalizeEmail(email);
     const result = await pool.query(
-      'SELECT id, password_hash FROM users WHERE LOWER(email) = LOWER($1)',
+      'SELECT id, password_hash, deletion_requested_at FROM users WHERE LOWER(email) = LOWER($1)',
       [cleanEmail],
     );
     if (result.rows.length === 0 || !result.rows[0].password_hash) {
       return res.status(401).json({ error: 'Incorrect email or password' });
+    }
+    if (result.rows[0].deletion_requested_at) {
+      return res.status(403).json({ error: 'This account has been deleted' });
     }
     const ok = await bcrypt.compare(String(password || ''), result.rows[0].password_hash);
     if (!ok) return res.status(401).json({ error: 'Incorrect email or password' });
@@ -157,12 +160,16 @@ router.post('/login/request-otp', async (req, res, next) => {
     }
 
     const user = (
-      await pool.query('SELECT id, full_name FROM users WHERE LOWER(email) = LOWER($1)', [
-        cleanEmail,
-      ])
+      await pool.query(
+        'SELECT id, full_name, deletion_requested_at FROM users WHERE LOWER(email) = LOWER($1)',
+        [cleanEmail],
+      )
     ).rows[0];
     if (!user) {
       return res.status(404).json({ error: 'No account found with this email' });
+    }
+    if (user.deletion_requested_at) {
+      return res.status(403).json({ error: 'This account has been deleted' });
     }
 
     const result = await createAndSendEmailOtp(user.id, cleanEmail, user.full_name, 'login');
@@ -185,13 +192,18 @@ router.post('/login/verify-otp', async (req, res, next) => {
 
     await client.query('BEGIN');
     const user = (
-      await client.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1) FOR UPDATE', [
-        cleanEmail,
-      ])
+      await client.query(
+        'SELECT id, deletion_requested_at FROM users WHERE LOWER(email) = LOWER($1) FOR UPDATE',
+        [cleanEmail],
+      )
     ).rows[0];
     if (!user) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'No account found with this email' });
+    }
+    if (user.deletion_requested_at) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'This account has been deleted' });
     }
 
     const otp = (
@@ -359,6 +371,24 @@ router.get('/me', requireAuth, async (req, res, next) => {
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/delete-account — user-initiated deletion (App Store Guideline
+ * 5.1.1(v): must be reachable in-app, not only via emailing support). Blocks
+ * the account from signing in again immediately; financial/KYC records are
+ * retained for the compliance period described in the privacy policy rather
+ * than hard-deleted on the spot.
+ */
+router.post('/delete-account', requireAuth, async (req, res, next) => {
+  try {
+    await pool.query('UPDATE users SET deletion_requested_at = now() WHERE id = $1', [
+      req.userId,
+    ]);
+    res.json({ requested: true });
   } catch (err) {
     next(err);
   }

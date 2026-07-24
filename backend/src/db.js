@@ -345,6 +345,14 @@ async function migrate() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT;
   `);
 
+  // Account deletion (App Store Guideline 5.1.1(v)): marks the account for
+  // deletion in-app; login is blocked from this timestamp on. Financial/KYC
+  // records are retained for the compliance period described in the privacy
+  // policy rather than hard-deleted immediately.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested_at TIMESTAMPTZ;
+  `);
+
   // Sole super-admin: keep this the only account with role='admin'. Runs
   // every boot so it's self-healing across environments/DB resets.
   await pool.query(

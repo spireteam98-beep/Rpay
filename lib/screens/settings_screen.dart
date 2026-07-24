@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
+import 'auth/welcome_screen.dart';
 
-/// The four real Settings destinations: Personal details (read-only — no
+/// The real Settings destinations: Personal details (read-only — no
 /// PATCH /auth/me exists yet, so this deliberately isn't a fake edit form),
 /// Linked accounts (the same three real wallet accounts shown elsewhere),
 /// Notifications (client-side preference toggles, no backend dispatch
-/// system to wire them to), and Support (the shared contact dialog).
+/// system to wire them to), Support (the shared contact dialog), and Delete
+/// account (in-app deletion request, required by App Store Guideline
+/// 5.1.1(v) — see POST /auth/delete-account).
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -62,10 +67,72 @@ class SettingsScreen extends StatelessWidget {
                 'Disputes and card help',
                 onTap: () => showSupportDialog(context),
               ),
+              const SizedBox(height: 8),
+              _tile(
+                context,
+                Icons.delete_outline_rounded,
+                'Delete account',
+                'Permanently close your Wayaki account',
+                onTap: () => _confirmDeleteAccount(context),
+                destructive: true,
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: BybitPalette.surface,
+            title: const Text(
+              'Delete your account?',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: const Text(
+              'This closes your Wayaki account and signs you out on every '
+              'device. Financial and identity records we\'re legally required '
+              'to retain will be kept for the mandated period and then '
+              'deleted — see our Privacy Policy for details. This can\'t be '
+              'undone from the app.',
+              style: TextStyle(color: BybitPalette.muted2),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ApiService.deleteAccount();
+    } catch (err) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete account: $err')),
+      );
+      return;
+    }
+
+    await AuthService.signOut();
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      kashRoute(const WelcomeScreen()),
+      (route) => false,
     );
   }
 
@@ -75,7 +142,9 @@ class SettingsScreen extends StatelessWidget {
     String title,
     String subtitle, {
     required VoidCallback onTap,
+    bool destructive = false,
   }) {
+    final iconColor = destructive ? Colors.redAccent : BybitPalette.accent;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TouchScale(
@@ -91,7 +160,7 @@ class SettingsScreen extends StatelessWidget {
                   color: BybitPalette.surface2,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: BybitPalette.accent, size: 19),
+                child: Icon(icon, color: iconColor, size: 19),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -100,8 +169,8 @@ class SettingsScreen extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: destructive ? Colors.redAccent : Colors.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
                       ),

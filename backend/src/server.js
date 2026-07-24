@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json({ limit: '6mb' }));
 
 app.get('/health', (_req, res) =>
-  res.json({ ok: true, network: config.network, service: 'royallpay-api' }),
+  res.json({ ok: true, network: config.network, service: 'wayaki-api' }),
 );
 
 app.use('/auth', require('./routes/auth'));
@@ -38,7 +38,7 @@ app.use((err, _req, res, _next) => {
 migrate()
   .then(() => {
     app.listen(config.port, () => {
-      console.log(`\nRoyallPay API listening on http://localhost:${config.port}`);
+      console.log(`\nWayaki API listening on http://localhost:${config.port}`);
       console.log(`Network: ${config.network} — custody: HD wallet (BIP44)\n`);
     });
   })

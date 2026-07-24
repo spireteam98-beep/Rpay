@@ -8,13 +8,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:crypto_exchange_app/main.dart';
+import 'package:wayaki/main.dart';
 
 void main() {
-  testWidgets('Kashflip opens on onboarding', (WidgetTester tester) async {
+  testWidgets('Wayaki opens on onboarding', (WidgetTester tester) async {
     await tester.pumpWidget(const CryptoExchangeApp());
 
-    expect(find.text('KASHFLIP'), findsOneWidget);
+    expect(find.text('All your money. One app.'), findsOneWidget);
     expect(find.text('Create account'), findsOneWidget);
     expect(find.text('Log in'), findsOneWidget);
   });
@@ -25,7 +25,7 @@ void main() {
     await tester.tap(find.text('Create account'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Join Kashflip'), findsOneWidget);
+    expect(find.text('Join Wayaki'), findsOneWidget);
     await tester.ensureVisible(find.text('Continue'));
     await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
@@ -68,7 +68,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Move money anywhere'), findsOneWidget);
-    expect(find.text('Kashflip user'), findsOneWidget);
+    expect(find.text('Wayaki'), findsOneWidget);
 
     await tester.enterText(find.byType(EditableText).first, '@amina');
     await tester.ensureVisible(find.text('Review transfer'));
@@ -77,7 +77,7 @@ void main() {
 
     expect(find.text('Transfer queued'), findsOneWidget);
     expect(
-      find.text('\$50.00 transfer queued through Kashflip user.'),
+      find.text('\$50.00 transfer queued through Wayaki.'),
       findsOneWidget,
     );
 

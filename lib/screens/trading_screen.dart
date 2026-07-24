@@ -160,7 +160,15 @@ class _TradingScreenState extends State<TradingScreen> {
                     ),
               ),
               const SizedBox(width: 10),
-              _circleIconButton(Icons.more_horiz_rounded, onTap: () {}),
+              _circleIconButton(
+                Icons.more_horiz_rounded,
+                onTap:
+                    () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('More trading options are coming soon'),
+                      ),
+                    ),
+              ),
             ],
           ),
         ],

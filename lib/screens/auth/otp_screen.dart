@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
@@ -19,6 +20,45 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   final List<String> _digits = List.filled(6, '');
   int _filled = 0;
+  int _resendSeconds = 42;
+  Timer? _resendTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startResendTimer();
+  }
+
+  @override
+  void dispose() {
+    _resendTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startResendTimer() {
+    _resendTimer?.cancel();
+    setState(() => _resendSeconds = 42);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendSeconds <= 1) {
+        timer.cancel();
+        setState(() => _resendSeconds = 0);
+      } else {
+        setState(() => _resendSeconds--);
+      }
+    });
+  }
+
+  void _resendCode() {
+    if (_resendSeconds > 0) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Verification code resent')),
+    );
+    _startResendTimer();
+  }
 
   void _tapKey(String v) {
     setState(() {
@@ -99,10 +139,17 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: 12),
               Center(
                 child: TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'Resend code (0:42)',
-                    style: TextStyle(color: BybitPalette.accent),
+                  onPressed: _resendSeconds > 0 ? null : _resendCode,
+                  child: Text(
+                    _resendSeconds > 0
+                        ? 'Resend code (0:${_resendSeconds.toString().padLeft(2, '0')})'
+                        : 'Resend code',
+                    style: TextStyle(
+                      color:
+                          _resendSeconds > 0
+                              ? BybitPalette.muted2
+                              : BybitPalette.accent,
+                    ),
                   ),
                 ),
               ),

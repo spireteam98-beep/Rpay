@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
 import '../../widgets/touch_scale.dart';
@@ -14,72 +16,106 @@ class WelcomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: BybitPalette.bg,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Spacer(),
-                      Image.asset(
-                        'assets/images/wayaki_logo.png',
-                        width: 260,
-                        fit: BoxFit.contain,
+        bottom: false,
+        child: Column(
+          children: [
+            _waveHero(),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight,
                       ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'All your money. One app.',
-                        style: TextStyle(
-                          color: BybitPalette.accent,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
+                      child: IntrinsicHeight(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 20),
+                            const Text(
+                              'All your money. One app.',
+                              style: TextStyle(
+                                color: BybitPalette.accent,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            _valueRow(
+                              Icons.currency_bitcoin_rounded,
+                              'Crypto wallet — buy, sell & swap safely',
+                            ),
+                            _valueRow(
+                              Icons.phone_iphone_rounded,
+                              'Mobile money — EVC Plus, Zaad, Sahal, M-Pesa',
+                            ),
+                            _valueRow(
+                              Icons.account_balance_rounded,
+                              'Bank account — receive money globally (IBAN soon)',
+                            ),
+                            _valueRow(
+                              Icons.storefront_rounded,
+                              'Pay anyone — person, merchant or bank',
+                            ),
+                            const Spacer(),
+                            BybitPrimaryButton(
+                              label: 'Create account',
+                              onTap:
+                                  () => Navigator.of(
+                                    context,
+                                  ).push(kashRoute(const SignupScreen())),
+                            ),
+                            const SizedBox(height: 12),
+                            _outlinedButton(
+                              'Log in',
+                              () => Navigator.of(
+                                context,
+                              ).push(kashRoute(const LoginScreen())),
+                            ),
+                            const SizedBox(height: 16),
+                            _legalFooter(),
+                            const SizedBox(height: 24),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      _valueRow(
-                        Icons.currency_bitcoin_rounded,
-                        'Crypto wallet — buy, sell & swap safely',
-                      ),
-                      _valueRow(
-                        Icons.phone_iphone_rounded,
-                        'Mobile money — EVC Plus, Zaad, Sahal, M-Pesa',
-                      ),
-                      _valueRow(
-                        Icons.account_balance_rounded,
-                        'Bank account — receive money globally (IBAN soon)',
-                      ),
-                      _valueRow(
-                        Icons.storefront_rounded,
-                        'Pay anyone — person, merchant or bank',
-                      ),
-                      const Spacer(),
-                      BybitPrimaryButton(
-                        label: 'Create account',
-                        onTap:
-                            () => Navigator.of(
-                              context,
-                            ).push(kashRoute(const SignupScreen())),
-                      ),
-                      const SizedBox(height: 12),
-                      _outlinedButton(
-                        'Log in',
-                        () => Navigator.of(
-                          context,
-                        ).push(kashRoute(const LoginScreen())),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  /// Lime wave hero, matching the "scoop" header used app-wide — the front
+  /// door gets the same brand signature as every screen behind it.
+  Widget _waveHero() {
+    return SizedBox(
+      height: 190,
+      width: double.infinity,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Positioned.fill(
+            child: ClipPath(
+              clipper: BybitWaveClipper(),
+              child: ColoredBox(color: BybitPalette.accent),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 22),
+            child: Image.asset(
+              'assets/images/wayaki_logo.png',
+              width: 210,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -106,6 +142,42 @@ class WelcomeScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _legalFooter() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _footerLink('Privacy Policy', '/privacy.html'),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            '·',
+            style: TextStyle(color: BybitPalette.muted2, fontSize: 12),
+          ),
+        ),
+        _footerLink('Support', '/support.html'),
+      ],
+    );
+  }
+
+  Widget _footerLink(String label, String path) {
+    return GestureDetector(
+      onTap: () => _openLink(path),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: BybitPalette.muted2,
+          fontSize: 12,
+          decoration: TextDecoration.underline,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLink(String path) async {
+    final uri = Uri.parse(kIsWeb ? path : 'https://wayaki.com$path');
+    await launchUrl(uri, webOnlyWindowName: '_blank');
   }
 
   Widget _valueRow(IconData icon, String text) {

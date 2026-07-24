@@ -7,6 +7,9 @@ import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
 import 'buy_screen.dart';
+import 'settings_screen.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
 
 class MarketScreen extends StatefulWidget {
   const MarketScreen({Key? key}) : super(key: key);
@@ -84,20 +87,41 @@ class _MarketScreenState extends State<MarketScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _circleIconButton(Icons.menu_rounded, onTap: () {}),
+          _circleIconButton(
+            Icons.menu_rounded,
+            onTap:
+                () => Navigator.of(
+                  context,
+                ).push(kashRoute(const SettingsScreen())),
+          ),
           Row(
             children: [
-              _circleIconButton(Icons.card_giftcard_rounded, onTap: () {}),
+              _circleIconButton(
+                Icons.card_giftcard_rounded,
+                onTap:
+                    () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Rewards are coming soon'),
+                      ),
+                    ),
+              ),
               const SizedBox(width: 10),
               _circleIconButton(
                 Icons.chat_bubble_outline_rounded,
-                onTap: () {},
+                onTap: () => _openSupport(),
               ),
             ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _openSupport() async {
+    final uri = Uri.parse(
+      kIsWeb ? '/support.html' : 'https://wayaki.com/support',
+    );
+    await launchUrl(uri, webOnlyWindowName: '_blank');
   }
 
   Widget _circleIconButton(IconData icon, {required VoidCallback onTap}) {
