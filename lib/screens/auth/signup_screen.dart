@@ -8,8 +8,9 @@ import '../../widgets/kash_widgets.dart';
 import 'email_verify_screen.dart';
 
 /// Step 2: create the account (phone-first, Somalia default).
-/// Sign-in is email + a one-time code, so signup never asks for a password —
-/// the email address collected here is confirmed next via [EmailVerifyScreen].
+/// Password is the primary sign-in credential; the email address collected
+/// here is confirmed next via [EmailVerifyScreen], and email-code sign-in
+/// remains available as an alternative on the login screen.
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -21,12 +22,17 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -40,6 +46,8 @@ class _SignupScreenState extends State<SignupScreen> {
     final fullName = _nameController.text.trim();
     final email = _emailController.text.trim().toLowerCase();
     final phone = _phoneController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
 
     if (fullName.isEmpty || email.isEmpty || phone.isEmpty) {
       _showMessage('Fill in name, email and phone number.');
@@ -51,6 +59,16 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
+    if (password.length < 8) {
+      _showMessage('Password must be at least 8 characters.');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      _showMessage('Passwords do not match.');
+      return;
+    }
+
     // Register on the real backend — this provisions the user's
     // on-chain custody wallet at signup and sends the email code.
     String? ethAddress;
@@ -59,6 +77,7 @@ class _SignupScreenState extends State<SignupScreen> {
         fullName: fullName,
         email: email,
         phone: phone,
+        password: password,
       );
     } on ApiException catch (err) {
       _showMessage(err.message);
@@ -134,6 +153,22 @@ class _SignupScreenState extends State<SignupScreen> {
                 icon: Icons.alternate_email_rounded,
                 keyboardType: TextInputType.emailAddress,
                 controller: _emailController,
+              ),
+              const SizedBox(height: 18),
+              BybitTextField(
+                label: 'Password',
+                hint: 'At least 8 characters',
+                icon: Icons.lock_outline_rounded,
+                obscure: true,
+                controller: _passwordController,
+              ),
+              const SizedBox(height: 18),
+              BybitTextField(
+                label: 'Confirm password',
+                hint: 'Re-enter your password',
+                icon: Icons.lock_outline_rounded,
+                obscure: true,
+                controller: _confirmPasswordController,
               ),
               const SizedBox(height: 28),
               BybitPrimaryButton(label: 'Continue', onTap: _handleContinue),

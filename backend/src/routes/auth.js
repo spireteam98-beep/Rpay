@@ -50,21 +50,32 @@ async function createAndSendEmailOtp(userId, cleanEmail, fullName, purpose = 'em
   return { sent: true, expiresInMinutes: config.emailOtpTtlMinutes };
 }
 
-/** POST /auth/signup { fullName, email, phone } — sign-in is email + code, no password. */
+/**
+ * POST /auth/signup { fullName, email, phone, password } — password is the
+ * primary credential (Apple App Review rejected OTP-only signup/login as
+ * the sole auth method); email OTP still runs right after to verify the
+ * address, and email-code sign-in remains available as an alternative to
+ * the password on /auth/login/request-otp.
+ */
 router.post('/signup', async (req, res, next) => {
   try {
-    const { fullName, email, phone } = req.body || {};
+    const { fullName, email, phone, password } = req.body || {};
     const cleanEmail = normalizeEmail(email);
     const cleanPhone = normalizePhone(phone);
+    const cleanPassword = String(password || '');
 
-    if (!fullName || !cleanEmail || !cleanPhone) {
+    if (!fullName || !cleanEmail || !cleanPhone || !cleanPassword) {
       return res.status(400).json({
-        error: 'fullName, email and phone are required',
+        error: 'fullName, email, phone and password are required',
       });
     }
 
     if (!isEmail(cleanEmail)) {
       return res.status(400).json({ error: 'Enter a valid email address' });
+    }
+
+    if (cleanPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
     const existing = await pool.query(
@@ -89,10 +100,11 @@ router.post('/signup', async (req, res, next) => {
       ).rows[0];
     }
 
+    const passwordHash = await bcrypt.hash(cleanPassword, 10);
     const inserted = await pool.query(
-      `INSERT INTO users (full_name, email, phone, referred_by_agent_id)
-       VALUES ($1,$2,$3,$4) RETURNING id, wallet_index`,
-      [String(fullName).trim(), cleanEmail, cleanPhone, referringAgent?.id || null],
+      `INSERT INTO users (full_name, email, phone, password_hash, referred_by_agent_id)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, wallet_index`,
+      [String(fullName).trim(), cleanEmail, cleanPhone, passwordHash, referringAgent?.id || null],
     );
     const user = inserted.rows[0];
 
@@ -125,9 +137,11 @@ router.post('/signup', async (req, res, next) => {
 });
 
 /**
- * POST /auth/login { email, password } — legacy path, kept only for accounts
- * that still carry a password_hash from before sign-in switched to email
- * codes. New accounts have no password_hash, so this always rejects them.
+ * POST /auth/login { email, password } — primary sign-in method now that
+ * every new account sets a password at signup. Accounts created before
+ * password signup existed have no password_hash and always reject here;
+ * /auth/login/request-otp remains available as an alternative for them
+ * (and for anyone who prefers a one-time code).
  */
 router.post('/login', async (req, res, next) => {
   try {

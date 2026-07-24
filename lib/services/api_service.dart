@@ -76,12 +76,14 @@ class ApiService {
   }
 
   /// Registers on the backend; returns the on-chain deposit address.
-  /// Sign-in is email + a one-time code, so signup never takes a password.
+  /// Password is the primary sign-in credential; email OTP sign-in remains
+  /// available as an alternative via [requestLoginOtp]/[verifyLoginOtp].
   /// If the backend is unreachable, signup fails with an error.
   static Future<String?> signup({
     required String fullName,
     required String email,
     required String phone,
+    required String password,
     String? agentCode,
   }) async {
     try {
@@ -93,6 +95,7 @@ class ApiService {
               'fullName': fullName,
               'email': email,
               'phone': phone,
+              'password': password,
               if (agentCode != null && agentCode.isNotEmpty)
                 'agentCode': agentCode,
             }),
@@ -104,6 +107,35 @@ class ApiService {
         return body['ethAddress'] as String?;
       }
       throw ApiException(body['error'] as String? ?? 'Signup failed');
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Signs in with email + password; true on success, false on bad
+  /// credentials, null if the backend is unreachable.
+  static Future<bool?> login({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/auth/login'),
+            headers: _headers(),
+            body: jsonEncode({'email': email, 'password': password}),
+          )
+          .timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200) {
+        await _prefs.setString(_tokenKey, body['token'] as String);
+        return true;
+      }
+      throw ApiException(
+        body['error'] as String? ?? 'Incorrect email or password',
+      );
     } on ApiException {
       rethrow;
     } catch (_) {
