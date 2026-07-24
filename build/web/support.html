@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Wayaki Support — get help with your account, transfers, KYC and more.">
+<title>Support — Wayaki</title>
+<style>
+  :root {
+    --bg: #050506;
+    --card: #101012;
+    --stroke: rgba(255,255,255,0.08);
+    --text: #F7F7F5;
+    --muted: #8A8F98;
+    --accent: #DDF716;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 48px 24px 96px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  header img { height: 28px; }
+  header span { font-weight: 700; font-size: 18px; letter-spacing: 0.2px; }
+  h1 { font-size: 28px; margin: 24px 0 8px; }
+  .sub { color: var(--muted); font-size: 15px; margin-bottom: 32px; }
+  h2 { font-size: 18px; margin-top: 36px; color: var(--accent); }
+  p, li { color: #D6D8DC; font-size: 15px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .card {
+    background: var(--card); border: 1px solid var(--stroke); border-radius: 16px;
+    padding: 20px 24px; margin-top: 16px;
+  }
+  .contact-btn {
+    display: inline-block; margin-top: 12px; background: var(--accent); color: #0D0F04;
+    font-weight: 700; padding: 12px 20px; border-radius: 999px; font-size: 14px;
+  }
+  .contact-btn:hover { text-decoration: none; opacity: 0.9; }
+  details {
+    background: var(--card); border: 1px solid var(--stroke); border-radius: 12px;
+    padding: 14px 18px; margin-top: 10px;
+  }
+  summary { cursor: pointer; font-weight: 600; }
+  summary::marker { color: var(--accent); }
+  details p { margin: 10px 0 2px; }
+  footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="assets/assets/images/wayaki_logo.png" alt="" onerror="this.style.display='none'">
+    <span>WAYAKI</span>
+  </header>
+  <h1>Support</h1>
+  <p class="sub">Need help with your account, a transfer, or verification? We're here for it.</p>
+
+  <div class="card">
+    <strong>Email support</strong>
+    <p>Our team typically replies within 24 hours.</p>
+    <a class="contact-btn" href="mailto:support@wayaki.com">support@wayaki.com</a>
+  </div>
+
+  <h2>Frequently asked questions</h2>
+
+  <details>
+    <summary>How do I verify my account (KYC)?</summary>
+    <p>Open the App, go to <em>Settings → Identity Verification</em>, and follow the prompts to submit a government-issued ID and a selfie. Verification typically increases your daily send/receive limits.</p>
+  </details>
+
+  <details>
+    <summary>How do I add money (cash in)?</summary>
+    <p>From the Home screen, tap <em>Cash In</em> and choose a method — mobile money (EVC Plus, Zaad, Sahal, M-Pesa, Waafi), or a card top-up. Follow the on-screen steps to complete the deposit.</p>
+  </details>
+
+  <details>
+    <summary>How do I send money to someone?</summary>
+    <p>Tap <em>Send</em>, choose whether you're sending to another Wayaki user or out to a mobile-money provider, enter the recipient details and amount, and confirm.</p>
+  </details>
+
+  <details>
+    <summary>A transaction is stuck or shows "pending" — what do I do?</summary>
+    <p>Mobile-money deposits and withdrawals go through an approval step and can take a few minutes. If a transaction has been pending for more than a few hours, contact <a href="mailto:support@wayaki.com">support@wayaki.com</a> with the transaction reference so we can look into it.</p>
+  </details>
+
+  <details>
+    <summary>How do I delete my account?</summary>
+    <p>Email <a href="mailto:support@wayaki.com">support@wayaki.com</a> from your account's registered email address and request account deletion. We'll confirm your identity, close out any pending balances or transactions with you, and delete your account and associated personal data in line with our <a href="/privacy">Privacy Policy</a>.</p>
+  </details>
+
+  <details>
+    <summary>Is my money and crypto safe?</summary>
+    <p>Fiat balances and crypto assets are held in custody infrastructure with restricted access and monitoring. See our <a href="/privacy">Privacy Policy</a> for details on how we protect your data and funds.</p>
+  </details>
+
+  <details>
+    <summary>I think I've been a victim of fraud or a scam</summary>
+    <p>Contact <a href="mailto:support@wayaki.com">support@wayaki.com</a> immediately with as much detail as possible (transaction reference, dates, amounts). Do not share your password, PIN or OTP codes with anyone, including someone claiming to be from Wayaki support.</p>
+  </details>
+
+  <h2>Still stuck?</h2>
+  <p>Email <a href="mailto:support@wayaki.com">support@wayaki.com</a> and include your account email and a description of the issue — screenshots help. We aim to respond within 24 hours.</p>
+
+  <footer>Wayaki · <a href="/">wayaki.com</a> · <a href="/privacy">Privacy Policy</a></footer>
+</div>
+</body>
+</html>

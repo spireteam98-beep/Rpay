@@ -1,11 +1,11 @@
 {
-    "name": "crypto_exchange_app",
-    "short_name": "crypto_exchange_app",
+    "name": "Wayaki",
+    "short_name": "Wayaki",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#050506",
+    "theme_color": "#050506",
+    "description": "Wayaki — your crypto wallet, mobile money and virtual bank account in one app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
