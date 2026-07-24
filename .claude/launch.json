@@ -1,0 +1,47 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["src/server.js"],
+      "cwd": "backend",
+      "port": 8080
+    },
+    {
+      "name": "flutter-web",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "--web-port",
+        "5252",
+        "--dart-define=API_BASE_URL=http://localhost:8080"
+      ],
+      "port": 5252
+    },
+    {
+      "name": "verify-backend",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["src/server.js"],
+      "cwd": "backend",
+      "port": 8090,
+      "autoPort": true
+    },
+    {
+      "name": "verify-web",
+      "runtimeExecutable": "flutter",
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "--web-port",
+        "4210",
+        "--dart-define=API_BASE_URL=http://localhost:8080"
+      ],
+      "port": 4210,
+      "autoPort": true
+    }
+  ]
+}

@@ -9,9 +9,16 @@ import 'auth_service.dart';
 /// This app requires a live backend session and does not use local sandbox-only mode.
 class ApiService {
   /// Backend URL, overridable at build time with `--dart-define=API_BASE_URL=`.
+  /// Defaults to the live Render backend so a plain `flutter build web
+  /// --release` (how every release build in this repo's history has been
+  /// produced) ships pointed at a real server instead of localhost — every
+  /// prior web build baked in localhost:8080, which is unreachable for any
+  /// real user. Local development against a backend running on this
+  /// machine should pass `--dart-define=API_BASE_URL=http://localhost:8080`
+  /// explicitly (see .claude/launch.json's flutter-web/verify-web entries).
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue: 'https://backend-aroy.onrender.com',
   );
 
   /// Stripe publishable key (safe to ship client-side by design).
