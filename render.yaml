@@ -62,9 +62,9 @@ services:
       - key: APP_PAYMENT_RETURN_URL
         value: https://wayaki.com/payment-return
       - key: NEXT_PUBLIC_PAYMENT_BACKEND_URL
-        value: https://backend-aroy.onrender.com
+        value: https://kashflip-api.onrender.com
       - key: NEXT_PUBLIC_WAAFI_BACKEND_URL
-        value: https://backend-aroy.onrender.com
+        value: https://kashflip-api.onrender.com
       - key: BINANCE_ENV
         value: testnet
       - key: BINANCE_ENABLE_TRADING

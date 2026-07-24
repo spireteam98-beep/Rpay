@@ -76,12 +76,12 @@ const config = {
   paymentBackendUrl: (
     process.env.PAYMENT_BACKEND_URL ||
     process.env.NEXT_PUBLIC_PAYMENT_BACKEND_URL ||
-    'https://backend-aroy.onrender.com'
+    'https://kashflip-api.onrender.com'
   ).trim(),
   waafiBackendUrl: (
     process.env.WAAFI_BACKEND_URL ||
     process.env.NEXT_PUBLIC_WAAFI_BACKEND_URL ||
-    'https://backend-aroy.onrender.com'
+    'https://kashflip-api.onrender.com'
   ).trim(),
   stripePublishableKey: (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim(),
   waafiEndpoint: (process.env.WAAFI_ENDPOINT || 'https://api.waafipay.net/asm').trim(),
