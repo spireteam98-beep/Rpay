@@ -37,6 +37,23 @@
   <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
+  <script>
+    // Older Flutter service workers can keep serving an obsolete payment UI
+    // after a production deployment. This app is network-backed and should
+    // always load the current bundle, so remove legacy workers once and
+    // reload any page that was still controlled by one.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        const wasControlled = Boolean(navigator.serviceWorker.controller);
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+        if (wasControlled && !sessionStorage.getItem('wayaki-sw-reset-20260725')) {
+          sessionStorage.setItem('wayaki-sw-reset-20260725', '1');
+          window.location.reload();
+        }
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
