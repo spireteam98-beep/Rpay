@@ -30,6 +30,12 @@
       "autoPort": true
     },
     {
+      "name": "site",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8096", "--directory", "build/web"],
+      "port": 8096
+    },
+    {
       "name": "verify-web",
       "runtimeExecutable": "flutter",
       "runtimeArgs": [
