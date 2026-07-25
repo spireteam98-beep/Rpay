@@ -596,13 +596,12 @@ class _ProcessStep extends StatelessWidget {
               submitLabel: 'Cash in now',
               onPaymentNotCredited: appState.syncFromBackend,
               onCredited: (amount, currency, gateway, gatewayLabel) async {
-                final amountUsd = currency == 'KES' ? amount / 130 : amount;
                 await appState.syncFromBackend();
                 if (!context.mounted) return;
                 await _showDone(
                   context,
                   'Cash in complete',
-                  '${amountUsd.toStringAsFixed(2)} USD credited to your wallet.',
+                  '${currency.toUpperCase()} ${amount.toStringAsFixed(2)} was added to your wallet.',
                 );
               },
             ),

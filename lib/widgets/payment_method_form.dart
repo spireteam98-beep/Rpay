@@ -312,14 +312,21 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         final topUp = response['topUp'] as Map<String, dynamic>?;
         final amount = (topUp?['amount'] as num?)?.toDouble() ?? 0;
         final currency = topUp?['currency'] as String? ?? _currency;
+        final topUpStatus = (topUp?['status'] as String? ?? '').toUpperCase();
+        final succeeded = verified || topUpStatus == 'SUCCEEDED';
 
-        if (verified && (credited || alreadyCredited)) {
+        if (succeeded &&
+            (credited || alreadyCredited || topUpStatus == 'SUCCEEDED')) {
+          setState(() {
+            _progressMessage = 'Payment successful. Updating your wallet...';
+          });
+          await widget.onCredited(amount, currency, gateway, gatewayLabel);
+          if (!mounted) return;
           setState(() {
             _submitting = false;
             _awaitingApproval = false;
             _progressMessage = '';
           });
-          await widget.onCredited(amount, currency, gateway, gatewayLabel);
           return;
         }
 
@@ -458,11 +465,14 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         return;
       }
 
-      setState(() => _submitting = false);
       final credited = response['credited'] == true;
       final providerRef = topUp?['providerRef'] as String?;
 
       if (credited) {
+        setState(() {
+          _awaitingApproval = true;
+          _progressMessage = 'Payment successful. Updating your wallet...';
+        });
         await widget.onCredited(
           chargedAmount,
           chargedCurrency,
@@ -481,6 +491,7 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         return;
       }
 
+      setState(() => _submitting = false);
       final message =
           response['message'] as String? ??
           'Payment initialized. Reference: pending';
