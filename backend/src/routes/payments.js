@@ -462,6 +462,20 @@ router.post('/topups/verify', async (req, res, next) => {
     ).rows[0];
     if (!topUp) return res.status(404).json({ error: 'Top-up not found' });
 
+    // The signed provider webhook may win the race and credit this top-up
+    // before the app's next fallback status request. In that case the local
+    // transaction record is already authoritative: do not ask the provider
+    // again and accidentally turn a completed payment back into "pending".
+    if (topUp.status === 'SUCCEEDED') {
+      return res.json({
+        verified: true,
+        credited: false,
+        alreadyCredited: true,
+        amountUsd: amountUsd(Number(topUp.amount), topUp.currency),
+        topUp: publicTopUp(topUp),
+      });
+    }
+
     let verified = false;
     let providerStatus = 'verified';
     let metadata = {};
