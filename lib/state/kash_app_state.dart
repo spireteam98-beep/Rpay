@@ -86,10 +86,28 @@ class KashAppState extends ChangeNotifier {
   /// transaction history / transfers alone; this only fixes the balances.
   Future<void> syncFromBackend() async {
     if (!ApiService.hasSession) return;
-    final me = await ApiService.me();
-    final hybrid = await ApiService.hybridWallet();
-    final bank = await ApiService.bankAccount();
-    final backendLedger = await ApiService.ledgerTransactions();
+    final meFuture = ApiService.me();
+    final hybridFuture = ApiService.hybridWallet();
+    final bankFuture = ApiService.bankAccount();
+    final ledgerFuture = ApiService.ledgerTransactions();
+
+    // Publish the wallet balance as soon as it arrives. Bank-account and
+    // ledger endpoints must never hold the dashboard header at its old value.
+    final hybrid = await hybridFuture;
+    if (hybrid != null) {
+      _applyHybridBalances(hybrid);
+      _persist();
+      notifyListeners();
+    }
+
+    final results = await Future.wait<dynamic>([
+      meFuture,
+      bankFuture,
+      ledgerFuture,
+    ]);
+    final me = results[0] as Map<String, dynamic>?;
+    final bank = results[1] as Map<String, dynamic>?;
+    final backendLedger = results[2] as List<dynamic>?;
     if (me == null && hybrid == null && bank == null && backendLedger == null) {
       return;
     }
@@ -108,25 +126,9 @@ class KashAppState extends ChangeNotifier {
         _accounts.map((account) {
           switch (account.type) {
             case KashAccountType.crypto:
-              if (hybrid == null) return account;
-              final crypto = hybrid['crypto'] as Map<String, dynamic>?;
-              final totalUsd = (crypto?['totalUsd'] as num?)?.toDouble() ?? 0;
-              final depositAddress = crypto?['depositAddress'] as String?;
-              return account.copyWith(
-                balanceUsd: totalUsd,
-                status:
-                    (depositAddress == null || depositAddress.isEmpty)
-                        ? account.status
-                        : 'Deposit address $depositAddress',
-              );
+              return account;
             case KashAccountType.mobileMoney:
-              if (hybrid == null) return account;
-              final fiat = hybrid['fiat'] as Map<String, dynamic>?;
-              final usd = (fiat?['USD'] as num?)?.toDouble() ?? 0;
-              final kes = (fiat?['KES'] as num?)?.toDouble() ?? 0;
-              final kesPerUsd = (fiat?['kesPerUsd'] as num?)?.toDouble() ?? 0;
-              final kesAsUsd = kesPerUsd > 0 ? kes / kesPerUsd : 0;
-              return account.copyWith(balanceUsd: usd + kesAsUsd);
+              return account;
             case KashAccountType.bank:
               if (bank == null) return account;
               final accountInfo = bank['account'] as Map<String, dynamic>?;
@@ -151,6 +153,40 @@ class KashAppState extends ChangeNotifier {
 
     _persist();
     notifyListeners();
+  }
+
+  void _applyHybridBalances(Map<String, dynamic> hybrid) {
+    final fiat = hybrid['fiat'] as Map<String, dynamic>?;
+    final crypto = hybrid['crypto'] as Map<String, dynamic>?;
+    final usd = _asDouble(fiat?['USD']);
+    final kes = _asDouble(fiat?['KES']);
+    final kesPerUsd = _asDouble(fiat?['kesPerUsd']);
+    final kesAsUsd = kesPerUsd > 0 ? kes / kesPerUsd : 0;
+    final cryptoTotal = _asDouble(crypto?['totalUsd']);
+    final walletTotal = _asDouble(hybrid['totalUsd']);
+    final fiatTotal =
+        walletTotal > 0 ? walletTotal - cryptoTotal : usd + kesAsUsd;
+    final depositAddress = crypto?['depositAddress'] as String?;
+
+    _accounts =
+        _accounts.map((account) {
+          switch (account.type) {
+            case KashAccountType.crypto:
+              return account.copyWith(
+                balanceUsd: cryptoTotal,
+                status:
+                    (depositAddress == null || depositAddress.isEmpty)
+                        ? account.status
+                        : 'Deposit address $depositAddress',
+              );
+            case KashAccountType.mobileMoney:
+              return account.copyWith(
+                balanceUsd: fiatTotal.clamp(0, double.infinity).toDouble(),
+              );
+            case KashAccountType.bank:
+              return account;
+          }
+        }).toList();
   }
 
   // ── Getters ─────────────────────────────────────────────────────
@@ -192,6 +228,11 @@ class KashAppState extends ChangeNotifier {
 
   KashAccount accountByType(KashAccountType type) {
     return _accounts.firstWhere((account) => account.type == type);
+  }
+
+  static double _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   // ── Identity ────────────────────────────────────────────────────
