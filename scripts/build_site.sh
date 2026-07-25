@@ -8,11 +8,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+echo "==> Cleaning previous build output…"
+rm -rf build/web build/web-app-tmp
+
 echo "==> Building Flutter web app (base href /app/)…"
 MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" flutter build web --release --base-href=/app/
 
 echo "==> Moving compiled app into build/web/app …"
-rm -rf build/web-app-tmp
 mv build/web build/web-app-tmp
 mkdir -p build/web
 mv build/web-app-tmp build/web/app
