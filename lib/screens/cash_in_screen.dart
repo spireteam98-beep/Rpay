@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/kash_account.dart';
@@ -596,12 +598,15 @@ class _ProcessStep extends StatelessWidget {
               submitLabel: 'Cash in now',
               onPaymentNotCredited: appState.syncFromBackend,
               onCredited: (amount, currency, gateway, gatewayLabel) async {
-                await appState.syncFromBackend();
+                // The provider has already returned a terminal success here.
+                // Do not hold the confirmation dialog behind unrelated bank
+                // and ledger refreshes; update the wallet in the background.
+                unawaited(appState.syncFromBackend());
                 if (!context.mounted) return;
                 await _showDone(
                   context,
-                  'Cash in complete',
-                  '${currency.toUpperCase()} ${amount.toStringAsFixed(2)} was added to your wallet.',
+                  'Transaction successful',
+                  '${currency.toUpperCase()} ${amount.toStringAsFixed(2)} has been added to your wallet.',
                 );
               },
             ),
