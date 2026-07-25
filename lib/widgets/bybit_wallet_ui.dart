@@ -210,46 +210,81 @@ class BybitSearchBar extends StatelessWidget {
   }
 }
 
+/// Standard sub-screen header, shared app-wide: a back/title/menu row over
+/// black, with the same lime "wave scoop" accent strip used on Trade and
+/// Buy beneath it — the unifying visual signature across every screen.
 class BybitSubHeader extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final Widget? trailing;
+  final VoidCallback? onBack;
 
-  const BybitSubHeader(this.title, {super.key});
+  const BybitSubHeader(this.title, {super.key, this.trailing, this.onBack});
 
   @override
-  Size get preferredSize => const Size.fromHeight(64);
+  Size get preferredSize => const Size.fromHeight(122);
 
   @override
   Widget build(BuildContext context) {
-    return AppBar(
-      backgroundColor: BybitPalette.bg,
-      elevation: 0,
-      centerTitle: true,
-      leading: TouchScale(
-        onTap: () => Navigator.of(context).maybePop(),
-        child: Container(
-          margin: const EdgeInsets.only(left: 16),
-          decoration: const BoxDecoration(
-            color: BybitPalette.surface2,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-        ),
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-      actions: const [
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
         Padding(
-          padding: EdgeInsets.only(right: 16),
-          child: CircleAvatar(
-            radius: 20,
-            backgroundColor: BybitPalette.surface2,
-            child: Icon(Icons.more_horiz_rounded, color: Colors.white),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            children: [
+              TouchScale(
+                onTap: onBack ?? () => Navigator.of(context).maybePop(),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: BybitPalette.surface2,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 42, minHeight: 42),
+                child: Center(
+                  child:
+                      trailing ??
+                      const CircleAvatar(
+                        radius: 20,
+                        backgroundColor: BybitPalette.surface2,
+                        child: Icon(
+                          Icons.more_horiz_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(
+          height: 72,
+          width: double.infinity,
+          child: ClipPath(
+            clipper: BybitWaveClipper(),
+            child: ColoredBox(color: BybitPalette.accent),
           ),
         ),
       ],
