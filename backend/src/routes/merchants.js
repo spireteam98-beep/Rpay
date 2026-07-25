@@ -40,11 +40,25 @@ router.post('/', async (req, res, next) => {
     const businessType = String(req.body?.businessType || '').trim() || null;
     const phone = String(req.body?.phone || '').trim() || null;
     if (!name) return res.status(400).json({ error: 'Merchant name is required' });
+
+    // Agent-assisted merchant onboarding: a valid referral code links the
+    // new merchant to the agent — commission is paid once an admin approves
+    // it (see admin.js POST /merchants/:id/approve), not at this PENDING stage.
+    const agentCode = String(req.body?.agentCode || '').trim();
+    let referringAgent = null;
+    if (agentCode) {
+      referringAgent = (
+        await pool.query("SELECT id FROM agents WHERE agent_code = $1 AND status = 'ACTIVE'", [
+          agentCode,
+        ])
+      ).rows[0];
+    }
+
     const inserted = await pool.query(
-      `INSERT INTO merchants (owner_id, name, till_number, business_type, phone, status)
-       VALUES ($1,$2,$3,$4,$5,'PENDING')
+      `INSERT INTO merchants (owner_id, name, till_number, business_type, phone, status, referred_by_agent_id)
+       VALUES ($1,$2,$3,$4,$5,'PENDING',$6)
        RETURNING id, name, till_number, business_type, phone, status, created_at`,
-      [req.userId, name, tillNumber(), businessType, phone],
+      [req.userId, name, tillNumber(), businessType, phone, referringAgent?.id || null],
     );
     res.status(201).json({ merchant: inserted.rows[0] });
   } catch (err) {

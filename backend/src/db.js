@@ -293,13 +293,15 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_p2p_orders_agent ON p2p_orders(agent_id, status, created_at DESC);
   `);
 
-  // agent_commissions.kind originally only allowed deposit/withdrawal/onboarding —
-  // widen it to include p2p order commissions and parent override payouts.
+  // agent_commissions.kind — widened over time (p2p, override, then
+  // merchant_onboarding/card_issuance below); kept as one canonical
+  // definition here since re-narrowing it between migrate() runs would
+  // break on whatever kind values already exist in the table.
   await pool.query(`
     ALTER TABLE agent_commissions DROP CONSTRAINT IF EXISTS agent_commissions_kind_check;
     ALTER TABLE agent_commissions
       ADD CONSTRAINT agent_commissions_kind_check
-      CHECK (kind IN ('deposit','withdrawal','onboarding','p2p','override'));
+      CHECK (kind IN ('deposit','withdrawal','onboarding','merchant_onboarding','card_issuance','p2p','override'));
   `);
 
   // Agent tier hierarchy — mirrors Safaricom M-Pesa's Super Agent / Agent /
@@ -309,9 +311,9 @@ async function migrate() {
   // immediate parent on the same aggregated-line convention Safaricom uses.
   await pool.query(`
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'AGENT';
-    ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_tier_check;
-    ALTER TABLE agents ADD CONSTRAINT agents_tier_check
-      CHECK (tier IN ('SUPER_AGENT','AGENT','SUB_AGENT'));
+    -- Kept as one canonical definition further below (widened to add
+    -- COUNTRY_AGENT) since re-narrowing it between migrate() runs would
+    -- break on whatever tier values already exist in the table.
 
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS parent_agent_id UUID REFERENCES agents(id);
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS override_rate NUMERIC(5,4) NOT NULL DEFAULT 0.20;
@@ -351,6 +353,70 @@ async function migrate() {
   // policy rather than hard-deleted immediately.
   await pool.query(`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_requested_at TIMESTAMPTZ;
+  `);
+
+  // Admin moderation: suspend/reactivate a user account outright — distinct
+  // from the App-Store-required self-service deletion above. A suspended
+  // user is blocked at login and on every authenticated request (see
+  // middleware/auth.js requireAuth and routes/auth.js login routes).
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ACTIVE';
+    ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
+    ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status IN ('ACTIVE','SUSPENDED'));
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_by UUID REFERENCES users(id);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
+  `);
+
+  // Transaction revocation: an admin can reverse a completed P2P transfer or
+  // merchant payment (dispute, fraud finding, wrong recipient). Reversal
+  // moves the money back and posts a compensating ledger transaction — see
+  // POST /admin/p2p-transfers/:id/reverse and /admin/merchant-payments/:id/reverse.
+  await pool.query(`
+    ALTER TABLE p2p_transfers ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMPTZ;
+    ALTER TABLE p2p_transfers ADD COLUMN IF NOT EXISTS reversed_by UUID REFERENCES users(id);
+    ALTER TABLE p2p_transfers ADD COLUMN IF NOT EXISTS reversal_reason TEXT;
+
+    ALTER TABLE merchant_payments ADD COLUMN IF NOT EXISTS reversed_at TIMESTAMPTZ;
+    ALTER TABLE merchant_payments ADD COLUMN IF NOT EXISTS reversed_by UUID REFERENCES users(id);
+    ALTER TABLE merchant_payments ADD COLUMN IF NOT EXISTS reversal_reason TEXT;
+  `);
+
+  // Agent revenue-sharing expansion: agents also earn for onboarding
+  // merchants (not just customers) and — once the Wayaki Card ships — for
+  // card issuance ('merchant_onboarding'/'card_issuance' added to the
+  // canonical kind check above). 'merchant_onboarding' mirrors the existing
+  // customer 'onboarding' flow (see merchants.js referredByAgent).
+  await pool.query(`
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS referred_by_agent_id UUID REFERENCES agents(id);
+  `);
+
+  // Location-scoped agent hierarchy: Country Agent (one per country) ->
+  // Super Agent -> Agent -> Sub-Agent. Self-serve "become an agent"
+  // applications (see agents.js POST /) are routed to the right sponsor by
+  // country/region and sit in PENDING_REVIEW until that sponsor (or admin,
+  // if no sponsor exists yet in that location) approves them — replacing
+  // the old free-text status with a real state machine.
+  await pool.query(`
+    ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_tier_check;
+    ALTER TABLE agents ADD CONSTRAINT agents_tier_check
+      CHECK (tier IN ('COUNTRY_AGENT','SUPER_AGENT','AGENT','SUB_AGENT'));
+
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS country_code TEXT;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS region TEXT;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS city TEXT;
+
+    UPDATE agents SET status = 'PENDING_REVIEW' WHERE status = 'PENDING';
+    ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_status_check;
+    ALTER TABLE agents ADD CONSTRAINT agents_status_check
+      CHECK (status IN ('PENDING_REVIEW','ACTIVE','REJECTED','SUSPENDED'));
+
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS min_float_usd NUMERIC(18,2);
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS daily_limit_usd NUMERIC(18,2);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_one_country_agent
+      ON agents (country_code) WHERE tier = 'COUNTRY_AGENT';
+    CREATE INDEX IF NOT EXISTS idx_agents_location ON agents(country_code, region, tier, status);
   `);
 
   // Sole super-admin: keep this the only account with role='admin'. Runs

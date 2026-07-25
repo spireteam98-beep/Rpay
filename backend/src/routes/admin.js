@@ -4,6 +4,14 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const config = require('../config');
 const ledger = require('../services/ledger');
 const exchange = require('../services/exchange');
+const compliance = require('../services/compliance');
+const { creditAgentCommission } = require('../services/commission');
+
+// Flat commissions for onboarding events that aren't sized by transaction
+// amount — customer onboarding ($1) already existed in auth.js; merchant
+// onboarding pays more since a merchant drives recurring transaction volume.
+// card_issuance is plumbed in ahead of the Wayaki Card feature shipping.
+const MERCHANT_ONBOARDING_COMMISSION_USD = 5;
 
 const router = express.Router();
 router.use(requireAuth, requireAdmin);
@@ -64,7 +72,8 @@ router.get('/users', async (req, res, next) => {
       : '';
     const rows = await pool.query(
       `SELECT id, full_name, email, phone, kyc_tier, phone_verified, role,
-              usd_balance, kes_balance, created_at
+              usd_balance, kes_balance, status, suspended_at, suspension_reason,
+              created_at
          FROM users
          ${where}
         ORDER BY created_at DESC
@@ -72,6 +81,55 @@ router.get('/users', async (req, res, next) => {
       params,
     );
     res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /admin/users/:id/suspend { reason } — freezes login and blocks every
+ * authenticated request for this user immediately (see middleware/auth.js).
+ * The sole admin account can't suspend itself or another admin. */
+router.post('/users/:id/suspend', async (req, res, next) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) return res.status(400).json({ error: 'A suspension reason is required' });
+    if (req.params.id === req.userId) {
+      return res.status(400).json({ error: 'Cannot suspend your own admin account' });
+    }
+
+    const target = (
+      await pool.query('SELECT role FROM users WHERE id = $1', [req.params.id])
+    ).rows[0];
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target.role === 'admin') {
+      return res.status(400).json({ error: 'Cannot suspend an admin account' });
+    }
+
+    const rows = await pool.query(
+      `UPDATE users
+          SET status = 'SUSPENDED', suspended_at = now(), suspended_by = $1, suspension_reason = $2
+        WHERE id = $3
+        RETURNING id, full_name, email, phone, status, suspended_at, suspension_reason`,
+      [req.userId, reason, req.params.id],
+    );
+    res.json({ user: rows.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /admin/users/:id/reactivate — lifts a suspension. */
+router.post('/users/:id/reactivate', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `UPDATE users
+          SET status = 'ACTIVE', suspended_at = NULL, suspended_by = NULL, suspension_reason = NULL
+        WHERE id = $1
+        RETURNING id, full_name, email, phone, status`,
+      [req.params.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ user: rows.rows[0] });
   } catch (err) {
     next(err);
   }
@@ -151,31 +209,37 @@ async function findUserByIdentifier(identifier) {
   return rows.rows[0] || null;
 }
 
-const AGENT_TIERS = ['SUPER_AGENT', 'AGENT', 'SUB_AGENT'];
+const { TIER_ORDER: AGENT_TIERS, TIER_LIMITS_USD, isValidParentTier } = require('../services/agentTiers');
 
-/** POST /admin/agents — admin directly onboards an existing user as an agent, pre-approved.
- * Optional tier ('SUPER_AGENT' | 'AGENT', default 'AGENT') and parentAgentId let an admin
- * place the new partner directly into the hierarchy — e.g. contracting a Super Agent
- * (dealer/country/area lead) or attaching an Agent under one. */
+/** POST /admin/agents — admin directly onboards an existing user into the hierarchy,
+ * pre-approved. tier defaults to 'AGENT'; countryCode is required for COUNTRY_AGENT and
+ * SUPER_AGENT (one Country Agent per country is enforced at the DB level). parentAgentId
+ * must reference a strictly higher tier when given. */
 router.post('/agents', async (req, res, next) => {
   try {
     const businessName = String(req.body?.businessName || '').trim();
     const phone = String(req.body?.phone || '').trim() || null;
     const tier = String(req.body?.tier || 'AGENT').toUpperCase();
     const parentAgentId = String(req.body?.parentAgentId || '').trim() || null;
+    const countryCode = String(req.body?.countryCode || '').trim().toUpperCase() || null;
+    const region = String(req.body?.region || '').trim() || null;
+    const city = String(req.body?.city || '').trim() || null;
     if (!businessName) return res.status(400).json({ error: 'Business name is required' });
-    if (!['SUPER_AGENT', 'AGENT'].includes(tier)) {
-      return res.status(400).json({ error: 'tier must be SUPER_AGENT or AGENT' });
+    if (!['COUNTRY_AGENT', 'SUPER_AGENT', 'AGENT'].includes(tier)) {
+      return res.status(400).json({ error: 'tier must be COUNTRY_AGENT, SUPER_AGENT or AGENT' });
+    }
+    if (['COUNTRY_AGENT', 'SUPER_AGENT'].includes(tier) && !/^[A-Z]{2}$/.test(countryCode || '')) {
+      return res.status(400).json({ error: 'A valid 2-letter countryCode is required for this tier' });
     }
 
     let parent = null;
     if (parentAgentId) {
-      if (tier === 'SUPER_AGENT') {
-        return res.status(400).json({ error: 'A Super Agent cannot have a parent' });
+      if (tier === 'COUNTRY_AGENT') {
+        return res.status(400).json({ error: 'A Country Agent cannot have a parent' });
       }
       parent = (await pool.query('SELECT * FROM agents WHERE id = $1', [parentAgentId])).rows[0];
-      if (!parent || parent.tier !== 'SUPER_AGENT') {
-        return res.status(400).json({ error: 'parentAgentId must reference a Super Agent' });
+      if (!parent || !isValidParentTier(parent.tier, tier)) {
+        return res.status(400).json({ error: `parentAgentId must reference a tier above ${tier}` });
       }
     }
 
@@ -187,14 +251,26 @@ router.post('/agents', async (req, res, next) => {
       return res.status(409).json({ error: 'This user is already registered as an agent' });
     }
 
-    const inserted = await pool.query(
-      `INSERT INTO agents
-        (user_id, business_name, agent_code, phone, status, tier, parent_agent_id, approved_by, approved_at)
-       VALUES ($1,$2,$3,$4,'ACTIVE',$5,$6,$7,now())
-       RETURNING *`,
-      [user.id, businessName, generateAgentCode(), phone, tier, parent?.id || null, req.userId],
-    );
-    res.status(201).json({ agent: inserted.rows[0] });
+    const limits = TIER_LIMITS_USD[tier] || {};
+    try {
+      const inserted = await pool.query(
+        `INSERT INTO agents
+          (user_id, business_name, agent_code, phone, status, tier, parent_agent_id,
+           country_code, region, city, min_float_usd, daily_limit_usd, approved_by, approved_at)
+         VALUES ($1,$2,$3,$4,'ACTIVE',$5,$6,$7,$8,$9,$10,$11,$12,now())
+         RETURNING *`,
+        [
+          user.id, businessName, generateAgentCode(), phone, tier, parent?.id || null,
+          countryCode, region, city, limits.minFloatUsd || null, limits.dailyLimitUsd || null, req.userId,
+        ],
+      );
+      res.status(201).json({ agent: inserted.rows[0] });
+    } catch (err) {
+      if (err.code === '23505') {
+        return res.status(409).json({ error: `${countryCode} already has a Country Agent` });
+      }
+      throw err;
+    }
   } catch (err) {
     next(err);
   }
@@ -240,8 +316,8 @@ router.post('/agents/:id/tier', async (req, res, next) => {
     if (!AGENT_TIERS.includes(tier)) {
       return res.status(400).json({ error: `tier must be one of ${AGENT_TIERS.join(', ')}` });
     }
-    if (tier === 'SUPER_AGENT' && parentAgentId) {
-      return res.status(400).json({ error: 'A Super Agent cannot have a parent' });
+    if (tier === 'COUNTRY_AGENT' && parentAgentId) {
+      return res.status(400).json({ error: 'A Country Agent cannot have a parent' });
     }
     if (parentAgentId === req.params.id) {
       return res.status(400).json({ error: 'An agent cannot be its own parent' });
@@ -249,8 +325,8 @@ router.post('/agents/:id/tier', async (req, res, next) => {
     if (parentAgentId) {
       const parent = (await pool.query('SELECT tier FROM agents WHERE id = $1', [parentAgentId])).rows[0];
       if (!parent) return res.status(404).json({ error: 'parentAgentId not found' });
-      if (tier === 'SUB_AGENT' && parent.tier === 'SUB_AGENT') {
-        return res.status(400).json({ error: 'A Sub-Agent cannot be a parent' });
+      if (!isValidParentTier(parent.tier, tier)) {
+        return res.status(400).json({ error: `parentAgentId must reference a tier above ${tier}` });
       }
     }
 
@@ -274,6 +350,24 @@ router.post('/agents/:id/approve', async (req, res, next) => {
       [req.userId, req.params.id],
     );
     if (rows.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ agent: rows.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Admin can reject any pending application directly — a fallback alongside the
+ * sponsor-side POST /agents/applications/:id/reject, e.g. for the bootstrap case
+ * where an application had no sponsor to route to. */
+router.post('/agents/:id/reject', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `UPDATE agents SET status = 'REJECTED' WHERE id = $1 AND status = 'PENDING_REVIEW' RETURNING *`,
+      [req.params.id],
+    );
+    if (rows.rows.length === 0) {
+      return res.status(404).json({ error: 'No matching pending agent found' });
+    }
     res.json({ agent: rows.rows[0] });
   } catch (err) {
     next(err);
@@ -339,8 +433,11 @@ router.get('/commissions/summary', async (_req, res, next) => {
   }
 });
 
-/** POST /admin/merchants — admin directly onboards an existing user as a merchant, pre-approved. */
+/** POST /admin/merchants — admin directly onboards an existing user as a merchant, pre-approved.
+ * Optional agentCode pays that agent the merchant-onboarding commission immediately, since the
+ * merchant is created already ACTIVE (no separate approval step to gate it on). */
 router.post('/merchants', async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const name = String(req.body?.name || '').trim();
     const businessType = String(req.body?.businessType || '').trim() || null;
@@ -350,30 +447,77 @@ router.post('/merchants', async (req, res, next) => {
     const user = await findUserByIdentifier(req.body?.identifier);
     if (!user) return res.status(404).json({ error: 'No user found with that email or phone' });
 
-    const inserted = await pool.query(
-      `INSERT INTO merchants (owner_id, name, till_number, business_type, phone, status, approved_by, approved_at)
-       VALUES ($1,$2,$3,$4,$5,'ACTIVE',$6,now())
+    const agentCode = String(req.body?.agentCode || '').trim();
+    let referringAgent = null;
+    if (agentCode) {
+      referringAgent = (
+        await client.query("SELECT * FROM agents WHERE agent_code = $1 AND status = 'ACTIVE'", [agentCode])
+      ).rows[0];
+    }
+
+    await client.query('BEGIN');
+    const inserted = await client.query(
+      `INSERT INTO merchants (owner_id, name, till_number, business_type, phone, status, approved_by, approved_at, referred_by_agent_id)
+       VALUES ($1,$2,$3,$4,$5,'ACTIVE',$6,now(),$7)
        RETURNING *`,
-      [user.id, name, generateTillNumber(), businessType, phone, req.userId],
+      [user.id, name, generateTillNumber(), businessType, phone, req.userId, referringAgent?.id || null],
     );
+    if (referringAgent) {
+      await creditAgentCommission(
+        client, referringAgent, 'merchant_onboarding', 'USD',
+        MERCHANT_ONBOARDING_COMMISSION_USD, user.id,
+      );
+    }
+    await client.query('COMMIT');
     res.status(201).json({ merchant: inserted.rows[0] });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
     next(err);
+  } finally {
+    client.release();
   }
 });
 
+/** Approving a merchant pays its referring agent (if any) the merchant-onboarding
+ * commission — guarded so a merchant can never pay it out twice on re-approval. */
 router.post('/merchants/:id/approve', async (req, res, next) => {
+  const client = await pool.connect();
   try {
-    const rows = await pool.query(
+    await client.query('BEGIN');
+    const before = (
+      await client.query('SELECT status, referred_by_agent_id FROM merchants WHERE id = $1 FOR UPDATE', [req.params.id])
+    ).rows[0];
+    if (!before) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+
+    const rows = await client.query(
       `UPDATE merchants SET status = 'ACTIVE', approved_by = $1, approved_at = now()
         WHERE id = $2
         RETURNING *`,
       [req.userId, req.params.id],
     );
-    if (rows.rows.length === 0) return res.status(404).json({ error: 'Merchant not found' });
+
+    if (before.status !== 'ACTIVE' && before.referred_by_agent_id) {
+      const agent = (
+        await client.query('SELECT * FROM agents WHERE id = $1', [before.referred_by_agent_id])
+      ).rows[0];
+      if (agent) {
+        await creditAgentCommission(
+          client, agent, 'merchant_onboarding', 'USD',
+          MERCHANT_ONBOARDING_COMMISSION_USD, rows.rows[0].owner_id,
+        );
+      }
+    }
+
+    await client.query('COMMIT');
     res.json({ merchant: rows.rows[0] });
   } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
     next(err);
+  } finally {
+    client.release();
   }
 });
 
@@ -387,6 +531,245 @@ router.post('/merchants/:id/deactivate', async (req, res, next) => {
     res.json({ merchant: rows.rows[0] });
   } catch (err) {
     next(err);
+  }
+});
+
+/** GET /admin/p2p-transfers — browse wallet-to-wallet transfers, filterable by status. */
+router.get('/p2p-transfers', async (req, res, next) => {
+  try {
+    const status = String(req.query.status || '').trim().toUpperCase();
+    const params = [];
+    let where = '';
+    if (status) {
+      where = 'WHERE t.status = $1';
+      params.push(status);
+    }
+    const rows = await pool.query(
+      `SELECT t.*, s.full_name AS sender_name, s.email AS sender_email,
+              r.full_name AS recipient_name, r.email AS recipient_email
+         FROM p2p_transfers t
+         JOIN users s ON s.id = t.sender_user_id
+         JOIN users r ON r.id = t.recipient_user_id
+         ${where}
+        ORDER BY t.created_at DESC
+        LIMIT 200`,
+      params,
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /admin/p2p-transfers/:id/reverse { reason } — undoes a completed
+ * wallet-to-wallet transfer: moves the money back from recipient to sender
+ * and posts a compensating ledger transaction mirroring the original.
+ * Blocked if the recipient no longer holds enough balance to reverse
+ * cleanly — this never pushes a balance negative.
+ */
+router.post('/p2p-transfers/:id/reverse', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) return res.status(400).json({ error: 'A reversal reason is required' });
+
+    await client.query('BEGIN');
+    const transfer = (
+      await client.query(
+        `SELECT t.*, s.full_name AS sender_name, r.full_name AS recipient_name
+           FROM p2p_transfers t
+           JOIN users s ON s.id = t.sender_user_id
+           JOIN users r ON r.id = t.recipient_user_id
+          WHERE t.id = $1
+          FOR UPDATE OF t`,
+        [req.params.id],
+      )
+    ).rows[0];
+    if (!transfer) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Transfer not found' });
+    }
+    if (transfer.status !== 'COMPLETED') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: `Transfer is already ${transfer.status}` });
+    }
+
+    const column = transfer.currency === 'KES' ? 'kes_balance' : 'usd_balance';
+    const recipient = (
+      await client.query(`SELECT ${column} AS balance FROM users WHERE id = $1 FOR UPDATE`, [
+        transfer.recipient_user_id,
+      ])
+    ).rows[0];
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [transfer.sender_user_id]);
+    if (Number(recipient.balance) < Number(transfer.amount)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: `Recipient only has ${recipient.balance} ${transfer.currency} left — not enough to reverse ${transfer.amount} ${transfer.currency}`,
+      });
+    }
+
+    await client.query(`UPDATE users SET ${column} = ${column} - $1 WHERE id = $2`, [
+      transfer.amount,
+      transfer.recipient_user_id,
+    ]);
+    await client.query(`UPDATE users SET ${column} = ${column} + $1 WHERE id = $2`, [
+      transfer.amount,
+      transfer.sender_user_id,
+    ]);
+
+    const amountUsd = compliance.toUsd(Number(transfer.amount), transfer.currency);
+    await ledger.postWithClient(
+      client,
+      transfer.sender_user_id,
+      { title: `Reversal: refund from ${transfer.recipient_name}`, rail: 'Wayaki P2P reversal' },
+      [
+        { accountName: 'Wayaki transfer clearing', direction: 'debit', amountUsd, memo: `Reversal of ${transfer.id}` },
+        { accountName: `Customer ${transfer.currency} wallet`, direction: 'credit', amountUsd, memo: reason },
+      ],
+    );
+    await ledger.postWithClient(
+      client,
+      transfer.recipient_user_id,
+      { title: 'Reversal: transfer clawed back', rail: 'Wayaki P2P reversal' },
+      [
+        { accountName: `Customer ${transfer.currency} wallet`, direction: 'debit', amountUsd, memo: reason },
+        { accountName: 'Wayaki transfer clearing', direction: 'credit', amountUsd, memo: `Reversal of ${transfer.id}` },
+      ],
+    );
+
+    const updated = await client.query(
+      `UPDATE p2p_transfers
+          SET status = 'REVERSED', reversed_at = now(), reversed_by = $1, reversal_reason = $2
+        WHERE id = $3
+        RETURNING *`,
+      [req.userId, reason, transfer.id],
+    );
+    await client.query('COMMIT');
+    res.json({ transfer: updated.rows[0] });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/** GET /admin/merchant-payments — browse merchant payments, filterable by status. */
+router.get('/merchant-payments', async (req, res, next) => {
+  try {
+    const status = String(req.query.status || '').trim().toUpperCase();
+    const params = [];
+    let where = '';
+    if (status) {
+      where = 'WHERE p.status = $1';
+      params.push(status);
+    }
+    const rows = await pool.query(
+      `SELECT p.*, m.name AS merchant_name, m.till_number,
+              u.full_name AS payer_name, u.email AS payer_email
+         FROM merchant_payments p
+         JOIN merchants m ON m.id = p.merchant_id
+         JOIN users u ON u.id = p.payer_id
+         ${where}
+        ORDER BY p.created_at DESC
+        LIMIT 200`,
+      params,
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /admin/merchant-payments/:id/reverse { reason } — refunds a
+ * completed merchant payment back to the payer. Blocked if the merchant
+ * owner no longer holds enough balance to reverse cleanly.
+ */
+router.post('/merchant-payments/:id/reverse', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) return res.status(400).json({ error: 'A reversal reason is required' });
+
+    await client.query('BEGIN');
+    const payment = (
+      await client.query(
+        `SELECT p.*, m.name AS merchant_name, m.owner_id
+           FROM merchant_payments p
+           JOIN merchants m ON m.id = p.merchant_id
+          WHERE p.id = $1
+          FOR UPDATE OF p`,
+        [req.params.id],
+      )
+    ).rows[0];
+    if (!payment) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+    if (payment.status !== 'COMPLETED') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: `Payment is already ${payment.status}` });
+    }
+
+    const column = payment.currency === 'KES' ? 'kes_balance' : 'usd_balance';
+    const merchantOwner = (
+      await client.query(`SELECT ${column} AS balance FROM users WHERE id = $1 FOR UPDATE`, [
+        payment.owner_id,
+      ])
+    ).rows[0];
+    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [payment.payer_id]);
+    if (Number(merchantOwner.balance) < Number(payment.amount)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: `Merchant only has ${merchantOwner.balance} ${payment.currency} left — not enough to reverse ${payment.amount} ${payment.currency}`,
+      });
+    }
+
+    await client.query(`UPDATE users SET ${column} = ${column} - $1 WHERE id = $2`, [
+      payment.amount,
+      payment.owner_id,
+    ]);
+    await client.query(`UPDATE users SET ${column} = ${column} + $1 WHERE id = $2`, [
+      payment.amount,
+      payment.payer_id,
+    ]);
+
+    const amountUsd = compliance.toUsd(Number(payment.amount), payment.currency);
+    await ledger.postWithClient(
+      client,
+      payment.owner_id,
+      { title: 'Reversal: refund to payer', rail: 'Merchant QR reversal' },
+      [
+        { accountName: `Customer ${payment.currency} wallet`, direction: 'debit', amountUsd, memo: reason },
+        { accountName: 'Merchant settlement clearing', direction: 'credit', amountUsd, memo: `Reversal of ${payment.id}` },
+      ],
+    );
+    await ledger.postWithClient(
+      client,
+      payment.payer_id,
+      { title: `Reversal: refund from ${payment.merchant_name}`, rail: 'Merchant QR reversal' },
+      [
+        { accountName: 'Merchant settlement clearing', direction: 'debit', amountUsd, memo: `Reversal of ${payment.id}` },
+        { accountName: `Customer ${payment.currency} wallet`, direction: 'credit', amountUsd, memo: reason },
+      ],
+    );
+
+    const updated = await client.query(
+      `UPDATE merchant_payments
+          SET status = 'REVERSED', reversed_at = now(), reversed_by = $1, reversal_reason = $2
+        WHERE id = $3
+        RETURNING *`,
+      [req.userId, reason, payment.id],
+    );
+    await client.query('COMMIT');
+    res.json({ payment: updated.rows[0] });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
   }
 });
 
