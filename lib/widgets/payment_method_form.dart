@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
@@ -42,6 +44,7 @@ class PaymentMethodForm extends StatefulWidget {
     String gatewayLabel,
   )
   onCredited;
+  final Future<void> Function()? onPaymentNotCredited;
 
   /// When set, the amount field is hidden and this value is charged
   /// instead — for screens (like Buy) that collect the amount in their
@@ -60,6 +63,7 @@ class PaymentMethodForm extends StatefulWidget {
     this.initialAmountText = '',
     required this.submitLabel,
     required this.onCredited,
+    this.onPaymentNotCredited,
     this.fixedAmount,
     this.showGatewaySelector = true,
     this.gateway,
@@ -78,6 +82,7 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
   bool _submitting = false;
   bool _awaitingApproval = false;
   bool _cardComplete = false;
+  String _progressMessage = '';
 
   @override
   void initState() {
@@ -180,6 +185,35 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
           ),
         ],
         const SizedBox(height: 28),
+        if (_submitting || _awaitingApproval) ...[
+          Center(
+            child: Column(
+              children: [
+                const SizedBox(
+                  width: 34,
+                  height: 34,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: BybitPalette.accent,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _progressMessage.isEmpty
+                      ? 'Starting payment...'
+                      : _progressMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: BybitPalette.muted2,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
         BybitPrimaryButton(
           label:
               _submitting || _awaitingApproval
@@ -231,114 +265,125 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     );
   }
 
-  Future<void> _verifyTopUp(String gateway, String reference) async {
-    setState(() => _submitting = true);
+  Future<void> _waitForPaymentResult(String gateway, String reference) async {
+    if (mounted) {
+      setState(() {
+        _submitting = true;
+        _awaitingApproval = true;
+        _progressMessage =
+            gateway == 'STRIPE'
+                ? 'Completing your card payment...'
+                : 'Waiting for approval on your phone...';
+      });
+    }
     try {
-      final response = await ApiService.verifyTopUp(
-        gateway: gateway,
-        reference: reference,
-      );
+      // Render's signed webhook is the primary completion path. Polling this
+      // endpoint is the fallback and also observes a top-up already credited
+      // by that webhook (`alreadyCredited`). Keep the UI in one loading state
+      // long enough for delayed mobile-money confirmations.
+      const maxAttempts = 120;
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        if (attempt > 0) await Future<void>.delayed(const Duration(seconds: 3));
+        if (!mounted) return;
+
+        Map<String, dynamic>? response;
+        try {
+          response = await ApiService.verifyTopUp(
+            gateway: gateway,
+            reference: reference,
+          );
+        } on ApiException {
+          // A temporary Render/provider error must not become a false payment
+          // failure while the webhook may still be processing.
+          if (attempt == maxAttempts - 1) rethrow;
+          setState(
+            () =>
+                _progressMessage =
+                    'Payment is processing. Reconnecting securely...',
+          );
+          continue;
+        }
+        if (!mounted) return;
+        if (response == null) continue;
+
+        final verified = response['verified'] == true;
+        final credited = response['credited'] == true;
+        final alreadyCredited = response['alreadyCredited'] == true;
+        final topUp = response['topUp'] as Map<String, dynamic>?;
+        final amount = (topUp?['amount'] as num?)?.toDouble() ?? 0;
+        final currency = topUp?['currency'] as String? ?? _currency;
+
+        if (verified && (credited || alreadyCredited)) {
+          setState(() {
+            _submitting = false;
+            _awaitingApproval = false;
+            _progressMessage = '';
+          });
+          await widget.onCredited(amount, currency, gateway, gatewayLabel);
+          return;
+        }
+
+        if (response['failed'] == true || response['pending'] == false) {
+          final status =
+              response['providerStatus'] as String? ?? 'Payment declined';
+          setState(() {
+            _submitting = false;
+            _awaitingApproval = false;
+            _progressMessage = '';
+          });
+          await widget.onPaymentNotCredited?.call();
+          if (!mounted) return;
+          _showMessage(
+            'Payment not completed',
+            'M-Pesa reported: $status. Your wallet was not charged.',
+          );
+          return;
+        }
+
+        setState(() {
+          _progressMessage =
+              gateway == 'STRIPE'
+                  ? 'Completing your card payment...'
+                  : 'Approve the prompt on your phone. This may take a moment...';
+        });
+      }
+
       if (!mounted) return;
-      setState(() => _submitting = false);
-      if (response == null) {
-        _showMessage('Verification failed', 'Unable to verify payment.');
-        return;
-      }
-
-      final verified = response['verified'] == true;
-      final credited = response['credited'] == true;
-      final alreadyCredited = response['alreadyCredited'] == true;
-      final topUp = response['topUp'] as Map<String, dynamic>?;
-      final amount = (topUp?['amount'] as num?)?.toDouble() ?? 0;
-      final currency = topUp?['currency'] as String? ?? _currency;
-
-      if (verified && credited) {
-        await widget.onCredited(amount, currency, gateway, gatewayLabel);
-        return;
-      }
-
-      if (verified && alreadyCredited) {
-        _showMessage(
-          'Already credited',
-          'This payment has already been credited to your account.',
-        );
-        return;
-      }
-
+      setState(() {
+        _submitting = false;
+        _awaitingApproval = false;
+        _progressMessage = '';
+      });
+      await widget.onPaymentNotCredited?.call();
+      if (!mounted) return;
       _showMessage(
-        'Payment not verified',
-        'The payment has not yet completed. Approve the prompt on your phone, then try verifying again.',
+        'Payment is still processing',
+        'The provider has not returned a final result yet. Your balance has not been changed. You can safely check your wallet again shortly.',
       );
     } on ApiException catch (err) {
       if (!mounted) return;
-      setState(() => _submitting = false);
-      _showMessage('Verification error', err.message);
+      setState(() {
+        _submitting = false;
+        _awaitingApproval = false;
+        _progressMessage = '';
+      });
+      await widget.onPaymentNotCredited?.call();
+      if (!mounted) return;
+      _showMessage('Payment could not be completed', err.message);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _submitting = false);
+      setState(() {
+        _submitting = false;
+        _awaitingApproval = false;
+        _progressMessage = '';
+      });
+      await widget.onPaymentNotCredited?.call();
+      if (!mounted) return;
       _showMessage(
-        'Verification failed',
-        'Unexpected error during verification.',
+        'Payment could not be completed',
+        'We could not receive the final payment result. Your balance has not been changed.',
       );
     }
-  }
-
-  Future<void> _showVerificationDialog(String gateway, String reference) async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (dialogContext) => PopScope(
-            canPop: false,
-            child: Dialog(
-              backgroundColor: BybitPalette.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Verify payment',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 19,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Check your phone for the payment prompt. Once you approve it, tap Verify to credit your account.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: BybitPalette.muted2,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    BybitPrimaryButton(
-                      label: 'Verify payment',
-                      onTap: () {
-                        Navigator.of(dialogContext).pop();
-                        _verifyTopUp(gateway, reference);
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(color: BybitPalette.muted),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-    );
   }
 
   Future<void> _submit() async {
@@ -369,7 +414,10 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
       return;
     }
 
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _progressMessage = 'Starting secure payment...';
+    });
     try {
       final response = await ApiService.createTopUp(
         gateway: _gateway,
@@ -399,7 +447,7 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
         );
         if (!mounted) return;
         if (result.succeeded) {
-          await _verifyTopUp('STRIPE', result.paymentIntentId!);
+          await _waitForPaymentResult('STRIPE', result.paymentIntentId!);
         } else {
           setState(() => _submitting = false);
           _showMessage(
@@ -425,9 +473,11 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
       }
 
       if (providerRef != null && providerRef.isNotEmpty) {
-        setState(() => _awaitingApproval = true);
-        await _showVerificationDialog(_gateway, providerRef);
-        if (mounted) setState(() => _awaitingApproval = false);
+        setState(() {
+          _awaitingApproval = true;
+          _progressMessage = 'Check your phone and approve the prompt.';
+        });
+        await _waitForPaymentResult(_gateway, providerRef);
         return;
       }
 

@@ -6,13 +6,80 @@ const config = require('../config');
 const ledger = require('../services/ledger');
 
 const router = express.Router();
-router.use(requireAuth);
 
 const GATEWAY_RAIL = {
   STRIPE: 'Card',
   PAYSTACK: 'M-Pesa',
   WAAFI: 'Waafi',
 };
+
+/**
+ * Paystack posts charge.success independently of the customer app. This must
+ * remain before requireAuth: authenticity comes from Paystack's HMAC
+ * signature, not a user's JWT. It makes wallet crediting reliable when the
+ * app is backgrounded or the last polling request misses the success state.
+ */
+router.post('/webhooks/paystack', async (req, res, next) => {
+  try {
+    if (!config.paystackSecretKey) {
+      return res.status(503).json({ error: 'Paystack is not configured' });
+    }
+
+    const signature = String(req.headers['x-paystack-signature'] || '');
+    const expected = crypto
+      .createHmac('sha512', config.paystackSecretKey)
+      .update(req.rawBody || Buffer.from(JSON.stringify(req.body || {})))
+      .digest('hex');
+    const signatureBuffer = Buffer.from(signature, 'hex');
+    const expectedBuffer = Buffer.from(expected, 'hex');
+    if (
+      signatureBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)
+    ) {
+      return res.status(401).json({ error: 'Invalid Paystack signature' });
+    }
+
+    if (req.body?.event !== 'charge.success') {
+      return res.sendStatus(200);
+    }
+
+    const reference = String(req.body?.data?.reference || '').trim();
+    if (!reference) return res.sendStatus(200);
+
+    const topUp = (
+      await pool.query(
+        `SELECT * FROM payment_topups
+          WHERE gateway = 'PAYSTACK' AND provider_ref = $1`,
+        [reference],
+      )
+    ).rows[0];
+    if (!topUp) return res.sendStatus(200);
+
+    const paidMinor = Number(req.body?.data?.amount);
+    const expectedMinor = Math.round(Number(topUp.amount) * 100);
+    const paidCurrency = String(req.body?.data?.currency || '').toUpperCase();
+    if (
+      !Number.isFinite(paidMinor) ||
+      paidMinor !== expectedMinor ||
+      paidCurrency !== topUp.currency
+    ) {
+      return res.status(400).json({ error: 'Paystack amount or currency mismatch' });
+    }
+
+    await creditTopUp(topUp.id, 'success', {
+      paystackWebhook: {
+        eventId: req.body?.data?.id,
+        reference,
+        channel: req.body?.data?.channel,
+      },
+    });
+    return res.sendStatus(200);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+router.use(requireAuth);
 
 function cleanGateway(value) {
   const gateway = String(value || '').toUpperCase();
@@ -346,14 +413,29 @@ router.post('/topups', async (req, res, next) => {
         throw new Error(waafi.responseMsg || 'Waafi payment was declined');
       }
       topUp = await markProviderRef(client, topUp.id, referenceId, waafi.responseMsg || 'initiated', { waafi });
-      responsePayload = { providerRef: referenceId, waafi };
+      // Waafi's 2001 response is the successful completion response from
+      // API_PURCHASE (the request waits while the customer approves the
+      // mobile prompt). Credit in the same transaction so the client never
+      // has to assert a provider status that it cannot independently know.
+      const credited = await creditTopUpWithClient(
+        client,
+        topUp.id,
+        waafi.responseMsg || 'success',
+        { waafi },
+      );
+      topUp = credited.topUp;
+      responsePayload = {
+        providerRef: referenceId,
+        waafi,
+        credited: credited.credited || credited.alreadyCredited,
+      };
     }
 
     await client.query('COMMIT');
     res.status(201).json({
       topUp: publicTopUp(topUp),
       amountUsd: amountUsd(amount, currency),
-      credited: false,
+      credited: responsePayload.credited === true,
       sandbox: false,
       ...responsePayload,
     });
@@ -403,11 +485,26 @@ router.post('/topups/verify', async (req, res, next) => {
       }
     } else if (gateway === 'PAYSTACK') {
       if (!config.paystackSecretKey) throw new Error('PAYSTACK_SECRET_KEY is not configured');
-      const paystack = await providerFetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-        headers: { Authorization: `Bearer ${config.paystackSecretKey}` },
-      });
+      // Direct mobile-money charges are asynchronous. The charge endpoint is
+      // authoritative while the STK prompt is pending; transaction/verify can
+      // return "not found" until Paystack has completed the charge.
+      const paystackResponse = await fetch(
+        `https://api.paystack.co/charge/${encodeURIComponent(reference)}`,
+        { headers: { Authorization: `Bearer ${config.paystackSecretKey}` } },
+      );
+      const paystack = await parseGatewayResponse(paystackResponse);
+      if (!paystackResponse.ok && ![400, 404].includes(paystackResponse.status)) {
+        const message =
+          paystack.error?.message ||
+          paystack.message ||
+          `Gateway request failed with ${paystackResponse.status}`;
+        throw new Error(message);
+      }
       verified = paystack.status === true && paystack.data?.status === 'success';
-      providerStatus = paystack.data?.status || paystack.message || 'unknown';
+      providerStatus =
+        paystack.data?.status ||
+        (paystackResponse.ok ? paystack.message : 'pending') ||
+        'pending';
       metadata = { paystackVerify: { status: providerStatus, channel: paystack.data?.channel } };
     } else if (gateway === 'WAAFI') {
       const accepted = ['success', 'approved', 'completed', 'paid'];
@@ -417,7 +514,24 @@ router.post('/topups/verify', async (req, res, next) => {
     }
 
     if (!verified) {
-      return res.status(400).json({ verified: false, providerStatus, topUp: publicTopUp(topUp) });
+      const failedStatuses = [
+        'failed',
+        'abandoned',
+        'declined',
+        'cancelled',
+        'reversed',
+      ];
+      const failed = failedStatuses.includes(String(providerStatus).toLowerCase());
+      // A mobile-money payment commonly remains pending for several seconds
+      // after the phone prompt is approved. Pending is a valid polling state,
+      // not a failed HTTP request.
+      return res.json({
+        verified: false,
+        pending: !failed,
+        failed,
+        providerStatus,
+        topUp: publicTopUp(topUp),
+      });
     }
 
     const credited = await creditTopUp(topUp.id, providerStatus, metadata);

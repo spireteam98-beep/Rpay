@@ -7,7 +7,14 @@ const app = express();
 app.use(cors());
 // Raised from the 100kb default so a payment-proof screenshot (base64 JSON
 // body, no multipart upload pipeline yet) fits in a single request.
-app.use(express.json({ limit: '6mb' }));
+app.use(
+  express.json({
+    limit: '6mb',
+    verify: (req, _res, buffer) => {
+      req.rawBody = buffer;
+    },
+  }),
+);
 
 app.get('/health', (_req, res) =>
   res.json({ ok: true, network: config.network, service: 'wayaki-api' }),

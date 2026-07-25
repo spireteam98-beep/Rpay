@@ -177,37 +177,12 @@ class _CashInScreenState extends State<CashInScreen> {
       _CashInStep.amount: 'Enter amount',
       _CashInStep.process: 'Cash in',
     };
-    return AppBar(
-      backgroundColor: BybitPalette.bg,
-      elevation: 0,
-      centerTitle: true,
-      leading: TouchScale(
-        onTap: () {
-          if (_stepBack()) Navigator.of(context).maybePop();
-        },
-        child: Container(
-          margin: const EdgeInsets.only(left: 16),
-          decoration: const BoxDecoration(
-            color: BybitPalette.surface2,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-        ),
-      ),
-      title: Text(
-        titles[_step]!,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: _StepDots(step: _step),
-        ),
-      ],
+    return BybitSubHeader(
+      titles[_step]!,
+      onBack: () {
+        if (_stepBack()) Navigator.of(context).maybePop();
+      },
+      trailing: _StepDots(step: _step),
     );
   }
 }
@@ -412,80 +387,87 @@ class _AmountStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currency = _currencyFor(gateway);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 6, 24, 24),
-      child: Column(
-        children: [
-          const SizedBox(height: 4),
-          FittedBox(
-            child: Text(
-              amountText.isEmpty ? '$currency 0' : '$currency $amountText',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 46,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -1,
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 6, 24, 24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(child: _amountColumn(currency)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _amountColumn(String currency) {
+    return Column(
+      children: [
+        const SizedBox(height: 4),
+        FittedBox(
+          child: Text(
+            amountText.isEmpty ? '$currency 0' : '$currency $amountText',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 46,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
             ),
           ),
-          const SizedBox(height: 18),
-          TouchScale(
-            onTap: onChangeMethod,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: BybitPalette.surface2,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _selectedGateway.$4,
-                    color: BybitPalette.accent,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Pay with',
-                          style: TextStyle(
-                            color: BybitPalette.muted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
+        ),
+        const SizedBox(height: 18),
+        TouchScale(
+          onTap: onChangeMethod,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: BybitPalette.surface2,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Icon(_selectedGateway.$4, color: BybitPalette.accent, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Pay with',
+                        style: TextStyle(
+                          color: BybitPalette.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
                         ),
-                        Text(
-                          _selectedGateway.$2,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      ),
+                      Text(
+                        _selectedGateway.$2,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: BybitPalette.muted2,
-                  ),
-                ],
-              ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: BybitPalette.muted2,
+                ),
+              ],
             ),
           ),
-          const Spacer(),
-          _keypad(),
-          const SizedBox(height: 20),
-          BybitPrimaryButton(
-            label: 'Next',
-            enabled: onNext != null,
-            onTap: onNext ?? () {},
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 28),
+        _keypad(),
+        const SizedBox(height: 20),
+        BybitPrimaryButton(
+          label: 'Next',
+          enabled: onNext != null,
+          onTap: onNext ?? () {},
+        ),
+      ],
     );
   }
 
@@ -612,6 +594,7 @@ class _ProcessStep extends StatelessWidget {
               showGatewaySelector: false,
               gateway: gateway,
               submitLabel: 'Cash in now',
+              onPaymentNotCredited: appState.syncFromBackend,
               onCredited: (amount, currency, gateway, gatewayLabel) async {
                 final amountUsd = currency == 'KES' ? amount / 130 : amount;
                 await appState.syncFromBackend();
