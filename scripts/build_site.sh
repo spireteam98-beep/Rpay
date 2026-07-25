@@ -24,8 +24,12 @@ cp landing/index.html build/web/index.html
 cp landing/wayaki.css build/web/wayaki.css
 cp landing/wayaki.js build/web/wayaki.js
 cp landing/favicon.png build/web/favicon.png
+cp landing/favicon.ico build/web/favicon.ico
 mkdir -p build/web/assets
 cp landing/assets/wayaki-logo.png build/web/assets/wayaki-logo.png
 cp landing/assets/mpesa.png build/web/assets/mpesa.png
+cp landing/assets/wayaki-icon-180.png build/web/assets/wayaki-icon-180.png
+cp landing/assets/wayaki-icon-192.png build/web/assets/wayaki-icon-192.png
+cp landing/assets/wayaki-icon-512.png build/web/assets/wayaki-icon-512.png
 
 echo "==> Done. build/web/index.html is the landing page; build/web/app/ is the Flutter app."

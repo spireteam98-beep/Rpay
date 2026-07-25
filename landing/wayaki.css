@@ -82,6 +82,7 @@ button, input { font: inherit; }
 .nav-links { display: flex; gap: 34px; color: #cfceca; font-size: 15px; }
 .nav-links a:hover { color: var(--lime); }
 .nav-actions { display: flex; gap: 10px; }
+.mobile-auth-actions { display: none; }
 .button {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 48px; padding: 0 22px; border: 0; border-radius: 999px;
@@ -497,6 +498,10 @@ h2 { font-size: clamp(58px, 7vw, 104px); line-height: .9; font-weight: 650; }
 @media (max-width: 980px) {
   :root { --shell: min(100% - 32px, 760px); --radius: 30px; }
   .nav-links, .nav-actions { display: none; }
+  .mobile-auth-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .mobile-auth-actions a { display: inline-flex; align-items: center; justify-content: center; min-height: 42px; padding: 0 16px; border-radius: 999px; font-size: 13px; font-weight: 800; white-space: nowrap; }
+  .mobile-login { border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.055); color: white; backdrop-filter: blur(16px); }
+  .mobile-signup { border: 1px solid rgba(255,255,255,.2); background: linear-gradient(105deg, var(--lime), #8bf25f 56%, var(--cyan)); color: #080b04; box-shadow: 0 10px 28px rgba(126,230,78,.17), inset 0 1px 0 rgba(255,255,255,.7); }
   .menu-button { display: block; }
   .menu-open .nav-links { position: absolute; top: 70px; left: 16px; right: 16px; display: grid; gap: 0; padding: 14px; border: 1px solid #2b2b2b; border-radius: 20px; background: #111; }
   .menu-open .nav-links a { padding: 14px; }
@@ -535,6 +540,12 @@ h2 { font-size: clamp(58px, 7vw, 104px); line-height: .9; font-weight: 650; }
   :root { --shell: calc(100% - 24px); --radius: 24px; }
   .motion-ticker { transform: none; width: 100%; }
   .site-header { padding: 12px 0; }
+  .nav { gap: 7px; }
+  .wordmark { width: 88px; min-width: 88px; height: 40px; }
+  .wordmark img { width: 96px; height: 54px; }
+  .mobile-auth-actions { gap: 6px; }
+  .mobile-auth-actions a { min-height: 38px; padding: 0 11px; font-size: 11px; }
+  .menu-button { display: none; }
   .hero { min-height: auto; gap: 45px; padding: 120px 0 50px; }
   h1 { font-size: clamp(45px, 14.4vw, 56px); overflow-wrap: anywhere; }
   .hero-text { font-size: 17px; }

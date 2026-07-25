@@ -4,6 +4,8 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:provider/provider.dart';
 import 'constants/app_theme.dart';
 import 'screens/auth/welcome_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/auth/signup_screen.dart';
 import 'screens/main_navigation.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
@@ -34,6 +36,17 @@ void main() {
 
 class CryptoExchangeApp extends StatelessWidget {
   const CryptoExchangeApp({super.key});
+
+  Widget _signedOutEntryScreen() {
+    final requestedScreen = Uri.base.queryParameters['screen'];
+    if (requestedScreen == 'login') {
+      return const LoginScreen();
+    }
+    if (requestedScreen == 'signup') {
+      return const SignupScreen();
+    }
+    return const WelcomeScreen();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +80,7 @@ class CryptoExchangeApp extends StatelessWidget {
             home:
                 AuthService.isSignedIn
                     ? const MainNavigation()
-                    : const WelcomeScreen(),
+                    : _signedOutEntryScreen(),
           ),
         );
       },

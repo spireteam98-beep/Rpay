@@ -15,7 +15,9 @@
     />
     <meta property="og:image" content="assets/wayaki-logo.png" />
     <title>Wayaki — All your money. One app.</title>
-    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="favicon.png" />
+    <link rel="shortcut icon" href="favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/wayaki-icon-180.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -43,8 +45,12 @@
           <a href="#company">Company</a>
         </div>
         <div class="nav-actions">
-          <a class="button button-ghost" href="/app">Log in</a>
-          <a class="button button-light" href="/app">Get Wayaki</a>
+          <a class="button button-ghost" href="/app/?screen=login">Log in</a>
+          <a class="button button-light" href="/app/?screen=signup">Get Wayaki</a>
+        </div>
+        <div class="mobile-auth-actions" aria-label="Account actions">
+          <a class="mobile-login" href="/app/?screen=login">Log in</a>
+          <a class="mobile-signup" href="/app/?screen=signup">Get started</a>
         </div>
         <button class="menu-button" type="button" aria-expanded="false" aria-label="Open menu">
           <span></span><span></span>
@@ -62,7 +68,7 @@
             Africa through wallet, remittance and mobile-money-native payments.
           </p>
           <div class="hero-actions">
-            <a class="button button-lime button-large" href="/app">Create account</a>
+          <a class="button button-lime button-large" href="/app/?screen=signup">Create account</a>
             <a class="text-link" href="#platform">Explore the platform <span>↘</span></a>
           </div>
         </div>
@@ -234,7 +240,7 @@
         <div class="steps-copy">
           <h2>Open a Wayaki<br />account in minutes.</h2>
           <p>Everything happens in the app — no branch visit, no paperwork to mail in.</p>
-          <a class="button button-lime button-large" href="/app">Create account</a>
+            <a class="button button-lime button-large" href="/app/?screen=signup">Create account</a>
         </div>
         <ol class="steps-list">
           <li>
@@ -268,7 +274,7 @@
               <li>Mobile-money cash-in &amp; cash-out</li>
               <li>Instant P2P transfers to other Wayaki users</li>
             </ul>
-            <a class="button button-light" href="/app">Get Wayaki Free</a>
+            <a class="button button-light" href="/app/?screen=signup">Get Wayaki Free</a>
           </article>
           <article class="price-card price-premium">
             <div class="price-icon">◆</div>
@@ -280,7 +286,7 @@
               <li>Lower FX spread on every corridor</li>
               <li>Priority support &amp; higher wallet limits</li>
             </ul>
-            <a class="button button-dark" href="/app">Get Wayaki Premium</a>
+            <a class="button button-dark" href="/app/?screen=signup">Get Wayaki Premium</a>
           </article>
         </div>
       </section>
@@ -330,7 +336,7 @@
               money: EVC Plus and Zaad in Somalia, M-Pesa in Kenya, telebirr in
               Ethiopia, alongside bank transfer and cash payout partners.
             </p>
-            <a class="text-link light" href="/app">Start moving money <span>↗</span></a>
+            <a class="text-link light" href="/app/?screen=signup">Start moving money <span>↗</span></a>
           </div>
           <div class="map-card" aria-label="Wayaki supported region illustration">
             <div class="map-grid"></div>
@@ -393,7 +399,7 @@
           <p class="eyebrow">Your money is ready</p>
           <h2>Wayaki is live. Move your first dollar today.</h2>
           <p>Create a free account in minutes, or reach out about corridor partnerships and investment.</p>
-          <a class="button button-dark button-large" href="/app" style="margin-top: 30px;">Create your account</a>
+          <a class="button button-dark button-large" href="/app/?screen=signup" style="margin-top: 30px;">Create your account</a>
         </div>
         <form class="signup-form" novalidate>
           <label for="email">Partnership &amp; investor interest</label>
@@ -421,7 +427,7 @@
         </div>
       </div>
       <div class="shell footer-legal">
-        <a href="/app">Log in</a>
+        <a href="/app/?screen=login">Log in</a>
         <a href="/privacy">Privacy Policy</a>
         <a href="/terms">Terms of Service</a>
         <a href="/disclaimer">Risk &amp; Regulatory Disclaimer</a>
