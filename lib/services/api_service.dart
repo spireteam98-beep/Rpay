@@ -169,7 +169,7 @@ class ApiService {
     }
   }
 
-  /// Sends a 6-digit sign-in code to an existing account's email.
+  /// Sends a 4-digit sign-in code to an existing account's email.
   /// Returns true once sent, null if the backend is unreachable.
   static Future<bool?> requestLoginOtp({required String email}) async {
     try {
@@ -481,7 +481,7 @@ class ApiService {
     }
   }
 
-  /// Sends a 6-digit verification code to the user's email.
+  /// Sends a 4-digit verification code to the user's email.
   static Future<bool> requestEmailOtp() async {
     if (!hasSession) return false;
     final res = await http
@@ -499,7 +499,7 @@ class ApiService {
     );
   }
 
-  /// Verifies the 6-digit email OTP.
+  /// Verifies the 4-digit email OTP.
   static Future<bool> verifyEmail(String code) async {
     if (!hasSession) return false;
     final res = await http
