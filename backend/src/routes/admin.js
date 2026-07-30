@@ -64,6 +64,108 @@ router.get('/overview', async (_req, res, next) => {
   }
 });
 
+/**
+ * GET /admin/sessions — login/logout timeline plus which users currently
+ * look "logged in". JWTs aren't revoked server-side, so "open" here just
+ * means the user's most recent recorded event was a login with no later
+ * logout — not a cryptographic guarantee their token is actually still in
+ * use (they may have just closed the tab).
+ */
+router.get('/sessions', async (req, res, next) => {
+  try {
+    const [recentEvents, openSessions] = await Promise.all([
+      pool.query(
+        `SELECT e.id, e.user_id, e.event_type, e.method, e.ip_address, e.user_agent, e.created_at,
+                u.full_name, u.email
+           FROM login_events e
+           LEFT JOIN users u ON u.id = e.user_id
+          ORDER BY e.created_at DESC
+          LIMIT 300`,
+      ),
+      pool.query(
+        `WITH latest AS (
+           SELECT DISTINCT ON (user_id) user_id, event_type, method, created_at
+             FROM login_events
+            ORDER BY user_id, created_at DESC
+         )
+         SELECT l.user_id, l.method, l.created_at AS since, u.full_name, u.email
+           FROM latest l
+           JOIN users u ON u.id = l.user_id
+          WHERE l.event_type = 'login'
+          ORDER BY l.created_at DESC`,
+      ),
+    ]);
+    res.json({ recentEvents: recentEvents.rows, openSessions: openSessions.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /admin/otp-deliveries — every OTP send attempt, success or failure,
+ * so support can answer "did this user's code actually go out" without
+ * digging through Resend's dashboard by hand. */
+router.get('/otp-deliveries', async (req, res, next) => {
+  try {
+    const status = String(req.query.status || '').trim();
+    const params = [];
+    const where = status ? 'WHERE e.delivery_status = $1' : '';
+    if (status) params.push(status);
+    const rows = await pool.query(
+      `SELECT e.id, e.email, e.purpose, e.delivery_status, e.failure_reason,
+              e.attempts, e.consumed_at, e.expires_at, e.created_at, u.full_name
+         FROM email_otps e
+         LEFT JOIN users u ON u.id = e.user_id
+         ${where}
+        ORDER BY e.created_at DESC
+        LIMIT 200`,
+      params,
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /admin/activity — unified feed across P2P transfers, merchant
+ * payments, mobile-money movements and login events, for a single
+ * "everything that just happened" view instead of admins checking four
+ * separate lists. Read-only trace/audit surface; disputes and reversals
+ * still go through the existing per-type endpoints below (each needs its
+ * own reversal semantics — a P2P reversal isn't the same operation as a
+ * mobile-money one).
+ */
+router.get('/activity', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `SELECT f.*, u.full_name, u.email
+         FROM (
+           (SELECT id, created_at, 'p2p_transfer'::text AS type, sender_user_id AS user_id,
+                   status, currency, amount, memo AS detail
+              FROM p2p_transfers)
+           UNION ALL
+           (SELECT id, created_at, 'merchant_payment'::text AS type, payer_id AS user_id,
+                   status, currency, amount, NULL::text AS detail
+              FROM merchant_payments)
+           UNION ALL
+           (SELECT id, created_at, 'mobile_money_' || lower(type) AS type, user_id,
+                   status, 'KES'::text AS currency, amount_kes AS amount, rail AS detail
+              FROM mobile_money_movements)
+           UNION ALL
+           (SELECT id, created_at, 'login_' || event_type AS type, user_id,
+                   event_type AS status, NULL::text AS currency, NULL::numeric AS amount, method AS detail
+              FROM login_events)
+         ) f
+         LEFT JOIN users u ON u.id = f.user_id
+        ORDER BY f.created_at DESC
+        LIMIT 300`,
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/users', async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();

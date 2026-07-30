@@ -16,6 +16,14 @@ app.use(
   }),
 );
 
+// Visiting the bare domain (e.g. checking "is the backend up?" in a browser)
+// otherwise hits Express's default 404 "Cannot GET /" — reads as a broken
+// server even when everything is fine, since this is an API-only backend
+// with no root page. /health remains the real status endpoint.
+app.get('/', (_req, res) =>
+  res.json({ ok: true, service: 'wayaki-api', health: '/health' }),
+);
+
 app.get('/health', (_req, res) =>
   res.json({ ok: true, network: config.network, service: 'wayaki-api' }),
 );

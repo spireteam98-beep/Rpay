@@ -27,6 +27,31 @@ function accountNumber(userId) {
 }
 
 /**
+ * Records a login/logout event for the admin sessions dashboard. Best-effort
+ * — never lets a logging failure block the actual sign-in/out it's
+ * recording, so this always runs fire-and-forget from the caller's
+ * perspective (no `await` needed, but callers do await it since the insert
+ * itself is fast and this keeps errors from becoming unhandled rejections).
+ */
+async function logLoginEvent(userId, eventType, method, req) {
+  try {
+    await pool.query(
+      `INSERT INTO login_events (user_id, event_type, method, ip_address, user_agent)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [
+        userId,
+        eventType,
+        method,
+        req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null,
+        req.headers['user-agent'] || null,
+      ],
+    );
+  } catch (_) {
+    // Never block a real login/logout over a logging failure.
+  }
+}
+
+/**
  * Verifies a Telegram Mini App `initData` payload per Telegram's documented
  * algorithm (https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app):
  * HMAC-SHA256 the sorted "key=value" pairs (everything but `hash`) using a
@@ -73,21 +98,38 @@ function verifyTelegramInitData(initData) {
 }
 
 /**
- * Sends the email OTP and only persists it once delivery succeeds. Never
- * throws — a Resend/domain failure must not take down signup or login,
- * since the account (or the login attempt) is otherwise valid; callers get
- * back `sent: false` plus the reason and can surface or retry it.
+ * Sends the email OTP. Never throws — a Resend/domain failure must not take
+ * down signup or login, since the account (or the login attempt) is
+ * otherwise valid; callers get back `sent: false` plus the reason and can
+ * surface or retry it. Every attempt is persisted either way (delivery_status
+ * 'sent' or 'failed') so admin/support can see "this user never actually got
+ * a code" instead of it vanishing — previously a failed send left no row at
+ * all.
  */
 async function createAndSendEmailOtp(userId, cleanEmail, fullName, purpose = 'email_verify') {
-  if (!config.resendApiKey) {
-    return { sent: false, warning: 'RESEND_API_KEY not configured' };
-  }
-  const code = email.generateOtp();
   const expiresAt = new Date(Date.now() + config.emailOtpTtlMinutes * 60 * 1000);
+
+  if (!config.resendApiKey) {
+    const reason = 'RESEND_API_KEY not configured';
+    await pool.query(
+      `INSERT INTO email_otps (user_id, email, code_hash, purpose, expires_at, delivery_status, failure_reason)
+       VALUES ($1,$2,$3,$4,$5,'failed',$6)`,
+      [userId, cleanEmail, '', purpose, expiresAt, reason],
+    );
+    return { sent: false, warning: reason };
+  }
+
+  const code = email.generateOtp();
   try {
     await email.sendEmailOtp({ to: cleanEmail, code, name: fullName });
   } catch (err) {
-    return { sent: false, warning: err.message || 'Email delivery failed' };
+    const reason = err.message || 'Email delivery failed';
+    await pool.query(
+      `INSERT INTO email_otps (user_id, email, code_hash, purpose, expires_at, delivery_status, failure_reason)
+       VALUES ($1,$2,$3,$4,$5,'failed',$6)`,
+      [userId, cleanEmail, email.hashCode(code), purpose, expiresAt, reason],
+    );
+    return { sent: false, warning: reason };
   }
   await pool.query(
     `INSERT INTO email_otps (user_id, email, code_hash, purpose, expires_at)
@@ -172,6 +214,7 @@ router.post('/signup', async (req, res, next) => {
     }
 
     const emailVerification = await createAndSendEmailOtp(user.id, cleanEmail, fullName);
+    await logLoginEvent(user.id, 'login', 'signup', req);
 
     res.status(201).json({
       token: signToken(user.id),
@@ -223,6 +266,7 @@ router.post('/telegram', async (req, res, next) => {
         'UPDATE users SET telegram_username = $1, telegram_photo_url = $2 WHERE id = $3',
         [tgUser.username || null, tgUser.photo_url || null, existing.id],
       );
+      await logLoginEvent(existing.id, 'login', 'telegram', req);
       return res.json({ token: signToken(existing.id), isNewUser: false });
     }
 
@@ -247,6 +291,7 @@ router.post('/telegram', async (req, res, next) => {
       [user.id, fullName, accountNumber(user.id)],
     );
 
+    await logLoginEvent(user.id, 'login', 'telegram', req);
     res.status(201).json({ token: signToken(user.id), ethAddress, isNewUser: true });
   } catch (err) {
     next(err);
@@ -279,6 +324,7 @@ router.post('/login', async (req, res, next) => {
     }
     const ok = await bcrypt.compare(String(password || ''), result.rows[0].password_hash);
     if (!ok) return res.status(401).json({ error: 'Incorrect email or password' });
+    await logLoginEvent(result.rows[0].id, 'login', 'password', req);
     res.json({ token: signToken(result.rows[0].id) });
   } catch (err) {
     next(err);
@@ -355,6 +401,7 @@ router.post('/login/verify-otp', async (req, res, next) => {
             AND LOWER(email) = LOWER($2)
             AND purpose = 'login'
             AND consumed_at IS NULL
+            AND delivery_status = 'sent'
           ORDER BY created_at DESC
           LIMIT 1
           FOR UPDATE`,
@@ -384,6 +431,7 @@ router.post('/login/verify-otp', async (req, res, next) => {
     await client.query('UPDATE email_otps SET consumed_at = now() WHERE id = $1', [otp.id]);
     await client.query('UPDATE users SET email_verified = TRUE WHERE id = $1', [user.id]);
     await client.query('COMMIT');
+    await logLoginEvent(user.id, 'login', 'otp', req);
     res.json({ token: signToken(user.id) });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
@@ -452,6 +500,7 @@ router.post('/verify-email', requireAuth, async (req, res, next) => {
             AND LOWER(email) = LOWER($2)
             AND purpose = 'email_verify'
             AND consumed_at IS NULL
+            AND delivery_status = 'sent'
           ORDER BY created_at DESC
           LIMIT 1
           FOR UPDATE`,
@@ -495,6 +544,22 @@ router.post('/kyc', requireAuth, async (req, res, next) => {
   try {
     await pool.query('UPDATE users SET kyc_tier = 2 WHERE id = $1', [req.userId]);
     res.json({ kycTier: 2 });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/logout — records a logout event for the admin sessions
+ * dashboard. JWTs aren't revoked server-side (this app has no token
+ * blocklist), so this is purely an audit signal, not what actually ends the
+ * session — the client discarding its token (AuthService.signOut()) is what
+ * does that.
+ */
+router.post('/logout', requireAuth, async (req, res, next) => {
+  try {
+    await logLoginEvent(req.userId, 'logout', 'app', req);
+    res.json({ loggedOut: true });
   } catch (err) {
     next(err);
   }

@@ -22,7 +22,7 @@ function cleanRail(rail) {
 function cleanAmount(amount) {
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0) {
-    throw new Error('A positive amountKes is required');
+    throw new Error('A positive amount is required');
   }
   return Number(value.toFixed(2));
 }
@@ -133,24 +133,30 @@ async function refundFailedWithdrawal(userId, movement, sourceCurrency, debitAmo
  * provider wired up yet, so they still queue for manual admin payout via
  * POST /admin/mobile-money/:id/complete-withdrawal.
  *
- * `amountKes` is always what lands on M-Pesa — Paystack only sends KES.
- * `sourceCurrency` (default 'KES') picks which wallet that comes out of; a
- * USD-sourced withdrawal converts at config.kesPerUsd and debits usd_balance
- * instead, so a user with only USD balance can still cash out to M-Pesa.
+ * `amount` is always in `sourceCurrency` (default 'KES') — never
+ * pre-converted by the client. This endpoint alone derives amountKes (what
+ * actually lands on M-Pesa — Paystack only sends KES) and amountUsd from it
+ * using this server's own config.kesPerUsd. That's deliberate: if the
+ * client converted USD->KES itself using a cached/stale rate, converting
+ * back here to check the balance wouldn't round-trip exactly, and a real
+ * $3.00 balance could come back needing $3.02 — a false "not enough
+ * balance" purely from rate drift between client and server.
  */
 router.post('/withdrawals', async (req, res, next) => {
   const client = await pool.connect();
   try {
     const rail = cleanRail(req.body?.rail);
-    const amountKes = cleanAmount(req.body?.amountKes);
     const sourceCurrency = cleanSourceCurrency(req.body?.sourceCurrency);
+    const amount = cleanAmount(req.body?.amount);
     const phone = String(req.body?.phone || '').trim();
     if (!phone) return res.status(400).json({ error: 'Payout phone is required' });
-    const amountUsd = Number((amountKes / config.kesPerUsd).toFixed(2));
-    // What actually gets debited from the source wallet: the KES amount
-    // itself if paying from the KES wallet, or its USD equivalent if paying
-    // from the USD wallet.
-    const debitAmount = sourceCurrency === 'USD' ? amountUsd : amountKes;
+    const amountKes =
+      sourceCurrency === 'USD' ? Number((amount * config.kesPerUsd).toFixed(2)) : amount;
+    const amountUsd =
+      sourceCurrency === 'USD' ? amount : Number((amount / config.kesPerUsd).toFixed(2));
+    // What actually gets debited from the source wallet — always just
+    // `amount`, since it's already in sourceCurrency.
+    const debitAmount = amount;
     const balanceColumn = sourceCurrency === 'USD' ? 'usd_balance' : 'kes_balance';
 
     await client.query('BEGIN');

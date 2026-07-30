@@ -466,6 +466,38 @@ async function migrate() {
       WHERE telegram_id IS NOT NULL;
   `);
 
+  // Admin monitoring: login/logout events (auth here is stateless JWT, so
+  // without this the backend has no record of who signed in, when, or from
+  // where — see routes/auth.js's logLoginEvent and POST /auth/logout).
+  // "Ongoing session" for the admin dashboard is inferred, not tracked
+  // directly: a user's most recent event being 'login' with no later
+  // 'logout'.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS login_events (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id    UUID REFERENCES users(id),
+      event_type TEXT NOT NULL CHECK (event_type IN ('login','logout')),
+      method     TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_login_events_user ON login_events(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_login_events_created ON login_events(created_at DESC);
+  `);
+
+  // OTP delivery visibility: previously a failed Resend send left no
+  // database row at all (createAndSendEmailOtp only inserted on success),
+  // so "did this user ever actually receive their code" was unanswerable
+  // after the fact. Now every attempt is recorded either way.
+  await pool.query(`
+    ALTER TABLE email_otps ADD COLUMN IF NOT EXISTS delivery_status TEXT NOT NULL DEFAULT 'sent';
+    ALTER TABLE email_otps DROP CONSTRAINT IF EXISTS email_otps_delivery_status_check;
+    ALTER TABLE email_otps ADD CONSTRAINT email_otps_delivery_status_check
+      CHECK (delivery_status IN ('sent','failed'));
+    ALTER TABLE email_otps ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+  `);
+
   // Sole super-admin: keep this the only account with role='admin'. Runs
   // every boot so it's self-healing across environments/DB resets.
   await pool.query(
