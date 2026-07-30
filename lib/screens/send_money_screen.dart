@@ -286,16 +286,48 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     );
   }
 
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF2A1418),
+        duration: const Duration(seconds: 5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: BybitPalette.red, width: 1),
+        ),
+        content: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.error_rounded,
+              color: BybitPalette.red,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirm(KashAppState appState, KashAccount source) async {
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
     final recipient = _recipientController.text.trim();
     if (recipient.isEmpty || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a recipient and a positive amount'),
-          backgroundColor: BybitPalette.surface2,
-        ),
-      );
+      _showErrorSnackBar('Enter a recipient and a positive amount');
       return;
     }
 
@@ -343,12 +375,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     setState(() => _submitting = false);
 
     if (!result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message),
-          backgroundColor: BybitPalette.surface2,
-        ),
-      );
+      _showErrorSnackBar(result.message);
       return;
     }
 

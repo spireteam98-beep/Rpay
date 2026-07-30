@@ -449,7 +449,13 @@ class ApiService {
             'sourceCurrency': sourceCurrency,
           }),
         )
-        .timeout(_timeout);
+        // Longer than the default _timeout: an M-Pesa payout makes two
+        // sequential Paystack calls server-side (create recipient, then
+        // initiate transfer) before it can respond — the 25s default was
+        // timing out on the client even when the withdrawal had actually
+        // gone through on the backend, showing a false "could not reach
+        // the transfer service" for a transaction that actually succeeded.
+        .timeout(const Duration(seconds: 55));
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode == 202) return body;
     throw ApiException(body['error'] as String? ?? 'Withdrawal request failed');
