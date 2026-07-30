@@ -425,11 +425,15 @@ class ApiService {
     );
   }
 
-  /// Queue a mobile-money payout; backend immediately holds the KES balance.
+  /// Queue a mobile-money payout; backend immediately holds the source
+  /// balance. [amountKes] is always what lands on M-Pesa — [sourceCurrency]
+  /// picks which wallet it's drawn from (KES 1:1, or USD converted at the
+  /// backend's configured rate), so a USD-only balance can still cash out.
   static Future<Map<String, dynamic>?> submitMobileMoneyWithdrawal({
     required String rail,
     required double amountKes,
     required String phone,
+    String sourceCurrency = 'KES',
   }) async {
     if (!hasSession) return null;
     final res = await http
@@ -440,6 +444,7 @@ class ApiService {
             'rail': rail,
             'amountKes': amountKes,
             'phone': phone,
+            'sourceCurrency': sourceCurrency,
           }),
         )
         .timeout(_timeout);

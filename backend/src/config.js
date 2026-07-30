@@ -60,7 +60,7 @@ const config = {
   ethRpcUrl: (process.env.ETH_RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com').trim(),
   network: (process.env.NETWORK || 'testnet').trim(),
   port: parseInt(process.env.PORT || '8080', 10),
-  kesPerUsd: Number(process.env.KES_PER_USD || '130'),
+  kesPerUsd: Number(process.env.KES_PER_USD || '129'),
   emailProvider: (process.env.EMAIL_PROVIDER || 'resend').trim(),
   resendApiUrl: (process.env.RESEND_API_URL || 'https://api.resend.com/emails').trim(),
   resendApiKey: (process.env.RESEND_API_KEY || '').trim(),

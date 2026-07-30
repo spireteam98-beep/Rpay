@@ -84,7 +84,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              _channelList(source.currency),
+              _channelList(),
               const SizedBox(height: 16),
               BybitTextField(
                 label:
@@ -197,20 +197,15 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     });
   }
 
-  /// Wayaki-to-Wayaki transfer is always available; M-Pesa cash-out only
-  /// makes sense when sending out of the KES account, since that's the
-  /// only currency M-Pesa settles in. Styled as a channel list — icon,
-  /// name, and a highlighted border on the selected row.
-  Widget _channelList(String sourceCurrency) {
-    final channels =
-        sourceCurrency == 'KES'
-            ? const [
-              _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
-              _ChannelOption('M-Pesa', Icons.phone_iphone_rounded),
-            ]
-            : const [
-              _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
-            ];
+  /// Wayaki-to-Wayaki transfer is always available. M-Pesa cash-out is too,
+  /// from either wallet — a USD-sourced payout converts to KES at the live
+  /// rate before it's sent (KashAppState.submitTransfer), since M-Pesa only
+  /// ever settles in KES regardless of which balance it's drawn from.
+  Widget _channelList() {
+    const channels = [
+      _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
+      _ChannelOption('M-Pesa', Icons.phone_iphone_rounded),
+    ];
     return Column(children: channels.map(_channelRow).toList());
   }
 

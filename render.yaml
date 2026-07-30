@@ -50,7 +50,7 @@ services:
       - key: NETWORK
         value: testnet
       - key: KES_PER_USD
-        value: "130"
+        value: "129"
       - key: EMAIL_PROVIDER
         value: resend
       - key: EMAIL_FROM
