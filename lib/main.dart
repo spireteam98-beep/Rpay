@@ -110,6 +110,14 @@ class CryptoExchangeApp extends StatelessWidget {
     if (requestedScreen == 'signup') {
       return const SignupScreen();
     }
+    // Inside Telegram there's no need for the marketing welcome screen —
+    // the user already arrived via the bot, so go straight to signup. This
+    // is also the fallback for anyone silent Telegram sign-in didn't cover
+    // (e.g. an older Telegram client). Regular web visitors still see the
+    // welcome screen first.
+    if (TelegramService.isAvailable) {
+      return const SignupScreen();
+    }
     return const WelcomeScreen();
   }
 
