@@ -571,6 +571,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
     const result = await pool.query(
       `SELECT id, full_name, email, phone, kyc_tier, phone_verified, eth_address,
               usd_balance, kes_balance, role, email_verified, created_at,
+              username, wallet_id_type,
               (pin_hash IS NOT NULL) AS has_pin
          FROM users WHERE id = $1`,
       [req.userId],
@@ -640,6 +641,68 @@ router.post('/pin/verify', requireAuth, async (req, res, next) => {
 
     const verified = await bcrypt.compare(pin, user.pin_hash);
     res.json({ verified, hasPin: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
+
+/**
+ * GET /auth/wallet-id/check-username?value=foo — live availability check
+ * used by the Wallet ID setup screen while the user is typing.
+ */
+router.get('/wallet-id/check-username', requireAuth, async (req, res, next) => {
+  try {
+    const value = String(req.query?.value || '').trim().toLowerCase();
+    if (!USERNAME_PATTERN.test(value)) {
+      return res.json({ available: false, reason: '3-20 characters: letters, numbers, underscore' });
+    }
+    const existing = await pool.query(
+      'SELECT id FROM users WHERE LOWER(username) = $1 AND id != $2',
+      [value, req.userId],
+    );
+    res.json({ available: existing.rows.length === 0 });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/wallet-id { type, username? } — sets which identifier (phone,
+ * email, or a custom handle) this user hands out to receive money. `type`
+ * 'username' requires `username` and claims it (case-insensitive unique).
+ */
+router.post('/wallet-id', requireAuth, async (req, res, next) => {
+  try {
+    const type = String(req.body?.type || '').trim().toLowerCase();
+    if (!['phone', 'email', 'username'].includes(type)) {
+      return res.status(400).json({ error: 'type must be phone, email or username' });
+    }
+
+    if (type === 'username') {
+      const username = String(req.body?.username || '').trim().toLowerCase();
+      if (!USERNAME_PATTERN.test(username)) {
+        return res.status(400).json({
+          error: 'Username must be 3-20 characters: letters, numbers, underscore',
+        });
+      }
+      const existing = await pool.query(
+        'SELECT id FROM users WHERE LOWER(username) = $1 AND id != $2',
+        [username, req.userId],
+      );
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'That username is taken' });
+      }
+      await pool.query(
+        'UPDATE users SET username = $1, wallet_id_type = $2 WHERE id = $3',
+        [username, type, req.userId],
+      );
+    } else {
+      await pool.query('UPDATE users SET wallet_id_type = $1 WHERE id = $2', [type, req.userId]);
+    }
+
+    res.json({ set: true, type });
   } catch (err) {
     next(err);
   }

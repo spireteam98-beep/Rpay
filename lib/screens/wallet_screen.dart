@@ -259,30 +259,13 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  static const List<_PersonSample> _illustrativePeople = [
-    _PersonSample('Anfac', avatarAsset: 'assets/images/Anfac.png'),
-    _PersonSample('Theresa'),
-    _PersonSample('Gladys'),
-    _PersonSample('Jane'),
-  ];
-
-  /// Quick-send shortcuts built from real recipients of past transfers
-  /// (ledger transactions with status 'Queued' carry the recipient as the
-  /// title). Falls back to illustrative sample contacts until the user has
-  /// actually sent money once — same convention as _recentActivityCard.
+  /// Quick-send shortcuts built from the user's real saved frequent
+  /// recipients (backend-tracked — see ApiService.frequentRecipients),
+  /// refreshed every time a P2P transfer completes. No illustrative sample
+  /// contacts: a new user with no transfer history simply sees the "Add"
+  /// shortcut on its own.
   Widget _peopleRow(BuildContext context, KashAppState appState) {
-    final people = <_PersonSample>[];
-    for (final t in appState.ledgerTransactions) {
-      final name = t.title.trim();
-      if (t.status == 'Queued' &&
-          name.isNotEmpty &&
-          !people.any((p) => p.name == name)) {
-        people.add(_PersonSample(name));
-      }
-      if (people.length >= 5) break;
-    }
-    if (people.isEmpty) people.addAll(_illustrativePeople);
-
+    final people = appState.frequentRecipients;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -305,15 +288,17 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _personAvatar(BuildContext context, _PersonSample person) {
-    final initial =
-        person.name.isEmpty ? '?' : person.name.substring(0, 1).toUpperCase();
+  Widget _personAvatar(BuildContext context, Map<String, dynamic> person) {
+    final label = person['label'] as String? ?? '?';
+    final identifier = person['identifier'] as String? ?? '';
+    final initial = label.isEmpty ? '?' : label.substring(0, 1).toUpperCase();
     return Padding(
       padding: const EdgeInsets.only(right: 18),
       child: TouchScale(
         onTap:
-            () =>
-                Navigator.of(context).push(kashRoute(const SendMoneyScreen())),
+            () => Navigator.of(context).push(
+              kashRoute(SendMoneyScreen(initialRecipient: identifier)),
+            ),
         child: SizedBox(
           width: 68,
           child: Column(
@@ -327,26 +312,18 @@ class _WalletScreenState extends State<WalletScreen> {
                   color: BybitPalette.surface2,
                   shape: BoxShape.circle,
                 ),
-                child:
-                    person.avatarAsset != null
-                        ? Image.asset(
-                          person.avatarAsset!,
-                          fit: BoxFit.cover,
-                          width: 66,
-                          height: 66,
-                        )
-                        : Text(
-                          initial,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                person.name,
+                label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -400,10 +377,9 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   /// Recent activity: real ledger transactions once the user has actually
-  /// sent, received, or topped up. Until then we show illustrative everyday
-  /// spend examples (card purchases, subscriptions) so the section reads
-  /// like a live feed instead of a blank state — same convention the
-  /// Trending Data screen already uses for its illustrative candles.
+  /// sent, received, or topped up. Until then a plain empty state is shown
+  /// rather than illustrative sample purchases, so new users never mistake
+  /// placeholder data for their own transaction history.
   Widget _recentActivityCard(BuildContext context, KashAppState appState) {
     final recent = appState.ledgerTransactions.take(4).toList();
     return Padding(
@@ -440,7 +416,7 @@ class _WalletScreenState extends State<WalletScreen> {
           ),
           const SizedBox(height: 14),
           if (recent.isEmpty)
-            ..._illustrativeActivity.map(_merchantRow)
+            _emptyActivityState()
           else
             ...recent.map((t) => _activityRow(context, t)),
         ],
@@ -448,109 +424,39 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  static final List<_MerchantActivity> _illustrativeActivity = [
-    _MerchantActivity(
-      'Starbucks',
-      'Coffee & snacks',
-      1.00,
-      Icons.local_cafe_rounded,
-      const Duration(hours: 2),
-      logoAsset: 'assets/images/starbuxks.jpg',
-    ),
-    _MerchantActivity(
-      'Netflix',
-      'Monthly subscription',
-      10.00,
-      Icons.play_circle_fill_rounded,
-      const Duration(hours: 9),
-      logoAsset: 'assets/images/netflix.jpg',
-    ),
-    _MerchantActivity(
-      'Spotify',
-      'Premium subscription',
-      9.99,
-      Icons.music_note_rounded,
-      const Duration(days: 1),
-    ),
-    _MerchantActivity(
-      'Amazon',
-      'Online purchase',
-      24.50,
-      Icons.shopping_bag_rounded,
-      const Duration(days: 2),
-    ),
-  ];
-
-  Widget _merchantRow(_MerchantActivity activity) {
-    final subtitle = DateFormat(
-      'MMM d, HH:mm',
-    ).format(DateTime.now().subtract(activity.agoOffset));
+  Widget _emptyActivityState() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      child: Column(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 52,
+            height: 52,
             alignment: Alignment.center,
-            clipBehavior: Clip.antiAlias,
             decoration: const BoxDecoration(
               color: BybitPalette.surface2,
               shape: BoxShape.circle,
             ),
-            child:
-                activity.logoAsset != null
-                    ? Image.asset(
-                      activity.logoAsset!,
-                      fit: BoxFit.cover,
-                      width: 50,
-                      height: 50,
-                    )
-                    : Icon(activity.icon, color: BybitPalette.muted, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  activity.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${activity.subtitle} · $subtitle',
-                  style: const TextStyle(
-                    color: BybitPalette.muted,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
+            child: const Icon(
+              Icons.receipt_long_outlined,
+              color: BybitPalette.muted,
+              size: 24,
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '-\$${activity.amount.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  color: BybitPalette.red,
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                '\$${activity.amount.toStringAsFixed(2)} USD',
-                style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
-              ),
-            ],
+          const SizedBox(height: 12),
+          const Text(
+            'No transactions yet',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Send, receive or top up to see activity here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: BybitPalette.muted, fontSize: 12.5),
           ),
         ],
       ),
@@ -801,30 +707,6 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 }
 
-class _PersonSample {
-  final String name;
-  final String? avatarAsset;
-
-  const _PersonSample(this.name, {this.avatarAsset});
-}
-
-class _MerchantActivity {
-  final String name;
-  final String subtitle;
-  final double amount;
-  final IconData icon;
-  final Duration agoOffset;
-  final String? logoAsset;
-
-  const _MerchantActivity(
-    this.name,
-    this.subtitle,
-    this.amount,
-    this.icon,
-    this.agoOffset, {
-    this.logoAsset,
-  });
-}
 
 /// Bottom sheet that moves value between the user's own Wayaki USD and
 /// Wayaki KES accounts — the one deliberate bridge between the two

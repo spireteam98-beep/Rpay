@@ -10,13 +10,15 @@ import '../../widgets/touch_scale.dart';
 import 'email_verify_screen.dart';
 import 'login_screen.dart';
 
-enum _SignupStep { emailName, phone, password }
+enum _SignupStep { name, email, phone, password }
 
-/// Step 2: create the account (phone-first, Somalia default) — split into
-/// three short pages (name+email, phone, password) instead of one long
-/// form, matching the wizard pattern used elsewhere in the app (Cash-in,
-/// Send). Password is the primary sign-in credential; the email address
-/// collected on the first page is confirmed next via [EmailVerifyScreen].
+/// Step 2: create the account — one question per screen (name, then email,
+/// then phone, then password), inspired by Revolut's onboarding: a single
+/// large heading and one field at a time keeps each screen trivially fast
+/// to fill in, instead of the old wall-of-fields wizard. Password is the
+/// primary sign-in credential (still required — Apple App Review rejected
+/// OTP-only auth); the email address collected here is confirmed next via
+/// [EmailVerifyScreen].
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -32,7 +34,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _confirmPasswordController =
       TextEditingController();
   bool _acceptedLegal = false;
-  _SignupStep _step = _SignupStep.emailName;
+  _SignupStep _step = _SignupStep.name;
   bool _submitting = false;
 
   @override
@@ -53,25 +55,31 @@ class _SignupScreenState extends State<SignupScreen> {
 
   void _stepBack() {
     switch (_step) {
+      case _SignupStep.email:
+        setState(() => _step = _SignupStep.name);
+        return;
       case _SignupStep.phone:
-        setState(() => _step = _SignupStep.emailName);
+        setState(() => _step = _SignupStep.email);
         return;
       case _SignupStep.password:
         setState(() => _step = _SignupStep.phone);
         return;
-      case _SignupStep.emailName:
+      case _SignupStep.name:
         Navigator.of(context).maybePop();
         return;
     }
   }
 
-  void _continueFromEmailName() {
-    final fullName = _nameController.text.trim();
-    final email = _emailController.text.trim().toLowerCase();
-    if (fullName.isEmpty) {
+  void _continueFromName() {
+    if (_nameController.text.trim().isEmpty) {
       _showMessage('Enter your full name.');
       return;
     }
+    setState(() => _step = _SignupStep.email);
+  }
+
+  void _continueFromEmail() {
+    final email = _emailController.text.trim().toLowerCase();
     if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
       _showMessage('Enter a valid email address.');
       return;
@@ -142,6 +150,7 @@ class _SignupScreenState extends State<SignupScreen> {
     context.read<KashAppState>().completeSignup(
       fullName: fullName,
       phoneNumber: phone,
+      email: email,
     );
 
     setState(() => _submitting = false);
@@ -160,16 +169,6 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Join Wayaki',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.6,
-                ),
-              ),
-              const SizedBox(height: 14),
               _stepDots(),
               const SizedBox(height: 24),
               AnimatedSwitcher(
@@ -188,7 +187,8 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                 child: switch (_step) {
-                  _SignupStep.emailName => _emailNameStep(),
+                  _SignupStep.name => _nameStep(),
+                  _SignupStep.email => _emailStep(),
                   _SignupStep.phone => _phoneStep(),
                   _SignupStep.password => _passwordStep(),
                 },
@@ -222,30 +222,51 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  Widget _emailNameStep() {
+  /// Big single-question heading + subtitle, matching the one-field-per-page
+  /// pattern (each step asks exactly one thing, in large friendly type).
+  Widget _questionHeading(String question, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            question,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.6,
+              height: 1.15,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _nameStep() {
     return Column(
-      key: const ValueKey('emailName'),
+      key: const ValueKey('name'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _questionHeading(
+          "What's your name?",
+          'This is how you\'ll appear to other Wayaki users.',
+        ),
         BybitTextField(
           label: 'Full name',
           hint: 'Mohamed Ali',
           icon: Icons.person_outline_rounded,
           controller: _nameController,
         ),
-        const SizedBox(height: 18),
-        BybitTextField(
-          label: 'Email address',
-          hint: 'you@example.com',
-          icon: Icons.alternate_email_rounded,
-          keyboardType: TextInputType.emailAddress,
-          controller: _emailController,
-        ),
         const SizedBox(height: 28),
-        BybitPrimaryButton(
-          label: 'Continue',
-          onTap: _continueFromEmailName,
-        ),
+        BybitPrimaryButton(label: 'Continue', onTap: _continueFromName),
         const SizedBox(height: 14),
         // Opened inside Telegram, this is the app's very first screen — no
         // welcome screen behind it to fall back on — so a returning user
@@ -276,11 +297,37 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  Widget _emailStep() {
+    return Column(
+      key: const ValueKey('email'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _questionHeading(
+          "What's your email?",
+          'We\'ll send a short code to confirm it.',
+        ),
+        BybitTextField(
+          label: 'Email address',
+          hint: 'you@example.com',
+          icon: Icons.alternate_email_rounded,
+          keyboardType: TextInputType.emailAddress,
+          controller: _emailController,
+        ),
+        const SizedBox(height: 28),
+        BybitPrimaryButton(label: 'Continue', onTap: _continueFromEmail),
+      ],
+    );
+  }
+
   Widget _phoneStep() {
     return Column(
       key: const ValueKey('phone'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _questionHeading(
+          "What's your phone number?",
+          'Used for M-Pesa transfers and account recovery.',
+        ),
         BybitTextField(
           label: 'Phone number',
           hint: '+252 61 000 0000',
@@ -299,6 +346,10 @@ class _SignupScreenState extends State<SignupScreen> {
       key: const ValueKey('password'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        _questionHeading(
+          'Secure your account',
+          'At least 8 characters — this is what you\'ll log in with.',
+        ),
         BybitTextField(
           label: 'Password',
           hint: 'At least 8 characters',

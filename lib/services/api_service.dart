@@ -1295,6 +1295,66 @@ class ApiService {
   static Future<void> clearSession() async {
     await _prefs.remove(_tokenKey);
   }
+
+  // ── Wallet ID ────────────────────────────────────────────────────
+
+  /// Live availability check while the user types a username on the
+  /// Wallet ID setup screen.
+  static Future<bool> checkUsernameAvailable(String username) async {
+    final res = await http
+        .get(
+          Uri.parse(
+            '$baseUrl/auth/wallet-id/check-username?value=${Uri.encodeQueryComponent(username)}',
+          ),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    if (res.statusCode != 200) return false;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['available'] == true;
+  }
+
+  /// Sets which identifier (phone, email, or a chosen username) this user
+  /// hands out to receive money from other Wayaki users.
+  static Future<void> setWalletId({required String type, String? username}) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/wallet-id'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'type': type, if (username != null) 'username': username}),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    throw ApiException(body['error'] as String? ?? 'Could not set Wallet ID');
+  }
+
+  // ── Frequent recipients ─────────────────────────────────────────
+
+  static Future<List<Map<String, dynamic>>> frequentRecipients() async {
+    if (!hasSession) return [];
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/transfers/frequent-recipients'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return [];
+      return (jsonDecode(res.body) as List).cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> removeFrequentRecipient(String id) async {
+    await http
+        .delete(
+          Uri.parse('$baseUrl/transfers/frequent-recipients/$id'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+  }
 }
 
 class ApiException implements Exception {

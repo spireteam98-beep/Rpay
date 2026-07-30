@@ -54,6 +54,9 @@ class KashAppState extends ChangeNotifier {
           .toList();
   String _profileName = 'Mohamed Ali';
   String _phoneNumber = '+252 61 000 0000';
+  String _email = '';
+  String? _username;
+  String _walletIdType = 'phone';
   bool _phoneVerified = false;
   bool _kycSubmitted = false;
   bool _hasPin = false;
@@ -65,6 +68,7 @@ class KashAppState extends ChangeNotifier {
   String _role = 'user';
   int _ledgerSequence = 1004;
   final List<LedgerTransaction> _ledgerTransactions = [];
+  final List<Map<String, dynamic>> _frequentRecipients = [];
   final List<AmlCase> _amlCases = [];
   final List<DateTime> _recentTransferTimes = [];
   double _spentToday = 0;
@@ -90,6 +94,7 @@ class KashAppState extends ChangeNotifier {
     final hybridFuture = ApiService.hybridWallet();
     final bankFuture = ApiService.bankAccount();
     final ledgerFuture = ApiService.ledgerTransactions();
+    final frequentRecipientsFuture = ApiService.frequentRecipients();
 
     // Publish the wallet balance as soon as it arrives. Bank-account and
     // ledger endpoints must never hold the dashboard header at its old value.
@@ -104,10 +109,17 @@ class KashAppState extends ChangeNotifier {
       meFuture,
       bankFuture,
       ledgerFuture,
+      frequentRecipientsFuture,
     ]);
     final me = results[0] as Map<String, dynamic>?;
     final bank = results[1] as Map<String, dynamic>?;
     final backendLedger = results[2] as List<dynamic>?;
+    final frequentRecipients = results[3] as List<Map<String, dynamic>>?;
+    if (frequentRecipients != null) {
+      _frequentRecipients
+        ..clear()
+        ..addAll(frequentRecipients);
+    }
     if (me == null && hybrid == null && bank == null && backendLedger == null) {
       return;
     }
@@ -115,6 +127,9 @@ class KashAppState extends ChangeNotifier {
     if (me != null) {
       _profileName = me['full_name'] as String? ?? _profileName;
       _phoneNumber = me['phone'] as String? ?? _phoneNumber;
+      _email = me['email'] as String? ?? _email;
+      _username = me['username'] as String?;
+      _walletIdType = me['wallet_id_type'] as String? ?? _walletIdType;
       _phoneVerified = me['phone_verified'] == true;
       final kycTier = me['kyc_tier'];
       _kycSubmitted = kycTier is num ? kycTier >= 2 : _kycSubmitted;
@@ -206,10 +221,37 @@ class KashAppState extends ChangeNotifier {
     _ledgerTransactions.expand((transaction) => transaction.entries).toList(),
   );
   List<AmlCase> get amlCases => List.unmodifiable(_amlCases);
+  List<Map<String, dynamic>> get frequentRecipients =>
+      List.unmodifiable(_frequentRecipients);
   int get openAmlCases =>
       _amlCases.where((amlCase) => amlCase.status == 'Open').length;
   String get profileName => _profileName;
   String get phoneNumber => _phoneNumber;
+  String get email => _email;
+  String? get username => _username;
+  String get walletIdType => _walletIdType;
+
+  /// The identifier this user hands out to receive money — whichever of
+  /// phone / email / username they chose as their Wallet ID during signup.
+  String get walletId {
+    switch (_walletIdType) {
+      case 'email':
+        return _email;
+      case 'username':
+        return _username ?? _phoneNumber;
+      case 'phone':
+      default:
+        return _phoneNumber;
+    }
+  }
+
+  void setWalletIdLocal({required String type, String? username}) {
+    _walletIdType = type;
+    if (username != null) _username = username;
+    _persist();
+    notifyListeners();
+  }
+
   bool get phoneVerified => _phoneVerified;
   bool get kycSubmitted => _kycSubmitted;
   bool get hasPin => _hasPin;
@@ -251,10 +293,15 @@ class KashAppState extends ChangeNotifier {
   }
 
   // ── Identity ────────────────────────────────────────────────────
-  void completeSignup({required String fullName, required String phoneNumber}) {
+  void completeSignup({
+    required String fullName,
+    required String phoneNumber,
+    String? email,
+  }) {
     _profileName = fullName.trim().isEmpty ? 'Mohamed Ali' : fullName.trim();
     _phoneNumber =
         phoneNumber.trim().isEmpty ? '+252 61 000 0000' : phoneNumber.trim();
+    if (email != null && email.trim().isNotEmpty) _email = email.trim();
     _persist();
     notifyListeners();
   }
@@ -653,6 +700,9 @@ class KashAppState extends ChangeNotifier {
     final state = {
       'profileName': _profileName,
       'phoneNumber': _phoneNumber,
+      'email': _email,
+      'username': _username,
+      'walletIdType': _walletIdType,
       'phoneVerified': _phoneVerified,
       'kycSubmitted': _kycSubmitted,
       'hasPin': _hasPin,
@@ -696,6 +746,9 @@ class KashAppState extends ChangeNotifier {
       final state = Map<String, dynamic>.from(jsonDecode(raw) as Map);
       _profileName = state['profileName'] as String? ?? _profileName;
       _phoneNumber = state['phoneNumber'] as String? ?? _phoneNumber;
+      _email = state['email'] as String? ?? _email;
+      _username = state['username'] as String?;
+      _walletIdType = state['walletIdType'] as String? ?? _walletIdType;
       _phoneVerified = state['phoneVerified'] as bool? ?? false;
       _kycSubmitted = state['kycSubmitted'] as bool? ?? false;
       _hasPin = state['hasPin'] as bool? ?? false;

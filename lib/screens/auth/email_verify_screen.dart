@@ -1,17 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/api_service.dart';
 import '../../widgets/bybit_wallet_ui.dart';
-import '../../widgets/code_boxes_input.dart';
 import '../../widgets/kash_widgets.dart';
-import '../../widgets/pin_keypad.dart';
-import 'pin_setup_screen.dart';
+import 'wallet_id_setup_screen.dart';
 
 /// Confirms the email address collected at signup with a 4-digit code
-/// (sent via Resend). The code can be typed on the on-screen keypad or
-/// pasted in one action; either way, verification fires automatically the
-/// moment the 4th digit lands — no separate tap needed.
+/// (sent via Resend). Entered into a plain text field — using the device's
+/// own keyboard instead of a custom on-screen dial pad makes typing or
+/// pasting the code feel like every other text input in the app; either
+/// way, verification fires automatically the moment the 4th digit lands —
+/// no separate tap needed.
 class EmailVerifyScreen extends StatefulWidget {
   final String email;
 
@@ -38,7 +39,12 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
     _codeController.addListener(_onCodeChanged);
   }
 
-  void _onCodeChanged() => setState(() {});
+  void _onCodeChanged() {
+    setState(() {});
+    if (_codeController.text.length == _codeLength && !_verifying) {
+      _verify();
+    }
+  }
 
   @override
   void dispose() {
@@ -59,17 +65,6 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
         setState(() => _cooldown--);
       }
     });
-  }
-
-  void _tapKey(String v) {
-    if (_codeController.text.length >= _codeLength) return;
-    _codeController.text += v;
-  }
-
-  void _backspace() {
-    final text = _codeController.text;
-    if (text.isEmpty) return;
-    _codeController.text = text.substring(0, text.length - 1);
   }
 
   void _showMessage(String message) {
@@ -94,7 +89,7 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
       }
       Navigator.of(
         context,
-      ).push(kashRoute(PinSetupScreen(email: widget.email)));
+      ).push(kashRoute(WalletIdSetupScreen(email: widget.email)));
     } on ApiException catch (err) {
       if (!mounted) return;
       _codeController.clear();
@@ -153,19 +148,48 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'We sent a code to ${widget.email}. Paste it or type it in.',
+                'Check your email — we sent a code to ${widget.email}.',
                 style: const TextStyle(
                   color: BybitPalette.muted2,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: 28),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: CodeBoxesInput(
-                  controller: _codeController,
-                  length: _codeLength,
-                  onCompleted: _verify,
+              TextField(
+                controller: _codeController,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(_codeLength),
+                ],
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 12,
+                ),
+                decoration: InputDecoration(
+                  hintText: '0000',
+                  hintStyle: const TextStyle(
+                    color: BybitPalette.muted,
+                    letterSpacing: 12,
+                  ),
+                  filled: true,
+                  fillColor: BybitPalette.input,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 18),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(
+                      color: BybitPalette.accent,
+                      width: 1.4,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -178,8 +202,6 @@ class _EmailVerifyScreenState extends State<EmailVerifyScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
-              NumericKeypad(onDigit: _tapKey, onBackspace: _backspace),
               const SizedBox(height: 12),
               BybitPrimaryButton(
                 label: _verifying ? 'Verifying…' : 'Verify',

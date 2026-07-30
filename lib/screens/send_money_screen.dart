@@ -12,8 +12,9 @@ import '../widgets/touch_scale.dart';
 
 class SendMoneyScreen extends StatefulWidget {
   final KashAccount? sourceAccount;
+  final String? initialRecipient;
 
-  const SendMoneyScreen({super.key, this.sourceAccount});
+  const SendMoneyScreen({super.key, this.sourceAccount, this.initialRecipient});
 
   @override
   State<SendMoneyScreen> createState() => _SendMoneyScreenState();
@@ -32,6 +33,9 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   void initState() {
     super.initState();
     _sourceType = widget.sourceAccount?.type ?? KashAccountType.walletUsd;
+    if (widget.initialRecipient != null) {
+      _recipientController.text = widget.initialRecipient!;
+    }
   }
 
   @override
@@ -87,6 +91,10 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
               const SizedBox(height: 10),
               _channelList(),
               const SizedBox(height: 16),
+              if (_rail != 'M-Pesa' && appState.frequentRecipients.isNotEmpty) ...[
+                _frequentRecipientsRow(appState),
+                const SizedBox(height: 12),
+              ],
               BybitTextField(
                 label:
                     _rail == 'M-Pesa' ? 'M-Pesa number' : 'Wayaki number or email',
@@ -105,6 +113,43 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Tap a saved recipient (people you've sent to before) to fill the
+  /// field instead of typing a phone/email/username every time.
+  Widget _frequentRecipientsRow(KashAppState appState) {
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: appState.frequentRecipients.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final person = appState.frequentRecipients[index];
+          final label = person['label'] as String? ?? '';
+          final identifier = person['identifier'] as String? ?? '';
+          return TouchScale(
+            onTap: () => setState(() => _recipientController.text = identifier),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: BybitPalette.surface2,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

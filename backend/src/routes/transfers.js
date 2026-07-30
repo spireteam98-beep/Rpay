@@ -50,7 +50,7 @@ router.post('/', async (req, res, next) => {
     const receiver = (
       await client.query(
         `SELECT id, full_name FROM users
-          WHERE LOWER(email) = $1 OR phone = $2
+          WHERE LOWER(email) = $1 OR phone = $2 OR LOWER(username) = $1
           LIMIT 1`,
         [recipient, req.body?.recipient],
       )
@@ -125,12 +125,55 @@ router.post('/', async (req, res, next) => {
     );
     await client.query('COMMIT');
 
+    // Best-effort: remember this recipient so Send Money can offer it as a
+    // one-tap pick next time, instead of the user retyping it. Never lets a
+    // logging failure affect the transfer that already committed.
+    try {
+      await client.query(
+        `INSERT INTO frequent_recipients (user_id, recipient_id, label, identifier, last_used_at)
+         VALUES ($1,$2,$3,$4, now())
+         ON CONFLICT (user_id, identifier)
+           DO UPDATE SET last_used_at = now(), label = EXCLUDED.label`,
+        [req.userId, receiver.id, receiver.full_name, req.body?.recipient],
+      );
+    } catch (_) {
+      // ignore
+    }
+
     res.status(201).json({ transfer: transfer.rows[0] });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
     next(err);
   } finally {
     client.release();
+  }
+});
+
+router.get('/frequent-recipients', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `SELECT id, label, identifier, last_used_at
+         FROM frequent_recipients
+        WHERE user_id = $1
+        ORDER BY last_used_at DESC
+        LIMIT 12`,
+      [req.userId],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/frequent-recipients/:id', async (req, res, next) => {
+  try {
+    await pool.query('DELETE FROM frequent_recipients WHERE id = $1 AND user_id = $2', [
+      req.params.id,
+      req.userId,
+    ]);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
   }
 });
 

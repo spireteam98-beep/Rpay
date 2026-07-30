@@ -16,7 +16,7 @@ class ReceiveScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phoneNumber = context.watch<KashAppState>().phoneNumber;
+    final appState = context.watch<KashAppState>();
     return Scaffold(
       backgroundColor: BybitPalette.bg,
       appBar: const BybitSubHeader('Receive'),
@@ -38,11 +38,11 @@ class ReceiveScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Share your phone number so other Wayaki users can send you money instantly — no address needed.',
+                'Share this so other Wayaki users can send you money instantly — no address needed.',
                 style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 16),
-              _walletIdCard(context, phoneNumber),
+              _walletIdCard(context, appState.walletId, appState.walletIdType),
               const SizedBox(height: 32),
               const Text(
                 'Your deposit address',
@@ -99,15 +99,27 @@ class ReceiveScreen extends StatelessWidget {
     );
   }
 
-  /// Phone number as the shareable "Wallet ID" for Wayaki-to-Wayaki
-  /// transfers — the Send screen already accepts a phone number as the
-  /// recipient (backend looks up `WHERE phone = $1 OR email = $2`), but
-  /// until now there was nowhere in the app telling a user *their own*
-  /// number is what they hand out to get paid.
-  Widget _walletIdCard(BuildContext context, String phoneNumber) {
+  /// Whichever identifier (phone, email, or a custom username) the user
+  /// picked as their Wallet ID during signup — the Send screen already
+  /// accepts any of the three as the recipient (backend looks up
+  /// `WHERE phone = $1 OR email = $2 OR username = $2`), but until now
+  /// there was nowhere in the app telling a user *their own* ID is what
+  /// they hand out to get paid.
+  Widget _walletIdCard(BuildContext context, String walletId, String walletIdType) {
+    final icon = switch (walletIdType) {
+      'email' => Icons.alternate_email_rounded,
+      'username' => Icons.badge_outlined,
+      _ => Icons.phone_iphone_rounded,
+    };
+    final label = switch (walletIdType) {
+      'email' => 'Wallet ID (email)',
+      'username' => 'Wallet ID (username)',
+      _ => 'Wallet ID (phone)',
+    };
+    final displayValue = walletIdType == 'username' ? '@$walletId' : walletId;
     return TouchScale(
       onTap: () {
-        Clipboard.setData(ClipboardData(text: phoneNumber));
+        Clipboard.setData(ClipboardData(text: walletId));
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Wallet ID copied'),
@@ -134,24 +146,20 @@ class ReceiveScreen extends StatelessWidget {
                 color: BybitPalette.accent.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
-                Icons.phone_iphone_rounded,
-                color: BybitPalette.accent,
-                size: 22,
-              ),
+              child: Icon(icon, color: BybitPalette.accent, size: 22),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Wallet ID (phone)',
-                    style: TextStyle(color: BybitPalette.muted, fontSize: 12),
+                  Text(
+                    label,
+                    style: const TextStyle(color: BybitPalette.muted, fontSize: 12),
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    phoneNumber,
+                    displayValue,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 17,

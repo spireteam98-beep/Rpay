@@ -498,6 +498,40 @@ async function migrate() {
     ALTER TABLE email_otps ADD COLUMN IF NOT EXISTS failure_reason TEXT;
   `);
 
+  // Wallet ID: at signup a user picks which identifier (phone, email, or a
+  // custom handle) they hand out to receive money — see routes/auth.js
+  // POST /auth/wallet-id and the p2p transfer recipient lookup, which now
+  // also matches on username alongside phone/email.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_id_type TEXT NOT NULL DEFAULT 'phone';
+    ALTER TABLE users DROP CONSTRAINT IF EXISTS users_wallet_id_type_check;
+    ALTER TABLE users ADD CONSTRAINT users_wallet_id_type_check
+      CHECK (wallet_id_type IN ('phone','email','username'));
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username
+      ON users (LOWER(username))
+      WHERE username IS NOT NULL;
+  `);
+
+  // Frequent recipients: lets Send Money show a tappable list of people the
+  // user has sent to before instead of retyping a phone/email/username
+  // every time. One row per (owner, recipient) pair, refreshed on each
+  // transfer rather than duplicated.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS frequent_recipients (
+      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id        UUID NOT NULL REFERENCES users(id),
+      recipient_id   UUID REFERENCES users(id),
+      label          TEXT NOT NULL,
+      identifier     TEXT NOT NULL,
+      last_used_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (user_id, identifier)
+    );
+    CREATE INDEX IF NOT EXISTS idx_frequent_recipients_user
+      ON frequent_recipients(user_id, last_used_at DESC);
+  `);
+
   // Sole super-admin: keep this the only account with role='admin'. Runs
   // every boot so it's self-healing across environments/DB resets.
   await pool.query(
