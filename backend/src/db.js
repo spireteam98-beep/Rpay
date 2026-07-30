@@ -391,6 +391,41 @@ async function migrate() {
     ALTER TABLE merchants ADD COLUMN IF NOT EXISTS referred_by_agent_id UUID REFERENCES agents(id);
   `);
 
+  // Scoped staff: a merchant can have tellers who accept/request payments
+  // on the till without ever seeing the owner's personal settlement wallet
+  // balance (that balance isn't exposed through any merchant-scoped route
+  // to begin with, so no extra restriction is needed there). An agent can
+  // have cashiers scoped to deposit/withdraw only — no recruiting, no
+  // override-commission visibility, no agent settings. Both are existing
+  // Wayaki users added by the owner, same convention as agents.js recruit.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS merchant_staff (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      merchant_id UUID NOT NULL REFERENCES merchants(id),
+      user_id     UUID NOT NULL REFERENCES users(id),
+      role        TEXT NOT NULL DEFAULT 'TELLER' CHECK (role IN ('TELLER')),
+      status      TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','SUSPENDED')),
+      added_by    UUID REFERENCES users(id),
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (merchant_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_merchant_staff_user ON merchant_staff(user_id, status);
+    CREATE INDEX IF NOT EXISTS idx_merchant_staff_merchant ON merchant_staff(merchant_id, status);
+
+    CREATE TABLE IF NOT EXISTS agent_staff (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      agent_id   UUID NOT NULL REFERENCES agents(id),
+      user_id    UUID NOT NULL REFERENCES users(id),
+      role       TEXT NOT NULL DEFAULT 'CASHIER' CHECK (role IN ('CASHIER')),
+      status     TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','SUSPENDED')),
+      added_by   UUID REFERENCES users(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (agent_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_staff_user ON agent_staff(user_id, status);
+    CREATE INDEX IF NOT EXISTS idx_agent_staff_agent ON agent_staff(agent_id, status);
+  `);
+
   // Location-scoped agent hierarchy: Country Agent (one per country) ->
   // Super Agent -> Agent -> Sub-Agent. Self-serve "become an agent"
   // applications (see agents.js POST /) are routed to the right sponsor by
@@ -417,6 +452,18 @@ async function migrate() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_agents_one_country_agent
       ON agents (country_code) WHERE tier = 'COUNTRY_AGENT';
     CREATE INDEX IF NOT EXISTS idx_agents_location ON agents(country_code, region, tier, status);
+  `);
+
+  // Telegram Mini App sign-in (see routes/auth.js POST /auth/telegram):
+  // identifies returning users without a password. phone stays NOT NULL, so
+  // a Telegram-only signup gets a synthetic 'tg:<id>' placeholder there.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_username TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_photo_url TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id
+      ON users (telegram_id)
+      WHERE telegram_id IS NOT NULL;
   `);
 
   // Sole super-admin: keep this the only account with role='admin'. Runs

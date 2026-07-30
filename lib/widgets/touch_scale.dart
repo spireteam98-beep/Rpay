@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/telegram_service.dart';
 
 /// Tactile press wrapper: scales down softly and fires a light haptic,
 /// so every touch feels physical — Apple-style. On mouse/trackpad input it
 /// also shows a pointer cursor and a gentle hover lift, so the same widget
 /// feels right whether it's tapped on a phone or clicked on web/desktop.
+/// Also fires Telegram's native haptic when running as a Mini App —
+/// Flutter's own HapticFeedback is a no-op on web, so without this every
+/// tap in Telegram would be silent.
 class TouchScale extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
@@ -47,7 +51,10 @@ class _TouchScaleState extends State<TouchScale> {
         onTapCancel: () => _setPressed(false),
         onTapUp: (_) => _setPressed(false),
         onTap: () {
-          if (widget.haptic) HapticFeedback.lightImpact();
+          if (widget.haptic) {
+            HapticFeedback.lightImpact();
+            TelegramService.hapticTap();
+          }
           widget.onTap?.call();
         },
         child: AnimatedScale(

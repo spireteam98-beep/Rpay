@@ -9,6 +9,7 @@ import 'screens/auth/signup_screen.dart';
 import 'screens/main_navigation.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
+import 'services/telegram_service.dart';
 import 'state/kash_app_state.dart';
 
 void main() {
@@ -34,6 +35,70 @@ void main() {
   runApp(const CryptoExchangeApp());
 }
 
+/// Runs auth-service init plus, when this page was opened as a Telegram
+/// Mini App, a silent Telegram sign-in — done before the entry screen is
+/// picked so a Telegram user lands straight in MainNavigation instead of
+/// seeing the email/password welcome screen. Outside Telegram (or if the
+/// backend can't verify it), this quietly falls through to the normal flow.
+Future<void> _bootstrap() async {
+  TelegramService.expandToFullHeight();
+  TelegramService.applyDarkChrome(
+    headerColorHex: '#050506',
+    backgroundColorHex: '#050506',
+  );
+  // A stray vertical scroll shouldn't be read as "swipe to dismiss the Mini
+  // App", and a wallet shouldn't let a stray tap close it mid-transfer.
+  TelegramService.disableSwipeToClose();
+  TelegramService.confirmBeforeClosing();
+
+  await AuthService.init();
+
+  if (!AuthService.isSignedIn && TelegramService.isAvailable) {
+    try {
+      final signedIn = await ApiService.telegramLogin(
+        initData: TelegramService.rawInitData,
+      );
+      if (signedIn == true) {
+        await AuthService.signInTelegramUser();
+      }
+    } catch (_) {
+      // Backend unreachable or Telegram data failed verification — fall
+      // through to the normal welcome/login screen below.
+    }
+  }
+
+  TelegramService.notifyReady();
+}
+
+/// Mirrors the Flutter navigation stack onto Telegram's native chrome back
+/// button: shown whenever there's a screen to pop back to, hidden at the
+/// root so Telegram's own close/swipe gesture takes over. Without this,
+/// the only way back is the in-app arrow — Telegram users expect its own
+/// back button to work too.
+class _TelegramBackButtonObserver extends NavigatorObserver {
+  void _sync() {
+    if (navigator?.canPop() ?? false) {
+      TelegramService.showBackButton(() => navigator?.maybePop());
+    } else {
+      TelegramService.hideBackButton();
+    }
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _sync();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _sync();
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _sync();
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      _sync();
+}
+
 class CryptoExchangeApp extends StatelessWidget {
   const CryptoExchangeApp({super.key});
 
@@ -51,7 +116,7 @@ class CryptoExchangeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
-      future: AuthService.init(),
+      future: _bootstrap(),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return MaterialApp(
@@ -77,6 +142,7 @@ class CryptoExchangeApp extends StatelessWidget {
             title: 'Wayaki',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,
+            navigatorObservers: [_TelegramBackButtonObserver()],
             home:
                 AuthService.isSignedIn
                     ? const MainNavigation()

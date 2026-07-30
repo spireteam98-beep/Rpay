@@ -113,6 +113,12 @@ const config = {
   // tied to a wallet user login, so this is what stops a stranger who finds
   // the URL from burning through the Anthropic quota.
   mobileAgentSharedSecret: (process.env.MOBILE_AGENT_SHARED_SECRET || '').trim(),
+
+  // Telegram Mini App sign-in (POST /auth/telegram) — verifies the WebApp
+  // initData HMAC against this token. Unset means Telegram sign-in is
+  // disabled rather than a hard boot failure, since the rest of the API
+  // works fine without it.
+  telegramBotToken: (process.env.TELEGRAM_BOT_TOKEN || '').trim(),
 };
 
 if (config.network !== 'testnet' && config.network !== 'mainnet') {

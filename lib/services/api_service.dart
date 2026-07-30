@@ -143,6 +143,32 @@ class ApiService {
     }
   }
 
+  /// Signs in (or silently registers) via a Telegram Mini App session.
+  /// [initData] is the raw `Telegram.WebApp.initData` string — the backend
+  /// re-verifies its signature, this call never trusts it client-side.
+  /// True on success, null if the backend is unreachable.
+  static Future<bool?> telegramLogin({required String initData}) async {
+    try {
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl/auth/telegram'),
+            headers: _headers(),
+            body: jsonEncode({'initData': initData}),
+          )
+          .timeout(_timeout);
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        await _prefs.setString(_tokenKey, body['token'] as String);
+        return true;
+      }
+      throw ApiException(body['error'] as String? ?? 'Telegram sign-in failed');
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Sends a 6-digit sign-in code to an existing account's email.
   /// Returns true once sent, null if the backend is unreachable.
   static Future<bool?> requestLoginOtp({required String email}) async {
@@ -232,6 +258,28 @@ class ApiService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Converts between the user's own USD and KES wallets at the fixed rate.
+  /// Returns the response body (from/to/amount/convertedAmount/kesPerUsd) or
+  /// throws [ApiException] with the backend's error message.
+  static Future<Map<String, dynamic>> convert({
+    required String from,
+    required String to,
+    required double amount,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/wallet/convert'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'from': from, 'to': to, 'amount': amount}),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) {
+      throw ApiException(body['error'] as String? ?? 'Conversion failed');
+    }
+    return body;
   }
 
   /// Real virtual bank account (account number/name/status); auto-created
@@ -1182,7 +1230,7 @@ class ApiService {
 
   // ── Security / PIN ──────────────────────────────────────────────
 
-  /// Sets or changes the 6-digit transaction PIN. [currentPin] is required
+  /// Sets or changes the 4-digit transaction PIN. [currentPin] is required
   /// only when a PIN is already set.
   static Future<void> setPin({required String pin, String? currentPin}) async {
     final res = await http

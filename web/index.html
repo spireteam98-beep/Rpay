@@ -19,6 +19,14 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Wayaki — your crypto wallet, mobile money and virtual bank account in one app.">
+  <!--
+    No viewport meta previously — mobile browsers (and Telegram's in-app
+    WebView) default to desktop-page zoom heuristics without it, which reads
+    as janky pinch/double-tap-zoom on what's meant to feel like a native
+    app. viewport-fit=cover also lets safe-area-inset-* CSS env vars work,
+    for devices with a notch/home-indicator.
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -35,8 +43,58 @@
 
   <!-- Required by flutter_stripe_web to render CardField/Stripe Elements -->
   <script src="https://js.stripe.com/v3/"></script>
+
+  <!--
+    Telegram Mini Apps SDK. Always loaded (harmless outside Telegram — it
+    just defines window.Telegram.WebApp with an empty initData) so the same
+    web build works standalone and as a Telegram Mini App.
+    https://core.telegram.org/bots/webapps
+  -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
+  <style>
+    /* Stops the browser's own pull-to-refresh / rubber-band bounce from
+       showing through — inside Telegram's WebView that reads as "this is
+       just a webpage", not a native-feeling app. */
+    html, body {
+      overscroll-behavior: none;
+      background: #050506;
+    }
+
+    /* Flutter's engine (download + parse + first paint) takes a beat,
+       especially on a cold mobile connection inside Telegram. Without this,
+       that gap is a blank white flash before Wayaki's own dark UI appears.
+       Removed automatically once Flutter fires 'flutter-first-frame'. */
+    #wayaki-boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #050506;
+      transition: opacity 200ms ease;
+    }
+    #wayaki-boot-splash.wayaki-boot-splash-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    #wayaki-boot-splash .wayaki-boot-spinner {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 3px solid rgba(221, 247, 22, 0.18);
+      border-top-color: #DDF716;
+      animation: wayaki-boot-spin 0.8s linear infinite;
+    }
+    @keyframes wayaki-boot-spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
+  <div id="wayaki-boot-splash"><div class="wayaki-boot-spinner"></div></div>
+
   <script>
     // Older Flutter service workers can keep serving an obsolete payment UI
     // after a production deployment. This app is network-backed and should
@@ -53,6 +111,13 @@
         }
       });
     }
+
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('wayaki-boot-splash');
+      if (!splash) return;
+      splash.classList.add('wayaki-boot-splash-hidden');
+      setTimeout(function () { splash.remove(); }, 250);
+    });
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

@@ -51,6 +51,12 @@ class AuthService {
     await _prefs.setBool(_signedInKey, true);
   }
 
+  /// Telegram Mini App sign-in has no email — the real name/phone get
+  /// filled in right after by KashAppState.syncFromBackend() (GET /auth/me).
+  static Future<void> signInTelegramUser() async {
+    await _prefs.setBool(_signedInKey, true);
+  }
+
   static Future<void> signOut() async {
     await _prefs.setBool(_signedInKey, false);
   }

@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { pool } = require('../db');
 const { signToken, requireAuth } = require('../middleware/auth');
@@ -23,6 +24,52 @@ function isEmail(value) {
 
 function accountNumber(userId) {
   return `WY${String(userId).replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+}
+
+/**
+ * Verifies a Telegram Mini App `initData` payload per Telegram's documented
+ * algorithm (https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app):
+ * HMAC-SHA256 the sorted "key=value" pairs (everything but `hash`) using a
+ * secret derived from the bot token, and compare. Also rejects stale data
+ * (a replayed initData string older than 24h) and returns the parsed
+ * Telegram user object on success, or null on any failure.
+ */
+function verifyTelegramInitData(initData) {
+  if (!config.telegramBotToken || !initData) return null;
+  try {
+    const params = new URLSearchParams(initData);
+    const hash = params.get('hash');
+    if (!hash) return null;
+    params.delete('hash');
+
+    const dataCheckString = Array.from(params.entries())
+      .map(([key, value]) => `${key}=${value}`)
+      .sort()
+      .join('\n');
+
+    const secretKey = crypto
+      .createHmac('sha256', 'WebAppData')
+      .update(config.telegramBotToken)
+      .digest();
+    const computedHash = crypto
+      .createHmac('sha256', secretKey)
+      .update(dataCheckString)
+      .digest('hex');
+
+    if (computedHash !== hash) return null;
+
+    const authDate = Number(params.get('auth_date') || '0');
+    const ONE_DAY_SECONDS = 24 * 60 * 60;
+    if (!authDate || Date.now() / 1000 - authDate > ONE_DAY_SECONDS) return null;
+
+    const userJson = params.get('user');
+    if (!userJson) return null;
+    const tgUser = JSON.parse(userJson);
+    if (!tgUser?.id) return null;
+    return tgUser;
+  } catch (_) {
+    return null;
+  }
 }
 
 /**
@@ -137,6 +184,76 @@ router.post('/signup', async (req, res, next) => {
 });
 
 /**
+ * POST /auth/telegram { initData } — sign in (or silently create an
+ * account for) the Telegram user opening this app as a Mini App inside
+ * Telegram. `initData` is the raw string Telegram's WebApp JS SDK exposes
+ * as `Telegram.WebApp.initData`; it's re-verified here server-side rather
+ * than trusted from the client. New accounts get the same wallet + virtual
+ * account provisioning as /auth/signup, minus email/phone (which Telegram
+ * doesn't hand over) — phone gets a synthetic 'tg:<id>' placeholder since
+ * the column is NOT NULL UNIQUE.
+ */
+router.post('/telegram', async (req, res, next) => {
+  try {
+    if (!config.telegramBotToken) {
+      return res.status(503).json({ error: 'Telegram sign-in is not configured' });
+    }
+
+    const tgUser = verifyTelegramInitData(String(req.body?.initData || ''));
+    if (!tgUser) {
+      return res.status(401).json({ error: 'Invalid or expired Telegram sign-in data' });
+    }
+
+    const telegramId = String(tgUser.id);
+    const existing = (
+      await pool.query(
+        'SELECT id, deletion_requested_at, status FROM users WHERE telegram_id = $1',
+        [telegramId],
+      )
+    ).rows[0];
+
+    if (existing) {
+      if (existing.deletion_requested_at) {
+        return res.status(403).json({ error: 'This account has been deleted' });
+      }
+      if (existing.status === 'SUSPENDED') {
+        return res.status(403).json({ error: 'This account has been suspended. Contact support.' });
+      }
+      await pool.query(
+        'UPDATE users SET telegram_username = $1, telegram_photo_url = $2 WHERE id = $3',
+        [tgUser.username || null, tgUser.photo_url || null, existing.id],
+      );
+      return res.json({ token: signToken(existing.id), isNewUser: false });
+    }
+
+    const fullName =
+      [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ').trim() ||
+      `Telegram User ${telegramId}`;
+    const syntheticPhone = `tg:${telegramId}`;
+
+    const inserted = await pool.query(
+      `INSERT INTO users (full_name, phone, telegram_id, telegram_username, telegram_photo_url)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, wallet_index`,
+      [fullName, syntheticPhone, telegramId, tgUser.username || null, tgUser.photo_url || null],
+    );
+    const user = inserted.rows[0];
+
+    const ethAddress = custody.addressFor(user.wallet_index);
+    await pool.query('UPDATE users SET eth_address = $1 WHERE id = $2', [ethAddress, user.id]);
+    await pool.query(
+      `INSERT INTO virtual_accounts (user_id, account_name, account_number, currency)
+       VALUES ($1,$2,$3,'USD')
+       ON CONFLICT (account_number) DO NOTHING`,
+      [user.id, fullName, accountNumber(user.id)],
+    );
+
+    res.status(201).json({ token: signToken(user.id), ethAddress, isNewUser: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * POST /auth/login { email, password } — primary sign-in method now that
  * every new account sets a password at signup. Accounts created before
  * password signup existed have no password_hash and always reject here;
@@ -148,7 +265,7 @@ router.post('/login', async (req, res, next) => {
     const { email, password } = req.body || {};
     const cleanEmail = normalizeEmail(email);
     const result = await pool.query(
-      'SELECT id, password_hash, deletion_requested_at FROM users WHERE LOWER(email) = LOWER($1)',
+      'SELECT id, password_hash, deletion_requested_at, status FROM users WHERE LOWER(email) = LOWER($1)',
       [cleanEmail],
     );
     if (result.rows.length === 0 || !result.rows[0].password_hash) {
@@ -156,6 +273,9 @@ router.post('/login', async (req, res, next) => {
     }
     if (result.rows[0].deletion_requested_at) {
       return res.status(403).json({ error: 'This account has been deleted' });
+    }
+    if (result.rows[0].status === 'SUSPENDED') {
+      return res.status(403).json({ error: 'This account has been suspended. Contact support.' });
     }
     const ok = await bcrypt.compare(String(password || ''), result.rows[0].password_hash);
     if (!ok) return res.status(401).json({ error: 'Incorrect email or password' });
@@ -165,7 +285,7 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-/** POST /auth/login/request-otp { email } — sends a 6-digit sign-in code. */
+/** POST /auth/login/request-otp { email } — sends a 4-digit sign-in code. */
 router.post('/login/request-otp', async (req, res, next) => {
   try {
     const cleanEmail = normalizeEmail(req.body?.email);
@@ -175,7 +295,7 @@ router.post('/login/request-otp', async (req, res, next) => {
 
     const user = (
       await pool.query(
-        'SELECT id, full_name, deletion_requested_at FROM users WHERE LOWER(email) = LOWER($1)',
+        'SELECT id, full_name, deletion_requested_at, status FROM users WHERE LOWER(email) = LOWER($1)',
         [cleanEmail],
       )
     ).rows[0];
@@ -184,6 +304,9 @@ router.post('/login/request-otp', async (req, res, next) => {
     }
     if (user.deletion_requested_at) {
       return res.status(403).json({ error: 'This account has been deleted' });
+    }
+    if (user.status === 'SUSPENDED') {
+      return res.status(403).json({ error: 'This account has been suspended. Contact support.' });
     }
 
     const result = await createAndSendEmailOtp(user.id, cleanEmail, user.full_name, 'login');
@@ -200,14 +323,14 @@ router.post('/login/verify-otp', async (req, res, next) => {
   try {
     const cleanEmail = normalizeEmail(req.body?.email);
     const code = String(req.body?.code || '').trim();
-    if (!isEmail(cleanEmail) || !/^\d{6}$/.test(code)) {
-      return res.status(400).json({ error: 'Enter the email and 6-digit code' });
+    if (!isEmail(cleanEmail) || !/^\d{4}$/.test(code)) {
+      return res.status(400).json({ error: 'Enter the email and 4-digit code' });
     }
 
     await client.query('BEGIN');
     const user = (
       await client.query(
-        'SELECT id, deletion_requested_at FROM users WHERE LOWER(email) = LOWER($1) FOR UPDATE',
+        'SELECT id, deletion_requested_at, status FROM users WHERE LOWER(email) = LOWER($1) FOR UPDATE',
         [cleanEmail],
       )
     ).rows[0];
@@ -218,6 +341,10 @@ router.post('/login/verify-otp', async (req, res, next) => {
     if (user.deletion_requested_at) {
       await client.query('ROLLBACK');
       return res.status(403).json({ error: 'This account has been deleted' });
+    }
+    if (user.status === 'SUSPENDED') {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'This account has been suspended. Contact support.' });
     }
 
     const otp = (
@@ -280,7 +407,7 @@ router.post('/verify-phone', requireAuth, async (req, res, next) => {
   }
 });
 
-/** POST /auth/request-email-otp - sends a 6-digit email verification code. */
+/** POST /auth/request-email-otp - sends a 4-digit email verification code. */
 router.post('/request-email-otp', requireAuth, async (req, res, next) => {
   try {
     const user = (
@@ -304,8 +431,8 @@ router.post('/verify-email', requireAuth, async (req, res, next) => {
   const client = await pool.connect();
   try {
     const code = String(req.body?.code || '').trim();
-    if (!/^\d{6}$/.test(code)) {
-      return res.status(400).json({ error: 'Enter the 6-digit email code' });
+    if (!/^\d{4}$/.test(code)) {
+      return res.status(400).json({ error: 'Enter the 4-digit email code' });
     }
 
     await client.query('BEGIN');
@@ -409,7 +536,7 @@ router.post('/delete-account', requireAuth, async (req, res, next) => {
 });
 
 /**
- * POST /auth/pin — set the 6-digit transaction PIN checked before a
+ * POST /auth/pin — set the 4-digit transaction PIN checked before a
  * transfer goes through. If a PIN already exists, the caller must supply
  * the current one to change it; first-time set needs no `currentPin`.
  */
@@ -417,8 +544,8 @@ router.post('/pin', requireAuth, async (req, res, next) => {
   try {
     const pin = String(req.body?.pin || '').trim();
     const currentPin = String(req.body?.currentPin || '').trim();
-    if (!/^\d{6}$/.test(pin)) {
-      return res.status(400).json({ error: 'PIN must be exactly 6 digits' });
+    if (!/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be exactly 4 digits' });
     }
 
     const existing = (

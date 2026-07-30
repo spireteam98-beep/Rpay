@@ -41,6 +41,8 @@ services:
         sync: false
       - key: BINANCE_PRIVATE_KEY
         sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
 
       # ── Non-secret config — safe defaults, matching backend/.env.example.
       - key: ETH_RPC_URL
