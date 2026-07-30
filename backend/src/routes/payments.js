@@ -39,40 +39,110 @@ router.post('/webhooks/paystack', async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid Paystack signature' });
     }
 
-    if (req.body?.event !== 'charge.success') {
+    const event = req.body?.event;
+
+    if (event === 'charge.success') {
+      const reference = String(req.body?.data?.reference || '').trim();
+      if (!reference) return res.sendStatus(200);
+
+      const topUp = (
+        await pool.query(
+          `SELECT * FROM payment_topups
+            WHERE gateway = 'PAYSTACK' AND provider_ref = $1`,
+          [reference],
+        )
+      ).rows[0];
+      if (!topUp) return res.sendStatus(200);
+
+      const paidMinor = Number(req.body?.data?.amount);
+      const expectedMinor = Math.round(Number(topUp.amount) * 100);
+      const paidCurrency = String(req.body?.data?.currency || '').toUpperCase();
+      if (
+        !Number.isFinite(paidMinor) ||
+        paidMinor !== expectedMinor ||
+        paidCurrency !== topUp.currency
+      ) {
+        return res.status(400).json({ error: 'Paystack amount or currency mismatch' });
+      }
+
+      await creditTopUp(topUp.id, 'success', {
+        paystackWebhook: {
+          eventId: req.body?.data?.id,
+          reference,
+          channel: req.body?.data?.channel,
+        },
+      });
       return res.sendStatus(200);
     }
 
-    const reference = String(req.body?.data?.reference || '').trim();
-    if (!reference) return res.sendStatus(200);
+    // Withdrawal payouts (money OUT via admin.js's complete-withdrawal ->
+    // services/paystackTransfers.js) settle asynchronously — this is what
+    // actually finalizes them from PROCESSING/PENDING_OTP to COMPLETED, or
+    // releases the balance hold back to the customer on failure.
+    if (['transfer.success', 'transfer.failed', 'transfer.reversed'].includes(event)) {
+      const reference = String(req.body?.data?.reference || '').trim();
+      if (!reference) return res.sendStatus(200);
 
-    const topUp = (
-      await pool.query(
-        `SELECT * FROM payment_topups
-          WHERE gateway = 'PAYSTACK' AND provider_ref = $1`,
-        [reference],
-      )
-    ).rows[0];
-    if (!topUp) return res.sendStatus(200);
+      const movement = (
+        await pool.query(
+          `SELECT * FROM mobile_money_movements WHERE type = 'WITHDRAWAL' AND reference = $1`,
+          [reference],
+        )
+      ).rows[0];
+      if (!movement) return res.sendStatus(200);
 
-    const paidMinor = Number(req.body?.data?.amount);
-    const expectedMinor = Math.round(Number(topUp.amount) * 100);
-    const paidCurrency = String(req.body?.data?.currency || '').toUpperCase();
-    if (
-      !Number.isFinite(paidMinor) ||
-      paidMinor !== expectedMinor ||
-      paidCurrency !== topUp.currency
-    ) {
-      return res.status(400).json({ error: 'Paystack amount or currency mismatch' });
+      if (event === 'transfer.success') {
+        await pool.query(
+          `UPDATE mobile_money_movements SET status = 'COMPLETED', updated_at = now() WHERE id = $1`,
+          [movement.id],
+        );
+        return res.sendStatus(200);
+      }
+
+      // transfer.failed / transfer.reversed — Paystack never delivered the
+      // money, so release the hold instead of leaving the customer's KES
+      // stuck in the clearing account indefinitely.
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('UPDATE users SET kes_balance = kes_balance + $1 WHERE id = $2', [
+          movement.amount_kes,
+          movement.user_id,
+        ]);
+        const failedAmountUsd = Number((Number(movement.amount_kes) / config.kesPerUsd).toFixed(2));
+        await ledger.postWithClient(
+          client,
+          movement.user_id,
+          { title: `${movement.rail} withdrawal failed`, rail: movement.rail },
+          [
+            {
+              accountName: 'Mobile money payout clearing',
+              direction: 'debit',
+              amountUsd: failedAmountUsd,
+              memo: `Paystack ${event}`,
+            },
+            {
+              accountName: 'Customer KES wallet',
+              direction: 'credit',
+              amountUsd: failedAmountUsd,
+              memo: `${movement.amount_kes} KES released`,
+            },
+          ],
+        );
+        await client.query(
+          `UPDATE mobile_money_movements SET status = 'FAILED', updated_at = now() WHERE id = $1`,
+          [movement.id],
+        );
+        await client.query('COMMIT');
+      } catch (err) {
+        try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+        throw err;
+      } finally {
+        client.release();
+      }
+      return res.sendStatus(200);
     }
 
-    await creditTopUp(topUp.id, 'success', {
-      paystackWebhook: {
-        eventId: req.body?.data?.id,
-        reference,
-        channel: req.body?.data?.channel,
-      },
-    });
     return res.sendStatus(200);
   } catch (err) {
     return next(err);

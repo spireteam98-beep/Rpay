@@ -6,6 +6,7 @@ const ledger = require('../services/ledger');
 const exchange = require('../services/exchange');
 const compliance = require('../services/compliance');
 const { creditAgentCommission } = require('../services/commission');
+const { payoutToMpesa } = require('../services/paystackTransfers');
 
 // Flat commissions for onboarding events that aren't sized by transaction
 // amount — customer onboarding ($1) already existed in auth.js; merchant
@@ -880,20 +881,66 @@ router.post('/mobile-money/:id/approve-deposit', async (req, res, next) => {
   }
 });
 
+/**
+ * Fires a real Paystack Transfer to the withdrawal's M-Pesa number instead
+ * of the admin paying out manually off-app. Paystack settles asynchronously
+ * — this only gets the payout moving (status PROCESSING or, if Paystack's
+ * "Confirm transfers before sending" is still on, PENDING_OTP); the
+ * transfer.success/failed webhook below moves it to its final state.
+ */
 router.post('/mobile-money/:id/complete-withdrawal', async (req, res, next) => {
   try {
     const note = String(req.body?.note || '').trim();
-    const updated = await pool.query(
-      `UPDATE mobile_money_movements
-          SET status = 'COMPLETED', admin_note = $1, approved_by = $2, updated_at = now()
-        WHERE id = $3 AND type = 'WITHDRAWAL' AND status = 'PENDING_PAYOUT'
-        RETURNING id`,
-      [note || null, req.userId, req.params.id],
-    );
-    if (updated.rows.length === 0) {
+    const movement = (
+      await pool.query(
+        `SELECT m.*, u.full_name
+           FROM mobile_money_movements m
+           JOIN users u ON u.id = m.user_id
+          WHERE m.id = $1 AND m.type = 'WITHDRAWAL' AND m.status = 'PENDING_PAYOUT'`,
+        [req.params.id],
+      )
+    ).rows[0];
+    if (!movement) {
       return res.status(404).json({ error: 'Pending withdrawal request not found' });
     }
-    res.json({ completed: true, movementId: updated.rows[0].id });
+    if (movement.rail !== 'M-Pesa') {
+      return res.status(400).json({
+        error: `Automated payout only supports M-Pesa via Paystack — this is a ${movement.rail} withdrawal. Complete it manually and use /cancel to release the hold if it can't be paid out.`,
+      });
+    }
+
+    const reference = `wd_${String(movement.id).replace(/-/g, '')}_${Date.now()}`;
+    let transfer;
+    try {
+      transfer = await payoutToMpesa({
+        name: movement.full_name,
+        phone: movement.phone,
+        amountKes: Number(movement.amount_kes),
+        reference,
+        reason: `Wayaki ${movement.rail} withdrawal`,
+      });
+    } catch (err) {
+      return res.status(502).json({ error: `Paystack transfer failed: ${err.message}` });
+    }
+
+    const status = transfer.status === 'otp' ? 'PENDING_OTP' : 'PROCESSING';
+    await pool.query(
+      `UPDATE mobile_money_movements
+          SET status = $1, reference = $2, admin_note = $3, approved_by = $4, updated_at = now()
+        WHERE id = $5`,
+      [status, reference, note || null, req.userId, movement.id],
+    );
+
+    res.json({
+      initiated: true,
+      movementId: movement.id,
+      status,
+      transferCode: transfer.transfer_code,
+      ...(status === 'PENDING_OTP' && {
+        warning:
+          'Paystack is asking for an OTP confirmation before it will send this. Disable "Confirm transfers before sending" in Paystack Settings > Preferences to automate payouts end-to-end.',
+      }),
+    });
   } catch (err) {
     next(err);
   }
