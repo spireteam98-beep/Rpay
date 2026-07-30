@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/pin_keypad.dart';
 import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 
@@ -246,7 +247,7 @@ class _PinFlowSheet extends StatefulWidget {
 }
 
 class _PinFlowSheetState extends State<_PinFlowSheet> {
-  static const _pinLength = 6;
+  static const _pinLength = 4;
   late _PinStep _step = widget.hasPin ? _PinStep.current : _PinStep.create;
   String _currentPin = '';
   String _newPin = '';
@@ -442,68 +443,9 @@ class _PinFlowSheetState extends State<_PinFlowSheet> {
                     ),
                   ),
                 )
-                : _keypad(),
+                : NumericKeypad(onDigit: _tapDigit, onBackspace: _backspace),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _keypad() {
-    const rows = [
-      ['1', '2', '3'],
-      ['4', '5', '6'],
-      ['7', '8', '9'],
-      ['', '0', 'del'],
-    ];
-    return Column(
-      children:
-          rows.map((row) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children:
-                    row.map((key) {
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 5),
-                          child: _keypadButton(key),
-                        ),
-                      );
-                    }).toList(),
-              ),
-            );
-          }).toList(),
-    );
-  }
-
-  Widget _keypadButton(String key) {
-    if (key.isEmpty) return const SizedBox(height: 52);
-    final isDelete = key == 'del';
-    return TouchScale(
-      onTap: isDelete ? _backspace : () => _tapDigit(key),
-      child: Container(
-        height: 52,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: BybitPalette.surface2,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child:
-            isDelete
-                ? const Icon(
-                  Icons.backspace_outlined,
-                  color: BybitPalette.muted2,
-                  size: 20,
-                )
-                : Text(
-                  key,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
       ),
     );
   }

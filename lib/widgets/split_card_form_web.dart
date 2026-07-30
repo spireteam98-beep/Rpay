@@ -9,7 +9,6 @@ import 'package:web/web.dart' as web;
 
 import 'bybit_wallet_ui.dart';
 import 'card_confirm_result.dart';
-import 'card_preview.dart';
 
 /// Raw shape of a Stripe Element's `change` event — just the fields we need
 /// to know whether the field is usable yet (and, for the card-number
@@ -72,7 +71,6 @@ class SplitCardFormState extends State<SplitCardForm> {
   bool _numberComplete = false;
   bool _expiryComplete = false;
   bool _cvcComplete = false;
-  String _brand = 'unknown';
 
   @override
   void initState() {
@@ -89,7 +87,10 @@ class SplitCardFormState extends State<SplitCardForm> {
     _elements = WebStripe.js.elements();
     _numberElement = _elements.create(
       'cardNumber',
-      _options(placeholder: '1234 1234 1234 1234').jsify(),
+      _options(
+        placeholder: '1234 1234 1234 1234',
+        showIcon: true,
+      ).jsify(),
     );
     _expiryElement = _elements.create('cardExpiry', _options().jsify());
     _cvcElement = _elements.create(
@@ -110,7 +111,7 @@ class SplitCardFormState extends State<SplitCardForm> {
     return div;
   }
 
-  Map<String, dynamic> _options({String? placeholder}) => {
+  Map<String, dynamic> _options({String? placeholder, bool? showIcon}) => {
     'style': {
       'base': {
         'color': _cssColor(Colors.white),
@@ -120,6 +121,7 @@ class SplitCardFormState extends State<SplitCardForm> {
       'invalid': {'color': _cssColor(BybitPalette.red)},
     },
     if (placeholder != null) 'placeholder': placeholder,
+    if (showIcon != null) 'showIcon': showIcon,
   };
 
   String _cssColor(Color color) {
@@ -151,10 +153,7 @@ class SplitCardFormState extends State<SplitCardForm> {
 
   void _onNumberChange(_ChangeEvent event) {
     if (!mounted) return;
-    setState(() {
-      _numberComplete = event.complete;
-      _brand = event.brand?.toDart ?? 'unknown';
-    });
+    setState(() => _numberComplete = event.complete);
     _notifyComplete();
   }
 
@@ -207,34 +206,34 @@ class SplitCardFormState extends State<SplitCardForm> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AnimatedBuilder(
-          animation: widget.nameController,
-          builder:
-              (context, _) => CardPreview(
-                holderName: widget.nameController.text,
-                brand: _brand,
-                numberComplete: _numberComplete,
-                expiryComplete: _expiryComplete,
-              ),
-        ),
-        const SizedBox(height: 18),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: BybitPalette.surface2,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF2A2E35)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _fieldLabel('Card number'),
-              const SizedBox(height: 6),
-              _fieldBox(height: 48, viewType: _numberViewType),
-              const SizedBox(height: 16),
-              _fieldLabel('Card holder'),
-              const SizedBox(height: 6),
-              _nameField(),
-              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _fieldLabel('Card number'),
+                  const Row(
+                    children: [
+                      _VisaBadge(),
+                      SizedBox(width: 6),
+                      _MastercardBadge(),
+                      SizedBox(width: 6),
+                      _BrandBadge('AMEX'),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _fieldBox(height: 52, viewType: _numberViewType),
+              const SizedBox(height: 18),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -242,20 +241,20 @@ class SplitCardFormState extends State<SplitCardForm> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _fieldLabel('Expiry (MM/YY)'),
-                        const SizedBox(height: 6),
-                        _fieldBox(height: 48, viewType: _expiryViewType),
+                        _fieldLabel('Expiration date'),
+                        const SizedBox(height: 8),
+                        _fieldBox(height: 52, viewType: _expiryViewType),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _fieldLabel('CVV'),
-                        const SizedBox(height: 6),
-                        _fieldBox(height: 48, viewType: _cvcViewType),
+                        _fieldLabel('Security code'),
+                        const SizedBox(height: 8),
+                        _fieldBox(height: 52, viewType: _cvcViewType),
                       ],
                     ),
                   ),
@@ -288,25 +287,108 @@ class SplitCardFormState extends State<SplitCardForm> {
       child: HtmlElementView(viewType: viewType),
     );
   }
+}
 
-  Widget _nameField() {
+/// Plain-text "accepted cards" badge — a neutral pill rather than a
+/// reproduction of any card network's actual logo artwork, so this stays
+/// legally safe while still telling the user what's accepted at a glance.
+class _BrandBadge extends StatelessWidget {
+  final String label;
+
+  const _BrandBadge(this.label);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: BybitPalette.input,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: const Color(0xFF33373E)),
       ),
-      child: TextField(
-        controller: widget.nameController,
-        onChanged: (_) => _notifyComplete(),
-        style: const TextStyle(color: Colors.white, fontSize: 15),
-        decoration: const InputDecoration(
-          hintText: 'Name on card',
-          hintStyle: TextStyle(color: BybitPalette.muted),
-          border: InputBorder.none,
-          isDense: true,
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: BybitPalette.muted2,
+          fontSize: 9.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.3,
         ),
+      ),
+    );
+  }
+}
+
+/// Small stylized Visa mark — a navy pill with an italic wordmark, evoking
+/// the network without reproducing its exact logo artwork or font.
+class _VisaBadge extends StatelessWidget {
+  const _VisaBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 20,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1F71),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text(
+        'VISA',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+          fontStyle: FontStyle.italic,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+}
+
+/// Small stylized Mastercard mark — two overlapping circles, the generic
+/// dual-circle motif used across the industry to indicate the network is
+/// accepted, not a reproduction of the network's exact logo artwork.
+class _MastercardBadge extends StatelessWidget {
+  const _MastercardBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 20,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            left: 5,
+            child: Container(
+              width: 13,
+              height: 13,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEB001B),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            right: 5,
+            child: Container(
+              width: 13,
+              height: 13,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF79E1B).withValues(alpha: 0.85),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

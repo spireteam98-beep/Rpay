@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/bybit_wallet_ui.dart';
+import '../../widgets/code_boxes_input.dart';
 import '../../widgets/kash_widgets.dart';
+import '../../widgets/pin_keypad.dart';
 import '../main_navigation.dart';
-import 'otp_screen.dart';
 
-/// Enter the sign-in code emailed by [LoginScreen] to finish logging in.
+/// Enter the 4-digit sign-in code emailed by [LoginScreen] to finish
+/// logging in. Paste it or type it on the keypad — either way, sign-in
+/// fires automatically the moment the 4th digit lands.
 class LoginOtpScreen extends StatefulWidget {
   final String email;
 
@@ -19,10 +22,10 @@ class LoginOtpScreen extends StatefulWidget {
 }
 
 class _LoginOtpScreenState extends State<LoginOtpScreen> {
+  static const _codeLength = 4;
   static const _resendCooldownSeconds = 60;
 
-  final List<String> _digits = List.filled(6, '');
-  int _filled = 0;
+  final TextEditingController _codeController = TextEditingController();
   bool _verifying = false;
   bool _resending = false;
   int _cooldown = _resendCooldownSeconds;
@@ -32,11 +35,16 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   void initState() {
     super.initState();
     _startCooldown();
+    _codeController.addListener(_onCodeChanged);
   }
+
+  void _onCodeChanged() => setState(() {});
 
   @override
   void dispose() {
     _cooldownTimer?.cancel();
+    _codeController.removeListener(_onCodeChanged);
+    _codeController.dispose();
     super.dispose();
   }
 
@@ -54,17 +62,14 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
   }
 
   void _tapKey(String v) {
-    setState(() {
-      if (v == '<') {
-        if (_filled > 0) {
-          _filled--;
-          _digits[_filled] = '';
-        }
-      } else if (_filled < 6) {
-        _digits[_filled] = v;
-        _filled++;
-      }
-    });
+    if (_codeController.text.length >= _codeLength) return;
+    _codeController.text += v;
+  }
+
+  void _backspace() {
+    final text = _codeController.text;
+    if (text.isEmpty) return;
+    _codeController.text = text.substring(0, text.length - 1);
   }
 
   void _showMessage(String message) {
@@ -73,12 +78,13 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _verify() async {
+  Future<void> _verify([String? code]) async {
+    if (_verifying) return;
     setState(() => _verifying = true);
     try {
       final signedIn = await ApiService.verifyLoginOtp(
         email: widget.email,
-        code: _digits.join(),
+        code: code ?? _codeController.text,
       );
       if (!mounted) return;
       if (signedIn == true) {
@@ -91,12 +97,14 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
         return;
       }
       setState(() => _verifying = false);
+      _codeController.clear();
       _showMessage(
         'Backend is not reachable. Start the Wayaki API and try again.',
       );
     } on ApiException catch (err) {
       if (!mounted) return;
       setState(() => _verifying = false);
+      _codeController.clear();
       _showMessage(err.message);
     }
   }
@@ -144,7 +152,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
             children: [
               const SizedBox(height: 8),
               const Text(
-                'Enter the 6-digit code',
+                'Enter the 4-digit code',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 25,
@@ -154,42 +162,20 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'We sent a code to ${widget.email}',
+                'We sent a code to ${widget.email}. Paste it or type it in.',
                 style: const TextStyle(
                   color: BybitPalette.muted2,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(height: 28),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: List.generate(6, (i) {
-                  final active = i == _filled;
-                  return Container(
-                    width: 48,
-                    height: 56,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: BybitPalette.surface,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color:
-                            active
-                                ? BybitPalette.accent
-                                : const Color(0xFF242832),
-                        width: active ? 1.4 : 1,
-                      ),
-                    ),
-                    child: Text(
-                      _digits[i],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  );
-                }),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: CodeBoxesInput(
+                  controller: _codeController,
+                  length: _codeLength,
+                  onCompleted: _verify,
+                ),
               ),
               const SizedBox(height: 12),
               Center(
@@ -202,33 +188,18 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              _keypad(),
+              NumericKeypad(onDigit: _tapKey, onBackspace: _backspace),
               const SizedBox(height: 12),
               BybitPrimaryButton(
                 label: _verifying ? 'Verifying…' : 'Log in',
-                enabled: _filled == 6 && !_verifying,
-                onTap: _filled == 6 ? _verify : () {},
+                enabled: _codeController.text.length == _codeLength && !_verifying,
+                onTap: () => _verify(),
               ),
               const SizedBox(height: 20),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _keypad() {
-    const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '<'];
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 2.1,
-      children:
-          keys.map((k) {
-            if (k.isEmpty) return const SizedBox.shrink();
-            return TouchScaleKey(label: k, onTap: () => _tapKey(k));
-          }).toList(),
     );
   }
 }

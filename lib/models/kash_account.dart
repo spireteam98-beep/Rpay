@@ -1,13 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-enum KashAccountType { crypto, mobileMoney, bank }
+/// Wayaki USD and Wayaki KES (M-Pesa) are the two real, currently-accepted
+/// currency accounts — everything shown on the wallet screen. Crypto custody
+/// and the virtual bank account exist as sub-accounts under the same Wayaki
+/// account for later phases (Binance custody, IBAN banking) but stay out of
+/// the account list/UI until those are actually ready to use.
+enum KashAccountType { walletUsd, walletKes, crypto, bank }
+
+const _hiddenAccountTypes = {KashAccountType.crypto, KashAccountType.bank};
 
 class KashAccount {
   final KashAccountType type;
   final String title;
   final String subtitle;
+
+  /// Balance expressed in USD terms — used for totals, transfer limits and
+  /// ledger amounts, which are all USD-denominated app-wide. For the KES
+  /// account this is the converted USD-equivalent, not what's shown on the
+  /// card itself (see [nativeAmount]).
   final double balanceUsd;
+
+  /// The actual balance in the account's own currency, formatted with
+  /// [nativeSymbol] for display. Equal to [balanceUsd] for USD accounts.
+  final double nativeAmount;
+  final String nativeSymbol;
+
   final String currency;
   final String status;
   final IconData icon;
@@ -20,6 +38,8 @@ class KashAccount {
     required this.title,
     required this.subtitle,
     required this.balanceUsd,
+    this.nativeAmount = 0,
+    this.nativeSymbol = '\$',
     required this.currency,
     required this.status,
     required this.icon,
@@ -28,10 +48,15 @@ class KashAccount {
     required this.transactions,
   });
 
-  String get balance => NumberFormat.currency(symbol: '\$').format(balanceUsd);
+  /// True for the accounts that actually show up on the wallet screen.
+  bool get isVisible => !_hiddenAccountTypes.contains(type);
+
+  String get balance =>
+      NumberFormat.currency(symbol: nativeSymbol).format(nativeAmount);
 
   KashAccount copyWith({
     double? balanceUsd,
+    double? nativeAmount,
     String? status,
     List<KashTransaction>? transactions,
   }) {
@@ -40,6 +65,8 @@ class KashAccount {
       title: title,
       subtitle: subtitle,
       balanceUsd: balanceUsd ?? this.balanceUsd,
+      nativeAmount: nativeAmount ?? this.nativeAmount,
+      nativeSymbol: nativeSymbol,
       currency: currency,
       status: status ?? this.status,
       icon: icon,
@@ -105,78 +132,61 @@ IconData kashIconFor(String? key) =>
 
 const List<KashAccount> kashAccounts = [
   KashAccount(
+    type: KashAccountType.walletUsd,
+    title: 'Wayaki · USD',
+    subtitle: 'Card top-ups, transfers and payments',
+    balanceUsd: 0,
+    nativeAmount: 0,
+    nativeSymbol: '\$',
+    currency: 'USD',
+    status: 'Active',
+    icon: Icons.attach_money_rounded,
+    accent: Color(0xFFDDF716),
+    rails: ['Card top-up', 'Wayaki transfer', 'Bill pay'],
+    transactions: [],
+  ),
+  KashAccount(
+    type: KashAccountType.walletKes,
+    title: 'Wayaki · KES',
+    subtitle: 'M-Pesa cash in and cash out',
+    balanceUsd: 0,
+    nativeAmount: 0,
+    nativeSymbol: 'KSh ',
+    currency: 'KES',
+    status: 'Active',
+    icon: Icons.phone_iphone_rounded,
+    accent: Color(0xFF2ED17C),
+    rails: ['M-Pesa', 'Wayaki transfer'],
+    transactions: [],
+  ),
+  // Hidden for now — Binance custody sub-account, coming in a later phase.
+  KashAccount(
     type: KashAccountType.crypto,
     title: 'Crypto custody',
     subtitle: 'BTC, ETH and USDT held by Wayaki',
-    balanceUsd: 12840.20,
+    balanceUsd: 0,
+    nativeAmount: 0,
+    nativeSymbol: '\$',
     currency: 'USDT value',
     status: 'MPC custody sandbox',
     icon: Icons.currency_bitcoin_rounded,
     accent: Color(0xFFDDF716),
     rails: ['BTC', 'ETH', 'USDT', 'Address screening'],
-    transactions: [
-      KashTransaction(
-        title: 'USDT deposit',
-        subtitle: 'Ethereum address confirmed',
-        amount: '+420.00 USDT',
-        icon: Icons.south_rounded,
-      ),
-      KashTransaction(
-        title: 'BTC to USDT swap',
-        subtitle: 'Internal custody ledger',
-        amount: '+1,120.50 USDT',
-        icon: Icons.sync_alt_rounded,
-      ),
-    ],
+    transactions: [],
   ),
-  KashAccount(
-    type: KashAccountType.mobileMoney,
-    title: 'Mobile money wallet',
-    subtitle: 'Domestic SOS and USD balances',
-    balanceUsd: 8430.12,
-    currency: 'USD / SOS',
-    status: 'Tier 1 limit active',
-    icon: Icons.phone_iphone_rounded,
-    accent: Color(0xFF2ED17C),
-    rails: ['EVC Plus', 'Zaad', 'Sahal', 'M-Pesa'],
-    transactions: [
-      KashTransaction(
-        title: 'Amina Hassan',
-        subtitle: 'Wayaki wallet transfer',
-        amount: '-85.00 USD',
-        icon: Icons.north_east_rounded,
-      ),
-      KashTransaction(
-        title: 'EVC Plus cash-in',
-        subtitle: 'Hormuud sandbox rail',
-        amount: '+250.00 USD',
-        icon: Icons.add_card_rounded,
-      ),
-    ],
-  ),
+  // Hidden for now — virtual bank sub-account, coming in a later phase.
   KashAccount(
     type: KashAccountType.bank,
     title: 'Virtual bank account',
     subtitle: 'Named account now, IBAN later',
-    balanceUsd: 3248.00,
+    balanceUsd: 0,
+    nativeAmount: 0,
+    nativeSymbol: '\$',
     currency: 'USD account',
     status: 'IBAN pending EMI phase',
     icon: Icons.account_balance_rounded,
     accent: Color(0xFF8FA7FF),
     rails: ['Account number', 'Statements', 'SEPA ready', 'Cards later'],
-    transactions: [
-      KashTransaction(
-        title: 'Salary placeholder',
-        subtitle: 'Virtual account credit',
-        amount: '+1,800.00 USD',
-        icon: Icons.account_balance_wallet_outlined,
-      ),
-      KashTransaction(
-        title: 'Statement generated',
-        subtitle: 'July account activity',
-        amount: 'PDF',
-        icon: Icons.description_outlined,
-      ),
-    ],
+    transactions: [],
   ),
 ];

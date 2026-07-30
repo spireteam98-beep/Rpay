@@ -33,7 +33,7 @@ class HomeScreen extends StatelessWidget {
               _quickActions(context),
               _sectionHeader('Your money identities', 'Phase 1'),
               const SizedBox(height: 12),
-              _accountCarousel(context, appState.accounts),
+              _accountCarousel(context, appState.visibleAccounts),
               const SizedBox(height: 24),
               _phaseOneStrip(),
               const SizedBox(height: 24),

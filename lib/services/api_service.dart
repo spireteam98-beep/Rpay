@@ -529,6 +529,22 @@ class ApiService {
     throw ApiException(body['error'] as String? ?? 'Account deletion failed');
   }
 
+  /// Records a logout event for the admin sessions dashboard — best-effort,
+  /// same pattern as [submitKyc]. Doesn't revoke the JWT (no server-side
+  /// token blocklist exists); [AuthService.signOut] discarding the token
+  /// locally is what actually ends the session. Call this before that so
+  /// there's still a valid Authorization header to send it with.
+  static Future<void> logout() async {
+    if (!hasSession) return;
+    try {
+      await http
+          .post(Uri.parse('$baseUrl/auth/logout'), headers: _headers(authed: true))
+          .timeout(_timeout);
+    } catch (_) {
+      /* offline — local sign-out still proceeds */
+    }
+  }
+
   /// KYC approval on the backend (raises tier to Full KYC).
   static Future<void> submitKyc() async {
     if (!hasSession) return;

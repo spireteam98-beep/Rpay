@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
@@ -173,6 +174,7 @@ class ProfileScreen extends StatelessWidget {
     );
     if (confirmed != true || !context.mounted) return;
 
+    await ApiService.logout();
     await AuthService.signOut();
     if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(

@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import '../state/kash_app_state.dart';
 import 'bybit_wallet_ui.dart';
 import 'split_card_form.dart';
 import 'touch_scale.dart';
@@ -91,6 +93,10 @@ class PaymentMethodFormState extends State<PaymentMethodForm> {
     _amountController = TextEditingController(
       text: widget.fixedAmount?.toStringAsFixed(2) ?? widget.initialAmountText,
     );
+    // The card form no longer asks for the holder's name separately — reuse
+    // the name already on file from signup so Stripe still gets a billing
+    // name without making the user retype it.
+    _cardHolderController.text = context.read<KashAppState>().profileName;
   }
 
   @override

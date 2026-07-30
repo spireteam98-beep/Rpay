@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/kash_account.dart';
 import '../models/ledger_entry.dart';
-import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
@@ -39,9 +37,10 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               _topBalanceCard(context, appState),
               const SizedBox(height: 20),
-              _onChainCustodyCard(),
               _peopleRow(context, appState),
-              _accountTabs(context, appState.accounts),
+              _accountsHeader(context, appState),
+              const SizedBox(height: 14),
+              _accountTabs(context, appState.visibleAccounts),
               _recentActivityCard(context, appState),
             ],
           ),
@@ -650,127 +649,56 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  /// Live on-chain custody card — appears when the Wayaki backend is
-  /// running and the user has a real API session. Renders nothing in
-  /// pure-sandbox mode, so the demo never breaks.
-  Widget _onChainCustodyCard() {
-    if (!ApiService.hasSession) return const SizedBox.shrink();
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: ApiService.walletSummary(),
-      builder: (context, snapshot) {
-        final data = snapshot.data;
-        if (data == null) return const SizedBox.shrink();
-        final address = data['depositAddress'] as String? ?? '';
-        final eth = data['eth'] as Map<String, dynamic>? ?? {};
-        final network = data['network'] as String? ?? 'Sepolia testnet';
-        final balance = (eth['balance'] as String?) ?? '0';
-        final usd = (eth['usd'] as num?)?.toDouble() ?? 0;
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: BybitCard(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  /// "Accounts" section title with a Convert action — the only way to move
+  /// value between Wayaki USD and Wayaki KES, since they're now two
+  /// separate currency accounts rather than one blended wallet.
+  Widget _accountsHeader(BuildContext context, KashAppState appState) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            'Accounts',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+          TouchScale(
+            onTap: () => _openConvertSheet(context, appState),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    const _BybitMiniIcon(Icons.link_rounded),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'On-chain custody',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            network,
-                            style: const TextStyle(
-                              color: BybitPalette.accent,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${double.parse(balance).toStringAsFixed(5)} ETH',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '\$${usd.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: BybitPalette.muted,
-                            fontSize: 11.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                Icon(
+                  Icons.sync_alt_rounded,
+                  color: BybitPalette.accent,
+                  size: 16,
                 ),
-                const SizedBox(height: 14),
-                TouchScale(
-                  onTap: () {
-                    Clipboard.setData(ClipboardData(text: address));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Deposit address copied')),
-                    );
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: BybitPalette.surface2,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            address,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: BybitPalette.muted,
-                              fontSize: 12,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.copy_rounded,
-                          color: BybitPalette.accent,
-                          size: 16,
-                        ),
-                      ],
-                    ),
+                SizedBox(width: 5),
+                Text(
+                  'Convert',
+                  style: TextStyle(
+                    color: BybitPalette.accent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
             ),
           ),
-        );
-      },
+        ],
+      ),
+    );
+  }
+
+  void _openConvertSheet(BuildContext context, KashAppState appState) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => const _ConvertSheet(),
     );
   }
 
@@ -898,22 +826,182 @@ class _MerchantActivity {
   });
 }
 
-class _BybitMiniIcon extends StatelessWidget {
-  final IconData icon;
-  final Color color;
+/// Bottom sheet that moves value between the user's own Wayaki USD and
+/// Wayaki KES accounts — the one deliberate bridge between the two
+/// currencies (everything else stays strictly separated).
+class _ConvertSheet extends StatefulWidget {
+  const _ConvertSheet();
 
-  const _BybitMiniIcon(this.icon, {this.color = BybitPalette.accent});
+  @override
+  State<_ConvertSheet> createState() => _ConvertSheetState();
+}
+
+class _ConvertSheetState extends State<_ConvertSheet> {
+  final TextEditingController _amountController = TextEditingController();
+  bool _kesToUsd = true;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<KashAppState>();
+    final from = _kesToUsd ? 'KES' : 'USD';
+    final to = _kesToUsd ? 'USD' : 'KES';
+    final fromAccount = appState.accountByType(
+      _kesToUsd ? KashAccountType.walletKes : KashAccountType.walletUsd,
+    );
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+        decoration: const BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: BybitPalette.muted.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Convert currency',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Available: ${fromAccount.balance}',
+              style: const TextStyle(color: BybitPalette.muted, fontSize: 13),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(child: _CurrencyPill(label: from)),
+                TouchScale(
+                  onTap:
+                      _submitting
+                          ? null
+                          : () => setState(() => _kesToUsd = !_kesToUsd),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 10),
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: BybitPalette.accent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.sync_alt_rounded,
+                      color: Colors.black,
+                      size: 18,
+                    ),
+                  ),
+                ),
+                Expanded(child: _CurrencyPill(label: to)),
+              ],
+            ),
+            const SizedBox(height: 18),
+            TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: BybitPalette.surface2,
+                hintText: 'Amount in $from',
+                hintStyle: const TextStyle(color: BybitPalette.muted),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            BybitPrimaryButton(
+              label: _submitting ? 'Converting…' : 'Convert',
+              enabled: !_submitting,
+              onTap: _submit,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter an amount greater than 0.')));
+      return;
+    }
+    setState(() => _submitting = true);
+    final result = await context.read<KashAppState>().convertCurrency(
+      from: _kesToUsd ? 'KES' : 'USD',
+      to: _kesToUsd ? 'USD' : 'KES',
+      amount: amount,
+    );
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(result.message)));
+    if (result.success) Navigator.of(context).pop();
+  }
+}
+
+class _CurrencyPill extends StatelessWidget {
+  final String label;
+
+  const _CurrencyPill({required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 46,
-      height: 46,
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
-        borderRadius: BorderRadius.circular(16),
+        color: BybitPalette.surface2,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF242832)),
       ),
-      child: Icon(icon, color: color, size: 23),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 15,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }

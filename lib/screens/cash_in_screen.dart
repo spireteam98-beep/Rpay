@@ -113,7 +113,11 @@ class _CashInScreenState extends State<CashInScreen> {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<KashAppState>();
-    final wallet = appState.accountByType(KashAccountType.mobileMoney);
+    final wallet = appState.accountByType(
+      _currencyFor(_gateway) == 'KES'
+          ? KashAccountType.walletKes
+          : KashAccountType.walletUsd,
+    );
     return PopScope(
       canPop: _step == _CashInStep.method,
       onPopInvokedWithResult: (didPop, _) {
@@ -595,7 +599,7 @@ class _ProcessStep extends StatelessWidget {
               fixedAmount: amount,
               showGatewaySelector: false,
               gateway: gateway,
-              submitLabel: 'Cash in now',
+              submitLabel: 'Add cash',
               onPaymentNotCredited: appState.syncFromBackend,
               onCredited: (amount, currency, gateway, gatewayLabel) async {
                 // The provider has already returned a terminal success here.

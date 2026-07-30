@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../state/kash_app_state.dart';
@@ -67,6 +68,13 @@ class SettingsScreen extends StatelessWidget {
                 'Disputes and card help',
                 onTap: () => showSupportDialog(context),
               ),
+              _tile(
+                context,
+                Icons.policy_outlined,
+                'Legal & privacy',
+                'Policies, data choices and support',
+                onTap: () => _showLegalCenter(context),
+              ),
               const SizedBox(height: 8),
               _tile(
                 context,
@@ -133,6 +141,65 @@ class SettingsScreen extends StatelessWidget {
     Navigator.of(context).pushAndRemoveUntil(
       kashRoute(const WelcomeScreen()),
       (route) => false,
+    );
+  }
+
+  void _showLegalCenter(BuildContext context) {
+    const links = [
+      ('Privacy Policy', '/privacy'),
+      ('Terms of Service', '/terms'),
+      ('Data & account deletion', '/data-deletion'),
+      ('KYC Policy', '/kyc-policy'),
+      ('AML Policy', '/aml-policy'),
+      ('Cookie Policy', '/cookies'),
+      ('Refund Policy', '/refund-policy'),
+      ('Risk disclosure', '/disclaimer'),
+      ('Support', '/support'),
+    ];
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: BybitPalette.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder:
+          (sheetContext) => SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Legal & privacy',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children:
+                        links
+                            .map(
+                              (link) => ActionChip(
+                                label: Text(link.$1),
+                                onPressed:
+                                    () => launchUrl(
+                                      Uri.parse('https://wayaki.com${link.$2}'),
+                                      mode: LaunchMode.externalApplication,
+                                    ),
+                              ),
+                            )
+                            .toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
     );
   }
 
@@ -270,7 +337,7 @@ class _LinkedAccountsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accounts = context.watch<KashAppState>().accounts;
+    final accounts = context.watch<KashAppState>().visibleAccounts;
     return Scaffold(
       backgroundColor: BybitPalette.bg,
       appBar: const BybitSubHeader('Linked accounts'),

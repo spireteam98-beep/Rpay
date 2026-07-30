@@ -1,37 +1,13 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/kash_account.dart';
 import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
+import '../widgets/pin_keypad.dart';
 import '../widgets/touch_scale.dart';
-
-/// Mobile money providers offered on the "Mobile money" rail: display name,
-/// icon, brand-ish accent color, and a recipient-number hint per provider.
-const List<(String, IconData, Color, String)> _mobileMoneyProviders = [
-  (
-    'EVC Plus',
-    Icons.phone_iphone_rounded,
-    Color(0xFF00A651),
-    '+252 61 000 0000',
-  ),
-  ('Zaad', Icons.sim_card_rounded, Color(0xFFEE3224), '+252 63 000 0000'),
-  (
-    'Sahal',
-    Icons.account_balance_wallet_rounded,
-    Color(0xFF1565C0),
-    '+252 90 000 0000',
-  ),
-  ('M-Pesa', Icons.smartphone_rounded, Color(0xFF4CAF50), '+254 7XX XXX XXX'),
-  ('Waafi', Icons.contactless_rounded, Color(0xFFFF6B35), '+252 61 000 0000'),
-  (
-    'MTN',
-    Icons.signal_cellular_alt_rounded,
-    Color(0xFFFFCC00),
-    '+234 8XX XXX XXXX',
-  ),
-  ('Paytm', Icons.qr_code_2_rounded, Color(0xFF00BAF2), '+91 98XXX XXXXX'),
-];
 
 class SendMoneyScreen extends StatefulWidget {
   final KashAccount? sourceAccount;
@@ -44,8 +20,7 @@ class SendMoneyScreen extends StatefulWidget {
 
 class _SendMoneyScreenState extends State<SendMoneyScreen> {
   late KashAccountType _sourceType;
-  String _rail = 'Crypto address';
-  String _mobileMoneyProvider = _mobileMoneyProviders.first.$1;
+  String _rail = 'Wayaki';
   final TextEditingController _recipientController = TextEditingController();
   final TextEditingController _amountController = TextEditingController(
     text: '0.00',
@@ -55,7 +30,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   @override
   void initState() {
     super.initState();
-    _sourceType = widget.sourceAccount?.type ?? KashAccountType.crypto;
+    _sourceType = widget.sourceAccount?.type ?? KashAccountType.walletUsd;
   }
 
   @override
@@ -80,59 +55,45 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Send assets',
+                'You send',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.7,
+                  color: BybitPalette.muted,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Route crypto, wallet balance, mobile money or bank transfers from one Bybit-style flow.',
-                style: TextStyle(
-                  color: BybitPalette.muted2,
-                  fontSize: 15,
-                  height: 1.35,
+              _amountCurrencyRow(appState, source),
+              Padding(
+                padding: const EdgeInsets.only(top: 6, left: 4),
+                child: Text(
+                  'Available ${source.balance}',
+                  style: const TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
-              _sourceSelector(appState.accounts),
-              const SizedBox(height: 16),
-              _railSelector(),
-              if (_rail == 'Mobile money') ...[
-                const SizedBox(height: 18),
-                const Text(
-                  'Choose provider',
-                  style: TextStyle(
-                    color: BybitPalette.muted2,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
+              const Text(
+                'Select channel',
+                style: TextStyle(
+                  color: BybitPalette.muted,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(height: 10),
-                _mobileMoneyGrid(),
-              ],
+              ),
+              const SizedBox(height: 10),
+              _channelList(source.currency),
               const SizedBox(height: 16),
-              _inputCard(
+              BybitTextField(
                 label:
-                    _rail == 'Mobile money'
-                        ? '$_mobileMoneyProvider number'
-                        : 'Recipient address',
+                    _rail == 'M-Pesa' ? 'M-Pesa number' : 'Wayaki number or email',
                 hint: _recipientHint,
                 icon: Icons.qr_code_scanner_rounded,
                 controller: _recipientController,
               ),
-              const SizedBox(height: 16),
-              _inputCard(
-                label: 'Amount',
-                hint: '0.00',
-                icon: Icons.all_inclusive_rounded,
-                controller: _amountController,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               _summary(appState, source),
               const SizedBox(height: 24),
               BybitPrimaryButton(
@@ -148,218 +109,77 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   }
 
   String get _recipientHint {
-    switch (_rail) {
-      case 'Mobile money':
-        return _mobileMoneyProviders
-            .firstWhere((p) => p.$1 == _mobileMoneyProvider)
-            .$4;
-      case 'Crypto address':
-        return '0x... or wallet address';
-      case 'Bank account':
-        return 'Account number or IBAN';
-      default:
-        return '@username or phone';
-    }
+    return _rail == 'M-Pesa'
+        ? '+254 7XX XXX XXX'
+        : 'Username, phone or email';
   }
 
-  Widget _sourceSelector(List<KashAccount> accounts) {
+  /// Amount input with the source currency picker inline on the same row —
+  /// tapping the pill cycles between the visible accounts (there are only
+  /// two: Wayaki USD and Wayaki KES) instead of opening a whole picker.
+  Widget _amountCurrencyRow(KashAppState appState, KashAccount source) {
     return BybitCard(
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<KashAccountType>(
-          value: _sourceType,
-          dropdownColor: BybitPalette.surface,
-          iconEnabledColor: BybitPalette.muted,
-          isExpanded: true,
-          items:
-              accounts.map((account) {
-                return DropdownMenuItem(
-                  value: account.type,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: account.accent.withOpacity(0.16),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          account.icon,
-                          color: account.accent,
-                          size: 25,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              account.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              account.balance,
-                              style: const TextStyle(
-                                color: BybitPalette.muted2,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-          onChanged: (account) {
-            if (account != null) setState(() => _sourceType = account);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _railSelector() {
-    final rails = ['Crypto address', 'Wayaki', 'Mobile money', 'Bank account'];
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children:
-          rails.map((rail) {
-            final selected = rail == _rail;
-            return TouchScale(
-              onTap: () => setState(() => _rail = rail),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color:
-                      selected ? BybitPalette.selected : BybitPalette.surface2,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Text(
-                  rail,
-                  style: TextStyle(
-                    color: selected ? Colors.white : BybitPalette.muted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-    );
-  }
-
-  Widget _mobileMoneyGrid() {
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 10,
-      crossAxisSpacing: 10,
-      childAspectRatio: 0.92,
-      children:
-          _mobileMoneyProviders.map((provider) {
-            final (name, icon, color, _) = provider;
-            final selected = name == _mobileMoneyProvider;
-            return TouchScale(
-              onTap: () => setState(() => _mobileMoneyProvider = name),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 6,
-                ),
-                decoration: BoxDecoration(
-                  color:
-                      selected ? BybitPalette.selected : BybitPalette.surface2,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: selected ? BybitPalette.accent : Colors.transparent,
-                    width: 1.6,
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.18),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, color: color, size: 19),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      name,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: selected ? Colors.white : BybitPalette.muted,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-    );
-  }
-
-  Widget _inputCard({
-    required String label,
-    required String hint,
-    required IconData icon,
-    required TextEditingController controller,
-    TextInputType? keyboardType,
-  }) {
-    return BybitCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: BybitPalette.muted2,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
+          Expanded(
+            child: TextField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+              ),
+              decoration: const InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                hintText: '0.00',
+                hintStyle: TextStyle(
+                  color: BybitPalette.muted,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-            ),
-            decoration: InputDecoration(
-              hintText: hint,
-              prefixIcon: Icon(icon, color: BybitPalette.muted),
-              filled: true,
-              fillColor: BybitPalette.surface2,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide.none,
+          const SizedBox(width: 12),
+          TouchScale(
+            onTap: () => _cycleSourceAccount(appState.visibleAccounts),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
               ),
-              hintStyle: const TextStyle(color: BybitPalette.muted),
+              decoration: BoxDecoration(
+                color: BybitPalette.surface2,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(source.icon, color: source.accent, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    source.currency,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (appState.visibleAccounts.length > 1) ...[
+                    const SizedBox(width: 2),
+                    const Icon(
+                      Icons.unfold_more_rounded,
+                      color: BybitPalette.muted,
+                      size: 15,
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ],
@@ -367,36 +187,103 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     );
   }
 
+  void _cycleSourceAccount(List<KashAccount> accounts) {
+    if (accounts.length < 2) return;
+    final index = accounts.indexWhere((a) => a.type == _sourceType);
+    final next = accounts[(index + 1) % accounts.length];
+    setState(() {
+      _sourceType = next.type;
+      _rail = 'Wayaki';
+    });
+  }
+
+  /// Wayaki-to-Wayaki transfer is always available; M-Pesa cash-out only
+  /// makes sense when sending out of the KES account, since that's the
+  /// only currency M-Pesa settles in. Styled as a channel list — icon,
+  /// name, and a highlighted border on the selected row.
+  Widget _channelList(String sourceCurrency) {
+    final channels =
+        sourceCurrency == 'KES'
+            ? const [
+              _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
+              _ChannelOption('M-Pesa', Icons.phone_iphone_rounded),
+            ]
+            : const [
+              _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
+            ];
+    return Column(children: channels.map(_channelRow).toList());
+  }
+
+  Widget _channelRow(_ChannelOption option) {
+    final selected = option.name == _rail;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TouchScale(
+        onTap: () => setState(() => _rail = option.name),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: BybitPalette.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color:
+                  selected ? BybitPalette.accent : const Color(0xFF242832),
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: BybitPalette.surface2,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  option.icon,
+                  color: BybitPalette.accent,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  option.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.circle_outlined,
+                color: selected ? BybitPalette.accent : BybitPalette.muted2,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _summary(KashAppState appState, KashAccount source) {
     final fee = appState.transferFee(_rail);
     return BybitCard(
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Transfer details',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          BybitInfoLine(
-            'Route',
-            '${source.title} -> ${_rail == 'Mobile money' ? _mobileMoneyProvider : _rail}',
-          ),
-          BybitInfoLine(
-            'Speed',
-            _rail == 'Crypto address' ? 'Network dependent' : 'Instant sandbox',
-          ),
+          BybitInfoLine('Available', source.balance),
           BybitInfoLine(
             'Fee',
             fee == 0 ? 'Free' : '\$${fee.toStringAsFixed(2)} estimated',
-          ),
-          BybitInfoLine('Available', source.balance),
-          BybitInfoLine(
-            'Limits (${appState.kycTier})',
-            '\$${appState.remainingDailyLimit.toStringAsFixed(0)} left today',
           ),
         ],
       ),
@@ -471,56 +358,99 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
 
     showDialog(
       context: context,
-      builder:
-          (_) => Dialog(
-            backgroundColor: BybitPalette.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircleAvatar(
-                    radius: 38,
-                    backgroundColor: BybitPalette.accent,
-                    child: Icon(
-                      Icons.check_rounded,
-                      color: Colors.black,
-                      size: 38,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Transfer queued',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    result.message,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: BybitPalette.muted2,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  BybitPrimaryButton(
-                    label: 'Done',
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                  ),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (_) => _DoneGlassDialog(message: result.message),
+    );
+  }
+}
+
+/// Success dialog after a transfer clears the PIN step — a frosted-glass
+/// card (blurred backdrop, translucent surface, thin light border) instead
+/// of a flat solid dialog, since this is the one moment worth a bit of
+/// visual flourish.
+class _DoneGlassDialog extends StatelessWidget {
+  final String message;
+
+  const _DoneGlassDialog({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.10),
+                  BybitPalette.accent.withValues(alpha: 0.06),
                 ],
               ),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.18),
+                width: 1.2,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: BybitPalette.accent.withValues(alpha: 0.16),
+                    border: Border.all(
+                      color: BybitPalette.accent.withValues(alpha: 0.5),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: BybitPalette.accent,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Transfer queued',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: BybitPalette.muted2,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                BybitPrimaryButton(
+                  label: 'Done',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
             ),
           ),
+        ),
+      ),
     );
   }
 }
@@ -571,7 +501,7 @@ class _PaymentConfirmationSheetState extends State<_PaymentConfirmationSheet> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Payment Confirmation',
+                  'Receipt',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 19,
@@ -715,7 +645,12 @@ class _PaymentConfirmationSheetState extends State<_PaymentConfirmationSheet> {
             _payWithRow('Deduct From', widget.source.title),
             const SizedBox(height: 10),
             _payWithRow('Currency', widget.currency),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
+            const CustomPaint(
+              size: Size(double.infinity, 1),
+              painter: _DashedLinePainter(),
+            ),
+            const SizedBox(height: 20),
             BybitPrimaryButton(
               label: 'Confirm',
               onTap: () => Navigator.of(context).pop(true),
@@ -747,7 +682,7 @@ class _PaymentConfirmationSheetState extends State<_PaymentConfirmationSheet> {
   }
 }
 
-/// Final gate before a transfer actually fires — a 6-digit transaction PIN,
+/// Final gate before a transfer actually fires — a 4-digit transaction PIN,
 /// same shape as the payment confirmation step every major wallet app uses.
 class _SecurityVerificationSheet extends StatefulWidget {
   const _SecurityVerificationSheet();
@@ -759,7 +694,7 @@ class _SecurityVerificationSheet extends StatefulWidget {
 
 class _SecurityVerificationSheetState
     extends State<_SecurityVerificationSheet> {
-  static const _pinLength = 6;
+  static const _pinLength = 4;
   String _pin = '';
   bool _verifying = false;
   String? _error;
@@ -784,7 +719,8 @@ class _SecurityVerificationSheetState
   }
 
   /// Checks the PIN against the real backend hash. The very first time a
-  /// user enters a PIN here (no PIN set yet), those same 6 digits become
+  /// user enters a PIN here (no PIN set yet — e.g. an account created
+  /// before PIN setup was part of signup), those same 4 digits become
   /// their PIN — no separate mandatory setup screen blocking a first send.
   Future<void> _submit() async {
     if (!mounted || _pin.length != _pinLength) return;
@@ -938,69 +874,40 @@ class _SecurityVerificationSheetState
               ),
             ),
             const SizedBox(height: 20),
-            _keypad(),
+            NumericKeypad(onDigit: _tapDigit, onBackspace: _backspace),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _keypad() {
-    const rows = [
-      ['1', '2', '3'],
-      ['4', '5', '6'],
-      ['7', '8', '9'],
-      ['', '0', 'del'],
-    ];
-    return Column(
-      children:
-          rows.map((row) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children:
-                    row.map((key) {
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 5),
-                          child: _keypadButton(key),
-                        ),
-                      );
-                    }).toList(),
-              ),
-            );
-          }).toList(),
-    );
+class _ChannelOption {
+  final String name;
+  final IconData icon;
+
+  const _ChannelOption(this.name, this.icon);
+}
+
+/// Perforated-edge line above the confirm button on the Receipt sheet.
+class _DashedLinePainter extends CustomPainter {
+  const _DashedLinePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = BybitPalette.muted.withValues(alpha: 0.3)
+          ..strokeWidth = 1;
+    const dashWidth = 6.0;
+    const gap = 5.0;
+    var x = 0.0;
+    while (x < size.width) {
+      canvas.drawLine(Offset(x, 0), Offset(x + dashWidth, 0), paint);
+      x += dashWidth + gap;
+    }
   }
 
-  Widget _keypadButton(String key) {
-    if (key.isEmpty) return const SizedBox(height: 52);
-    final isDelete = key == 'del';
-    return TouchScale(
-      onTap: isDelete ? _backspace : () => _tapDigit(key),
-      child: Container(
-        height: 52,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: BybitPalette.surface2,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child:
-            isDelete
-                ? const Icon(
-                  Icons.backspace_outlined,
-                  color: BybitPalette.muted2,
-                  size: 20,
-                )
-                : Text(
-                  key,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-      ),
-    );
-  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
