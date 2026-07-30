@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
 import 'admin_console_screen.dart';
+import 'auth/welcome_screen.dart';
 import 'kyc_limits_screen.dart';
 import 'security_screen.dart';
 import 'settings_screen.dart';
@@ -129,10 +131,53 @@ class ProfileScreen extends StatelessWidget {
                         context,
                       ).push(kashRoute(const AdminConsoleScreen())),
                 ),
+              const SizedBox(height: 8),
+              _tile(
+                Icons.logout_rounded,
+                'Log out',
+                'Sign out of this device',
+                onTap: () => _confirmLogout(context),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (dialogContext) => AlertDialog(
+            backgroundColor: BybitPalette.surface,
+            title: const Text('Log out?', style: TextStyle(color: Colors.white)),
+            content: const Text(
+              "You'll need to sign in again to access your wallet.",
+              style: TextStyle(color: BybitPalette.muted2),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text(
+                  'Log out',
+                  style: TextStyle(color: BybitPalette.red),
+                ),
+              ),
+            ],
+          ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    await AuthService.signOut();
+    if (!context.mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      kashRoute(const WelcomeScreen()),
+      (route) => false,
     );
   }
 

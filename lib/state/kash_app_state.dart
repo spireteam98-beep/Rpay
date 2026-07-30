@@ -125,9 +125,11 @@ class KashAppState extends ChangeNotifier {
     _accounts =
         _accounts.map((account) {
           switch (account.type) {
-            case KashAccountType.crypto:
+            case KashAccountType.walletUsd:
               return account;
-            case KashAccountType.mobileMoney:
+            case KashAccountType.walletKes:
+              return account;
+            case KashAccountType.crypto:
               return account;
             case KashAccountType.bank:
               if (bank == null) return account;
@@ -161,27 +163,28 @@ class KashAppState extends ChangeNotifier {
     final usd = _asDouble(fiat?['USD']);
     final kes = _asDouble(fiat?['KES']);
     final kesPerUsd = _asDouble(fiat?['kesPerUsd']);
-    final kesAsUsd = kesPerUsd > 0 ? kes / kesPerUsd : 0;
+    final kesAsUsd = kesPerUsd > 0 ? kes / kesPerUsd : 0.0;
     final cryptoTotal = _asDouble(crypto?['totalUsd']);
-    final walletTotal = _asDouble(hybrid['totalUsd']);
-    final fiatTotal =
-        walletTotal > 0 ? walletTotal - cryptoTotal : usd + kesAsUsd;
     final depositAddress = crypto?['depositAddress'] as String?;
 
     _accounts =
         _accounts.map((account) {
           switch (account.type) {
+            case KashAccountType.walletUsd:
+              return account.copyWith(balanceUsd: usd, nativeAmount: usd);
+            case KashAccountType.walletKes:
+              return account.copyWith(
+                balanceUsd: kesAsUsd.toDouble(),
+                nativeAmount: kes,
+              );
             case KashAccountType.crypto:
               return account.copyWith(
                 balanceUsd: cryptoTotal,
+                nativeAmount: cryptoTotal,
                 status:
                     (depositAddress == null || depositAddress.isEmpty)
                         ? account.status
                         : 'Deposit address $depositAddress',
-              );
-            case KashAccountType.mobileMoney:
-              return account.copyWith(
-                balanceUsd: fiatTotal.clamp(0, double.infinity).toDouble(),
               );
             case KashAccountType.bank:
               return account;
@@ -191,6 +194,12 @@ class KashAppState extends ChangeNotifier {
 
   // ── Getters ─────────────────────────────────────────────────────
   List<KashAccount> get accounts => List.unmodifiable(_accounts);
+
+  /// The accounts actually shown in the app — Wayaki USD and Wayaki KES.
+  /// Crypto custody and the virtual bank account stay in [_accounts] (kept
+  /// in sync in the background) but are hidden from the UI until later.
+  List<KashAccount> get visibleAccounts =>
+      List.unmodifiable(_accounts.where((account) => account.isVisible));
   List<LedgerTransaction> get ledgerTransactions =>
       List.unmodifiable(_ledgerTransactions);
   List<LedgerEntry> get ledgerEntries => List.unmodifiable(
@@ -219,11 +228,17 @@ class KashAppState extends ChangeNotifier {
   double get remainingDailyLimit =>
       (tier.dailyLimit - spentToday).clamp(0, tier.dailyLimit);
   String get totalBalance => _money.format(
-    _accounts.fold<double>(0, (total, account) => total + account.balanceUsd),
+    visibleAccounts.fold<double>(
+      0,
+      (total, account) => total + account.balanceUsd,
+    ),
   );
 
   List<KashTransaction> get recentTransactions {
-    return _accounts.expand((account) => account.transactions).take(6).toList();
+    return visibleAccounts
+        .expand((account) => account.transactions)
+        .take(6)
+        .toList();
   }
 
   KashAccount accountByType(KashAccountType type) {
@@ -301,7 +316,7 @@ class KashAppState extends ChangeNotifier {
       try {
         final response = await ApiService.createP2pTransfer(
           recipient: recipient.trim(),
-          currency: sourceType == KashAccountType.mobileMoney ? 'KES' : 'USD',
+          currency: sourceType == KashAccountType.walletKes ? 'KES' : 'USD',
           amount: amount,
           memo: 'Hybrid wallet transfer',
         );
@@ -310,6 +325,30 @@ class KashAppState extends ChangeNotifier {
         return TransferResult.success(
           '${_money.format(amount)} sent through Wayaki.',
           transactionId: transfer?['id']?.toString(),
+        );
+      } on ApiException catch (err) {
+        return TransferResult.failure(err.message);
+      } catch (_) {
+        return const TransferResult.failure(
+          'Could not reach the live transfer service. Try again.',
+        );
+      }
+    }
+
+    // M-Pesa channel only ever appears when the source account is the KES
+    // wallet (see SendMoneyScreen._channelList), so `amount` here is already
+    // native KES, not USD — fires a real Paystack payout to `recipient`
+    // (the phone number typed in), not the local simulated ledger below.
+    if (ApiService.hasSession && rail == 'M-Pesa') {
+      try {
+        final response = await ApiService.submitMobileMoneyWithdrawal(
+          rail: rail,
+          amountKes: amount,
+          phone: recipient.trim(),
+        );
+        await syncFromBackend();
+        return TransferResult.success(
+          response?['message'] as String? ?? 'Withdrawal submitted.',
         );
       } on ApiException catch (err) {
         return TransferResult.failure(err.message);
@@ -448,9 +487,51 @@ class KashAppState extends ChangeNotifier {
     );
   }
 
+  /// Converts between the user's own Wayaki USD and Wayaki KES wallets at
+  /// the backend's fixed rate — the "intentionally convert to USD" bridge.
+  /// Requires a live session; there's no offline/local simulation of this
+  /// since the rate and the ledger posting both live on the backend.
+  Future<TransferResult> convertCurrency({
+    required String from,
+    required String to,
+    required double amount,
+  }) async {
+    if (amount <= 0) {
+      return const TransferResult.failure('Enter an amount greater than 0.');
+    }
+    if (!ApiService.hasSession) {
+      return const TransferResult.failure(
+        'Sign in to convert between USD and KES.',
+      );
+    }
+    try {
+      final response = await ApiService.convert(
+        from: from,
+        to: to,
+        amount: amount,
+      );
+      await syncFromBackend();
+      final converted = (response['convertedAmount'] as num).toDouble();
+      return TransferResult.success(
+        'Converted ${amount.toStringAsFixed(2)} $from to ${converted.toStringAsFixed(2)} $to.',
+      );
+    } on ApiException catch (err) {
+      return TransferResult.failure(err.message);
+    } catch (_) {
+      return const TransferResult.failure(
+        'Could not reach the conversion service. Try again.',
+      );
+    }
+  }
+
   double transferFee(String rail) {
     switch (rail) {
       case 'Wayaki':
+        return 0;
+      // No fee for now — the real Paystack payout (services/paystackTransfers.js)
+      // doesn't deduct one either. Left at 0 until an admin-configurable fee
+      // is built; don't let this drift from the backend in the meantime.
+      case 'M-Pesa':
         return 0;
       case 'Crypto address':
         return 1.25;
@@ -513,7 +594,12 @@ class KashAppState extends ChangeNotifier {
     if (value.contains('bank') || value.contains('virtual')) {
       return KashAccountType.bank;
     }
-    return KashAccountType.mobileMoney;
+    if (value.contains('kes') ||
+        value.contains('m-pesa') ||
+        value.contains('mpesa')) {
+      return KashAccountType.walletKes;
+    }
+    return KashAccountType.walletUsd;
   }
 
   // ── AML ─────────────────────────────────────────────────────────
@@ -580,6 +666,7 @@ class KashAppState extends ChangeNotifier {
                 (account) => {
                   'type': account.type.index,
                   'balanceUsd': account.balanceUsd,
+                  'nativeAmount': account.nativeAmount,
                   'status': account.status,
                   'transactions':
                       account.transactions
@@ -629,6 +716,7 @@ class KashAppState extends ChangeNotifier {
             }
             return template.copyWith(
               balanceUsd: (match['balanceUsd'] as num?)?.toDouble() ?? 0,
+              nativeAmount: (match['nativeAmount'] as num?)?.toDouble() ?? 0,
               status: match['status'] as String? ?? template.status,
               transactions:
                   ((match['transactions'] as List?) ?? [])

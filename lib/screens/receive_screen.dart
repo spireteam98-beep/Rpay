@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../services/api_service.dart';
+import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/touch_scale.dart';
 
@@ -14,9 +16,10 @@ class ReceiveScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final phoneNumber = context.watch<KashAppState>().phoneNumber;
     return Scaffold(
       backgroundColor: BybitPalette.bg,
-      appBar: const BybitSubHeader('Receive crypto'),
+      appBar: const BybitSubHeader('Receive'),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -24,6 +27,23 @@ class ReceiveScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text(
+                'Your Wallet ID',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.6,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Share your phone number so other Wayaki users can send you money instantly — no address needed.',
+                style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              _walletIdCard(context, phoneNumber),
+              const SizedBox(height: 32),
               const Text(
                 'Your deposit address',
                 style: TextStyle(
@@ -74,6 +94,79 @@ class ReceiveScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Phone number as the shareable "Wallet ID" for Wayaki-to-Wayaki
+  /// transfers — the Send screen already accepts a phone number as the
+  /// recipient (backend looks up `WHERE phone = $1 OR email = $2`), but
+  /// until now there was nowhere in the app telling a user *their own*
+  /// number is what they hand out to get paid.
+  Widget _walletIdCard(BuildContext context, String phoneNumber) {
+    return TouchScale(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: phoneNumber));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Wallet ID copied'),
+            backgroundColor: BybitPalette.surface2,
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: BybitPalette.accent.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: BybitPalette.accent.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.phone_iphone_rounded,
+                color: BybitPalette.accent,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Wallet ID (phone)',
+                    style: TextStyle(color: BybitPalette.muted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    phoneNumber,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.copy_rounded,
+              color: BybitPalette.accent,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );
