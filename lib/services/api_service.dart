@@ -1296,6 +1296,72 @@ class ApiService {
     await _prefs.remove(_tokenKey);
   }
 
+  // ── Profile ──────────────────────────────────────────────────────
+
+  static Future<void> updateFullName(String fullName) async {
+    final res = await http
+        .patch(
+          Uri.parse('$baseUrl/auth/profile'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'fullName': fullName}),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    throw ApiException(body['error'] as String? ?? 'Could not update name');
+  }
+
+  /// Starts an email change — sends a code to [newEmail]. The account's
+  /// email doesn't switch until [confirmEmailChange] verifies it.
+  static Future<Map<String, dynamic>> requestEmailChange(String newEmail) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/email/change'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'newEmail': newEmail}),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not start email change');
+  }
+
+  /// Confirms the code sent by [requestEmailChange]; returns the new email
+  /// on success.
+  static Future<String> confirmEmailChange(String code) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/email/change/confirm'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'code': code}),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body['email'] as String;
+    throw ApiException(body['error'] as String? ?? 'Incorrect code');
+  }
+
+  /// Sets or changes the login password. [currentPassword] is required
+  /// only when the account already has one.
+  static Future<void> changePassword({
+    required String newPassword,
+    String? currentPassword,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/password/change'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'newPassword': newPassword,
+            if (currentPassword != null) 'currentPassword': currentPassword,
+          }),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    throw ApiException(body['error'] as String? ?? 'Could not change password');
+  }
+
   // ── Wallet ID ────────────────────────────────────────────────────
 
   /// Live availability check while the user types a username on the

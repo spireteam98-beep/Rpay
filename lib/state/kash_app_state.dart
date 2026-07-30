@@ -60,6 +60,7 @@ class KashAppState extends ChangeNotifier {
   bool _phoneVerified = false;
   bool _kycSubmitted = false;
   bool _hasPin = false;
+  bool _hasPassword = false;
   bool _biometricEnabled = false;
   bool _trustedDevice = true;
   bool _notifyPush = true;
@@ -135,6 +136,7 @@ class KashAppState extends ChangeNotifier {
       _kycSubmitted = kycTier is num ? kycTier >= 2 : _kycSubmitted;
       _role = me['role'] as String? ?? _role;
       _hasPin = me['has_pin'] == true;
+      _hasPassword = me['has_password'] == true;
     }
 
     _accounts =
@@ -255,6 +257,7 @@ class KashAppState extends ChangeNotifier {
   bool get phoneVerified => _phoneVerified;
   bool get kycSubmitted => _kycSubmitted;
   bool get hasPin => _hasPin;
+  bool get hasPassword => _hasPassword;
   bool get biometricEnabled => _biometricEnabled;
   bool get trustedDevice => _trustedDevice;
   bool get notifyPush => _notifyPush;
@@ -308,6 +311,18 @@ class KashAppState extends ChangeNotifier {
 
   void verifyPhone() {
     _phoneVerified = true;
+    _persist();
+    notifyListeners();
+  }
+
+  void updateProfileNameLocal(String fullName) {
+    _profileName = fullName;
+    _persist();
+    notifyListeners();
+  }
+
+  void updateEmailLocal(String email) {
+    _email = email;
     _persist();
     notifyListeners();
   }
@@ -706,6 +721,7 @@ class KashAppState extends ChangeNotifier {
       'phoneVerified': _phoneVerified,
       'kycSubmitted': _kycSubmitted,
       'hasPin': _hasPin,
+      'hasPassword': _hasPassword,
       'biometricEnabled': _biometricEnabled,
       'trustedDevice': _trustedDevice,
       'notifyPush': _notifyPush,
@@ -752,6 +768,7 @@ class KashAppState extends ChangeNotifier {
       _phoneVerified = state['phoneVerified'] as bool? ?? false;
       _kycSubmitted = state['kycSubmitted'] as bool? ?? false;
       _hasPin = state['hasPin'] as bool? ?? false;
+      _hasPassword = state['hasPassword'] as bool? ?? false;
       _biometricEnabled = state['biometricEnabled'] as bool? ?? false;
       _trustedDevice = state['trustedDevice'] as bool? ?? true;
       _notifyPush = state['notifyPush'] as bool? ?? true;

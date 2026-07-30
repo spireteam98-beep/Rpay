@@ -10,9 +10,11 @@ import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 import 'auth/welcome_screen.dart';
 
-/// The real Settings destinations: Personal details (read-only — no
-/// PATCH /auth/me exists yet, so this deliberately isn't a fake edit form),
-/// Linked accounts (the same three real wallet accounts shown elsewhere),
+/// The real Settings destinations: Personal details (name and email are
+/// editable — email requires re-verifying the new address; phone is
+/// locked, shown but not editable, per compliance — it's the account's
+/// KYC-linked identifier), Linked accounts (the same three real wallet
+/// accounts shown elsewhere),
 /// Notifications (client-side preference toggles, no backend dispatch
 /// system to wire them to), Support (the shared contact dialog), and Delete
 /// account (in-app deletion request, required by App Store Guideline
@@ -35,7 +37,7 @@ class SettingsScreen extends StatelessWidget {
                 context,
                 Icons.person_outline_rounded,
                 'Personal details',
-                'Name, phone',
+                'Name, email, phone',
                 onTap:
                     () => Navigator.of(
                       context,
@@ -280,11 +282,32 @@ class _PersonalDetailsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _field('Full name', appState.profileName),
-              const SizedBox(height: 10),
-              _field('Phone', appState.phoneNumber),
+              _field(
+                context,
+                'Full name',
+                appState.profileName,
+                onTap: () => _editName(context, appState.profileName),
+              ),
               const SizedBox(height: 10),
               _field(
+                context,
+                'Email',
+                appState.email.isEmpty ? 'Not set' : appState.email,
+                onTap: () => _changeEmail(context),
+              ),
+              const SizedBox(height: 10),
+              _field(context, 'Phone', appState.phoneNumber, locked: true),
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  "Phone number can't be changed — it's tied to your verified identity for compliance.",
+                  style: TextStyle(color: BybitPalette.muted, fontSize: 11.5, height: 1.3),
+                ),
+              ),
+              const SizedBox(height: 10),
+              _field(
+                context,
                 'Verification',
                 appState.phoneVerified ? 'Phone verified' : 'Phone unverified',
               ),
@@ -295,8 +318,32 @@ class _PersonalDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _field(String label, String value) {
-    return Container(
+  void _editName(BuildContext context, String currentName) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditNameSheet(currentName: currentName),
+    );
+  }
+
+  void _changeEmail(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ChangeEmailSheet(),
+    );
+  }
+
+  Widget _field(
+    BuildContext context,
+    String label,
+    String value, {
+    VoidCallback? onTap,
+    bool locked = false,
+  }) {
+    final card = Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
@@ -326,7 +373,300 @@ class _PersonalDetailsScreen extends StatelessWidget {
               ),
             ),
           ),
+          if (locked) ...[
+            const SizedBox(width: 8),
+            const Icon(Icons.lock_outline_rounded, color: BybitPalette.muted, size: 15),
+          ] else if (onTap != null) ...[
+            const SizedBox(width: 8),
+            const Icon(Icons.edit_outlined, color: BybitPalette.accent, size: 15),
+          ],
         ],
+      ),
+    );
+    if (onTap == null) return card;
+    return TouchScale(onTap: onTap, child: card);
+  }
+}
+
+/// Bottom sheet: edit full name (no re-verification needed).
+class _EditNameSheet extends StatefulWidget {
+  final String currentName;
+  const _EditNameSheet({required this.currentName});
+
+  @override
+  State<_EditNameSheet> createState() => _EditNameSheetState();
+}
+
+class _EditNameSheetState extends State<_EditNameSheet> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.currentName);
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _controller.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Enter your full name');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await ApiService.updateFullName(name);
+      if (!mounted) return;
+      context.read<KashAppState>().updateProfileNameLocal(name);
+      Navigator.of(context).pop();
+      BybitToast.success(context, 'Name updated');
+    } on ApiException catch (err) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = err.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _BottomSheetShell(
+      title: 'Edit full name',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          BybitTextField(
+            label: 'Full name',
+            hint: 'Mohamed Ali',
+            icon: Icons.person_outline_rounded,
+            controller: _controller,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _error!,
+              style: const TextStyle(color: BybitPalette.red, fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+          ],
+          const SizedBox(height: 20),
+          BybitPrimaryButton(
+            label: _submitting ? 'Saving…' : 'Save',
+            enabled: !_submitting,
+            onTap: _save,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _EmailChangeStep { enterEmail, enterCode }
+
+/// Bottom sheet: change email — a two-step flow (enter new address, then
+/// the code sent to it) since email is a login credential and lookup key,
+/// unlike the full name.
+class _ChangeEmailSheet extends StatefulWidget {
+  const _ChangeEmailSheet();
+
+  @override
+  State<_ChangeEmailSheet> createState() => _ChangeEmailSheetState();
+}
+
+class _ChangeEmailSheetState extends State<_ChangeEmailSheet> {
+  _EmailChangeStep _step = _EmailChangeStep.enterEmail;
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _codeController = TextEditingController();
+  String _pendingEmail = '';
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendCode() async {
+    final email = _emailController.text.trim().toLowerCase();
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      setState(() => _error = 'Enter a valid email address');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await ApiService.requestEmailChange(email);
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _pendingEmail = email;
+        _step = _EmailChangeStep.enterCode;
+      });
+    } on ApiException catch (err) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = err.message;
+      });
+    }
+  }
+
+  Future<void> _confirmCode() async {
+    final code = _codeController.text.trim();
+    if (code.length != 4) {
+      setState(() => _error = 'Enter the 4-digit code');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final newEmail = await ApiService.confirmEmailChange(code);
+      if (!mounted) return;
+      context.read<KashAppState>().updateEmailLocal(newEmail);
+      Navigator.of(context).pop();
+      BybitToast.success(context, 'Email updated');
+    } on ApiException catch (err) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = err.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_step == _EmailChangeStep.enterEmail) {
+      return _BottomSheetShell(
+        title: 'Change email',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            BybitTextField(
+              label: 'New email address',
+              hint: 'you@example.com',
+              icon: Icons.alternate_email_rounded,
+              keyboardType: TextInputType.emailAddress,
+              controller: _emailController,
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: const TextStyle(color: BybitPalette.red, fontSize: 12.5, fontWeight: FontWeight.w700),
+              ),
+            ],
+            const SizedBox(height: 20),
+            BybitPrimaryButton(
+              label: _submitting ? 'Sending…' : 'Send code',
+              enabled: !_submitting,
+              onTap: _sendCode,
+            ),
+          ],
+        ),
+      );
+    }
+    return _BottomSheetShell(
+      title: 'Enter the code',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'We sent a code to $_pendingEmail.',
+            style: const TextStyle(color: BybitPalette.muted2, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          BybitTextField(
+            label: 'Verification code',
+            hint: '0000',
+            icon: Icons.password_rounded,
+            keyboardType: TextInputType.number,
+            controller: _codeController,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _error!,
+              style: const TextStyle(color: BybitPalette.red, fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+          ],
+          const SizedBox(height: 20),
+          BybitPrimaryButton(
+            label: _submitting ? 'Confirming…' : 'Confirm',
+            enabled: !_submitting,
+            onTap: _confirmCode,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shared bottom-sheet chrome (title + close button) used by the personal
+/// details / security edit sheets.
+class _BottomSheetShell extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _BottomSheetShell({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        decoration: const BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                TouchScale(
+                  onTap: () => Navigator.of(context).pop(),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: const BoxDecoration(
+                      color: BybitPalette.surface2,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      color: BybitPalette.muted2,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            child,
+          ],
+        ),
       ),
     );
   }

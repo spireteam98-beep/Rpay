@@ -498,6 +498,24 @@ async function migrate() {
     ALTER TABLE email_otps ADD COLUMN IF NOT EXISTS failure_reason TEXT;
   `);
 
+  // WhatsApp as an alternative OTP delivery channel (via WATI) — see
+  // services/whatsapp.js and routes/auth.js POST /auth/login/request-otp.
+  // `phone` is only populated for channel='whatsapp' rows; `email` only for
+  // channel='email' rows, so existing email-channel queries/indexes are
+  // untouched. Verifying a whatsapp-channel code proves phone ownership,
+  // not email — callers must not set email_verified from it.
+  await pool.query(`
+    ALTER TABLE email_otps ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'email';
+    ALTER TABLE email_otps DROP CONSTRAINT IF EXISTS email_otps_channel_check;
+    ALTER TABLE email_otps ADD CONSTRAINT email_otps_channel_check
+      CHECK (channel IN ('email','whatsapp'));
+    ALTER TABLE email_otps ADD COLUMN IF NOT EXISTS phone TEXT;
+    ALTER TABLE email_otps ALTER COLUMN email DROP NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_email_otps_phone
+      ON email_otps(phone, purpose, created_at DESC)
+      WHERE phone IS NOT NULL;
+  `);
+
   // Wallet ID: at signup a user picks which identifier (phone, email, or a
   // custom handle) they hand out to receive money — see routes/auth.js
   // POST /auth/wallet-id and the p2p transfer recipient lookup, which now

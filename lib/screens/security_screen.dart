@@ -72,6 +72,50 @@ class SecurityScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
+              TouchScale(
+                onTap: () => _openPasswordFlow(context, appState),
+                child: BybitCard(
+                  padding: const EdgeInsets.all(15),
+                  child: Row(
+                    children: [
+                      const CircleIconWrap(icon: Icons.password_rounded),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              appState.hasPassword
+                                  ? 'Change password'
+                                  : 'Set password',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              appState.hasPassword
+                                  ? 'Used to sign in with email + password'
+                                  : 'Not set yet — you can add one for password sign-in',
+                              style: const TextStyle(
+                                color: BybitPalette.muted,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: BybitPalette.muted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               _toggleRow(
                 icon: Icons.fingerprint_rounded,
                 title: 'Biometric login',
@@ -212,6 +256,15 @@ class SecurityScreen extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _PinFlowSheet(hasPin: appState.hasPin),
+    );
+  }
+
+  void _openPasswordFlow(BuildContext context, KashAppState appState) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PasswordFlowSheet(hasPassword: appState.hasPassword),
     );
   }
 }
@@ -445,6 +498,162 @@ class _PinFlowSheetState extends State<_PinFlowSheet> {
                 )
                 : NumericKeypad(onDigit: _tapDigit, onBackspace: _backspace),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Set-or-change password flow. Only asks for the current password when
+/// one already exists — accounts created via Telegram or OTP-only sign-in
+/// may have none yet.
+class _PasswordFlowSheet extends StatefulWidget {
+  final bool hasPassword;
+  const _PasswordFlowSheet({required this.hasPassword});
+
+  @override
+  State<_PasswordFlowSheet> createState() => _PasswordFlowSheetState();
+}
+
+class _PasswordFlowSheetState extends State<_PasswordFlowSheet> {
+  final TextEditingController _currentController = TextEditingController();
+  final TextEditingController _newController = TextEditingController();
+  final TextEditingController _confirmController = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final newPassword = _newController.text;
+    if (newPassword.length < 8) {
+      setState(() => _error = 'Password must be at least 8 characters');
+      return;
+    }
+    if (newPassword != _confirmController.text) {
+      setState(() => _error = 'Passwords do not match');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await ApiService.changePassword(
+        newPassword: newPassword,
+        currentPassword:
+            widget.hasPassword ? _currentController.text : null,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      BybitToast.success(
+        context,
+        widget.hasPassword ? 'Password changed' : 'Password set',
+      );
+    } on ApiException catch (err) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = err.message;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        decoration: const BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    widget.hasPassword ? 'Change password' : 'Set password',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  TouchScale(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: BybitPalette.muted2,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (widget.hasPassword) ...[
+                BybitTextField(
+                  label: 'Current password',
+                  hint: 'Enter your current password',
+                  icon: Icons.lock_outline_rounded,
+                  obscure: true,
+                  controller: _currentController,
+                ),
+                const SizedBox(height: 18),
+              ],
+              BybitTextField(
+                label: 'New password',
+                hint: 'At least 8 characters',
+                icon: Icons.lock_outline_rounded,
+                obscure: true,
+                controller: _newController,
+              ),
+              const SizedBox(height: 18),
+              BybitTextField(
+                label: 'Confirm new password',
+                hint: 'Re-enter your new password',
+                icon: Icons.lock_outline_rounded,
+                obscure: true,
+                controller: _confirmController,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    color: BybitPalette.red,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              BybitPrimaryButton(
+                label: _submitting ? 'Saving…' : 'Save',
+                enabled: !_submitting,
+                onTap: _save,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -572,12 +572,133 @@ router.get('/me', requireAuth, async (req, res, next) => {
       `SELECT id, full_name, email, phone, kyc_tier, phone_verified, eth_address,
               usd_balance, kes_balance, role, email_verified, created_at,
               username, wallet_id_type,
-              (pin_hash IS NOT NULL) AS has_pin
+              (pin_hash IS NOT NULL) AS has_pin,
+              (password_hash IS NOT NULL) AS has_password
          FROM users WHERE id = $1`,
       [req.userId],
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
     res.json(result.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * PATCH /auth/profile { fullName } — updates the display name only. No
+ * re-verification needed since it isn't a login credential or lookup key.
+ */
+router.patch('/profile', requireAuth, async (req, res, next) => {
+  try {
+    const fullName = String(req.body?.fullName || '').trim();
+    if (!fullName) {
+      return res.status(400).json({ error: 'Full name is required' });
+    }
+    await pool.query('UPDATE users SET full_name = $1 WHERE id = $2', [fullName, req.userId]);
+    res.json({ fullName });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/email/change { newEmail } — starts an email change: sends a
+ * code to the *new* address (purpose 'email_change') rather than switching
+ * immediately, so the account can't be pointed at an email the user
+ * doesn't actually control. The old email keeps working until confirmed.
+ */
+router.post('/email/change', requireAuth, async (req, res, next) => {
+  try {
+    const newEmail = normalizeEmail(req.body?.newEmail);
+    if (!isEmail(newEmail)) {
+      return res.status(400).json({ error: 'Enter a valid email address' });
+    }
+    const existing = await pool.query(
+      'SELECT id FROM users WHERE LOWER(email) = $1 AND id != $2',
+      [newEmail, req.userId],
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'An account with this email already exists' });
+    }
+    const user = (
+      await pool.query('SELECT full_name FROM users WHERE id = $1', [req.userId])
+    ).rows[0];
+    const result = await createAndSendEmailOtp(req.userId, newEmail, user.full_name, 'email_change');
+    if (!result.sent) return res.status(503).json(result);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/email/change/confirm { code } — verifies the code sent to the
+ * pending new email (matched by purpose='email_change', not by the old
+ * email still on the account) and, on success, switches users.email over.
+ */
+router.post('/email/change/confirm', requireAuth, async (req, res, next) => {
+  try {
+    const code = String(req.body?.code || '').trim();
+    const otp = (
+      await pool.query(
+        `SELECT id, email, code_hash, attempts, expires_at
+           FROM email_otps
+          WHERE user_id = $1
+            AND purpose = 'email_change'
+            AND consumed_at IS NULL
+            AND delivery_status = 'sent'
+          ORDER BY created_at DESC
+          LIMIT 1`,
+        [req.userId],
+      )
+    ).rows[0];
+    if (!otp) return res.status(404).json({ error: 'No pending email change. Start again.' });
+    if (new Date(otp.expires_at).getTime() < Date.now()) {
+      return res.status(410).json({ error: 'Code has expired. Start again.' });
+    }
+    if (Number(otp.attempts) >= 5) {
+      return res.status(429).json({ error: 'Too many attempts. Start again.' });
+    }
+    if (email.hashCode(code) !== otp.code_hash) {
+      await pool.query('UPDATE email_otps SET attempts = attempts + 1 WHERE id = $1', [otp.id]);
+      return res.status(400).json({ error: 'Incorrect code' });
+    }
+
+    await pool.query('UPDATE email_otps SET consumed_at = now() WHERE id = $1', [otp.id]);
+    await pool.query(
+      'UPDATE users SET email = $1, email_verified = TRUE WHERE id = $2',
+      [otp.email, req.userId],
+    );
+    res.json({ email: otp.email });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/password/change { currentPassword?, newPassword } — sets or
+ * changes the login password. `currentPassword` is required only when one
+ * is already set (accounts created via Telegram/OTP-only may have none).
+ */
+router.post('/password/change', requireAuth, async (req, res, next) => {
+  try {
+    const newPassword = String(req.body?.newPassword || '');
+    const currentPassword = String(req.body?.currentPassword || '');
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const existing = (
+      await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.userId])
+    ).rows[0];
+    if (existing?.password_hash) {
+      const ok = currentPassword && (await bcrypt.compare(currentPassword, existing.password_hash));
+      if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    const hash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.userId]);
+    res.json({ set: true });
   } catch (err) {
     next(err);
   }
