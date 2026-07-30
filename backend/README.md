@@ -34,7 +34,7 @@ shows the live balance and can broadcast real (Sepolia testnet) transactions.
 |--------|---------------------|------------------------------------------------|
 | POST   | /auth/signup        | Create user + provision custody wallet         |
 | POST   | /auth/login         | Password login → JWT                           |
-| POST   | /auth/verify-phone  | OTP check (sandbox: any 6 digits)              |
+| POST   | /auth/verify-phone  | OTP check (sandbox: any 4 digits)              |
 | POST   | /auth/kyc           | Raise to full KYC tier                         |
 | GET    | /auth/me            | Profile                                        |
 | GET    | /wallet/summary     | Deposit address, on-chain balance, live prices |

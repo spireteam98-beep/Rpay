@@ -393,12 +393,12 @@ router.post('/login/verify-otp', async (req, res, next) => {
   }
 });
 
-/** POST /auth/verify-phone { code } — sandbox: any 6 digits pass. */
+/** POST /auth/verify-phone { code } — sandbox: any 4 digits pass. */
 router.post('/verify-phone', requireAuth, async (req, res, next) => {
   try {
     const { code } = req.body || {};
-    if (!/^\d{6}$/.test(String(code || ''))) {
-      return res.status(400).json({ error: 'Enter the 6-digit code' });
+    if (!/^\d{4}$/.test(String(code || ''))) {
+      return res.status(400).json({ error: 'Enter the 4-digit code' });
     }
     await pool.query('UPDATE users SET phone_verified = TRUE WHERE id = $1', [req.userId]);
     res.json({ verified: true });

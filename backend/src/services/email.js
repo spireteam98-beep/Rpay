@@ -5,8 +5,10 @@ function hashCode(code) {
   return crypto.createHash('sha256').update(String(code)).digest('hex');
 }
 
+/** Always exactly 4 digits (1000-9999) — must match the `/^\d{4}$/` checks
+ * in routes/auth.js and the 4-box CodeBoxesInput on every OTP screen. */
 function generateOtp() {
-  return crypto.randomInt(100000, 1000000).toString();
+  return crypto.randomInt(1000, 10000).toString();
 }
 
 async function sendEmail({ to, subject, html }) {
