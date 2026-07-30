@@ -39,68 +39,66 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-        decoration: BoxDecoration(
-          color: const Color(0xF20B0C0E),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFF1F2227)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0xB3000000),
-              blurRadius: 22,
-              offset: Offset(0, -8),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: BybitPalette.accent,
-          unselectedItemColor: BybitPalette.muted,
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
-          selectedLabelStyle: const TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.1,
+      // Flush, full-width, docked to the screen edge — a native OS tab bar
+      // (and the reference Telegram Mini Apps like @wallet) sits flat
+      // against the bottom, not floating above it with a visible gap and
+      // rounded corners, which reads as "a widget on a webpage" rather
+      // than the app's own chrome.
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF0B0C0E),
+            border: Border(top: BorderSide(color: Color(0xFF1F2227))),
           ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w500,
-            letterSpacing: -0.1,
+          child: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (index) {
+              HapticFeedback.selectionClick();
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: BybitPalette.accent,
+            unselectedItemColor: BybitPalette.muted,
+            showSelectedLabels: true,
+            showUnselectedLabels: true,
+            selectedLabelStyle: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.1,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              letterSpacing: -0.1,
+            ),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.account_balance_wallet_outlined),
+                activeIcon: Icon(Icons.account_balance_wallet_rounded),
+                label: 'Wallet',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.candlestick_chart_outlined),
+                activeIcon: Icon(Icons.candlestick_chart_rounded),
+                label: 'Markets',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.swap_vert_circle_outlined),
+                activeIcon: Icon(Icons.swap_vert_circle_rounded),
+                label: 'Trade',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.grid_view_outlined),
+                activeIcon: Icon(Icons.grid_view_rounded),
+                label: 'Hub',
+              ),
+            ],
           ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              activeIcon: Icon(Icons.account_balance_wallet_rounded),
-              label: 'Wallet',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.candlestick_chart_outlined),
-              activeIcon: Icon(Icons.candlestick_chart_rounded),
-              label: 'Markets',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.swap_vert_circle_outlined),
-              activeIcon: Icon(Icons.swap_vert_circle_rounded),
-              label: 'Trade',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.grid_view_outlined),
-              activeIcon: Icon(Icons.grid_view_rounded),
-              label: 'Hub',
-            ),
-          ],
         ),
       ),
     );
