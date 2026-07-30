@@ -69,11 +69,6 @@ class KashAppState extends ChangeNotifier {
   final List<DateTime> _recentTransferTimes = [];
   double _spentToday = 0;
   String _spentDate = '';
-  // Refreshed from the backend's live rate in _applyHybridBalances; this
-  // default only covers the brief window before the first syncFromBackend()
-  // call lands, and must be converting a USD amount to the KES a real
-  // M-Pesa payout will actually send.
-  double _kesPerUsd = 129;
 
   KashAppState({String? profileName, String? phoneNumber}) {
     if (profileName != null && profileName.isNotEmpty) {
@@ -168,7 +163,6 @@ class KashAppState extends ChangeNotifier {
     final usd = _asDouble(fiat?['USD']);
     final kes = _asDouble(fiat?['KES']);
     final kesPerUsd = _asDouble(fiat?['kesPerUsd']);
-    if (kesPerUsd > 0) _kesPerUsd = kesPerUsd;
     final kesAsUsd = kesPerUsd > 0 ? kes / kesPerUsd : 0.0;
     final cryptoTotal = _asDouble(crypto?['totalUsd']);
     final depositAddress = crypto?['depositAddress'] as String?;
@@ -342,19 +336,18 @@ class KashAppState extends ChangeNotifier {
     }
 
     // M-Pesa can be funded from either wallet (see SendMoneyScreen._channelList)
-    // — `amount` is in whatever currency the source account is in. A real
-    // M-Pesa payout is always KES, so a USD-sourced send converts up front;
-    // the backend independently converts back down to know how much USD to
-    // debit, and refunds the same wallet on failure. Fires a real Paystack
-    // payout to `recipient` (the phone number typed in), not the local
-    // simulated ledger below.
+    // — `amount` is in whatever currency the source account is in, sent
+    // as-is; the backend alone converts USD->KES for the actual M-Pesa
+    // payout, using its own exchange rate (see ApiService.submitMobileMoneyWithdrawal
+    // for why this side never does that math). Fires a real Paystack payout
+    // to `recipient` (the phone number typed in), not the local simulated
+    // ledger below.
     if (ApiService.hasSession && rail == 'M-Pesa') {
       final sourceCurrency = sourceType == KashAccountType.walletUsd ? 'USD' : 'KES';
-      final amountKes = sourceCurrency == 'USD' ? amount * _kesPerUsd : amount;
       try {
         final response = await ApiService.submitMobileMoneyWithdrawal(
           rail: rail,
-          amountKes: amountKes,
+          amount: amount,
           phone: recipient.trim(),
           sourceCurrency: sourceCurrency,
         );

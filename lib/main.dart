@@ -14,8 +14,9 @@ import 'state/kash_app_state.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Kick off a health ping immediately — if the Render backend is asleep,
-  // this starts its cold start now instead of on the user's first tap.
+  // Kick off a health ping immediately — harmless no-op now that the
+  // backend (Cloud Run, min-instances=1) never sleeps, but cheap insurance
+  // if a future deploy ever points back at a backend that can cold-start.
   ApiService.warmUp();
   Stripe.publishableKey = ApiService.stripePublishableKey;
   // Set preferred orientations to portrait mode

@@ -61,6 +61,7 @@ dependencies:
   web: ^1.1.1
   qr_flutter: ^4.1.0
   image_picker: ^1.1.2
+  share_plus: ^13.3.0
 
 dev_dependencies:
   flutter_test:

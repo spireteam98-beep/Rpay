@@ -1,12 +1,13 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/kash_account.dart';
 import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/pin_keypad.dart';
+import '../widgets/receipt_dialog.dart';
+import '../widgets/receipt_ticket.dart';
 import '../widgets/touch_scale.dart';
 
 class SendMoneyScreen extends StatefulWidget {
@@ -351,103 +352,28 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       return;
     }
 
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (_) => _DoneGlassDialog(message: result.message),
-    );
-  }
-}
-
-/// Success dialog after a transfer clears the PIN step — a frosted-glass
-/// card (blurred backdrop, translucent surface, thin light border) instead
-/// of a flat solid dialog, since this is the one moment worth a bit of
-/// visual flourish.
-class _DoneGlassDialog extends StatelessWidget {
-  final String message;
-
-  const _DoneGlassDialog({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.10),
-                  BybitPalette.accent.withValues(alpha: 0.06),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.18),
-                width: 1.2,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: BybitPalette.accent.withValues(alpha: 0.16),
-                    border: Border.all(
-                      color: BybitPalette.accent.withValues(alpha: 0.5),
-                      width: 1.2,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    color: BybitPalette.accent,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Transfer queued',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: BybitPalette.muted2,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                BybitPrimaryButton(
-                  label: 'Done',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
+    final fee = appState.transferFee(_rail);
+    await showReceiptDialog(
+      context,
+      statusTitle: 'Payment Success',
+      reference: result.transactionId ?? _nextFallbackReference(),
+      dateTime: DateFormat('d MMM yyyy, hh:mm a').format(DateTime.now()),
+      paymentMethod: _rail,
+      details: [ReceiptLine('Sent to', recipient)],
+      amountLines: [
+        ReceiptLine('Amount', '${source.currency} ${amount.toStringAsFixed(2)}'),
+        ReceiptLine('Fee', fee == 0 ? 'Free' : '${source.currency} ${fee.toStringAsFixed(2)}'),
+      ],
+      total: ReceiptLine(
+        'Total',
+        '${source.currency} ${(amount + fee).toStringAsFixed(2)}',
+        emphasize: true,
       ),
     );
   }
+
+  String _nextFallbackReference() =>
+      DateTime.now().millisecondsSinceEpoch.toString();
 }
 
 /// Review step before a transfer goes out — recipient, amount, and funding

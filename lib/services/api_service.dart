@@ -9,20 +9,19 @@ import 'auth_service.dart';
 /// This app requires a live backend session and does not use local sandbox-only mode.
 class ApiService {
   /// Backend URL, overridable at build time with `--dart-define=API_BASE_URL=`.
-  /// Defaults to the live Render backend (the actual deployed service is
-  /// "kashflip-api" at kashflip-api.onrender.com — confirmed via the Render
-  /// dashboard and a live /health check; "backend-aroy.onrender.com" was a
-  /// stale/wrong host that happened to answer /health but had none of the
-  /// real routes mounted) so a plain `flutter build web --release` (how
-  /// every release build in this repo's history has been produced) ships
-  /// pointed at a real server instead of localhost — every prior web build
-  /// baked in localhost:8080, which is unreachable for any real user. Local
-  /// development against a backend running on this machine should pass
-  /// `--dart-define=API_BASE_URL=http://localhost:8080` explicitly (see
-  /// .claude/launch.json's flutter-web/verify-web entries).
+  /// Defaults to Cloud Run (wayaki-api, project zinc-wares-464304-t4,
+  /// us-central1) — moved off Render's free tier because its 15-minute
+  /// idle spin-down (30-50s cold start) was showing up as frequent "backend
+  /// not reachable" errors for real users. Cloud Run runs with
+  /// --min-instances=1, so it never scales to zero. Render
+  /// (kashflip-api.onrender.com) is left running untouched as a fallback —
+  /// same shared Neon database, so either backend works if this ever needs
+  /// rolling back. Local development against a backend running on this
+  /// machine should pass `--dart-define=API_BASE_URL=http://localhost:8080`
+  /// explicitly (see .claude/launch.json's flutter-web/verify-web entries).
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://kashflip-api.onrender.com',
+    defaultValue: 'https://wayaki-api-361052105935.us-central1.run.app',
   );
 
   /// Stripe publishable key (safe to ship client-side by design).
@@ -426,12 +425,15 @@ class ApiService {
   }
 
   /// Queue a mobile-money payout; backend immediately holds the source
-  /// balance. [amountKes] is always what lands on M-Pesa — [sourceCurrency]
-  /// picks which wallet it's drawn from (KES 1:1, or USD converted at the
-  /// backend's configured rate), so a USD-only balance can still cash out.
+  /// balance. [amount] is always in [sourceCurrency] (KES or USD) — never
+  /// pre-converted here. The backend alone derives the KES amount that
+  /// actually lands on M-Pesa, using its own exchange rate; converting on
+  /// the client first and having the backend convert back to check the
+  /// balance would risk the two rates drifting out of sync (e.g. after a
+  /// rate change) and rejecting a genuinely sufficient balance.
   static Future<Map<String, dynamic>?> submitMobileMoneyWithdrawal({
     required String rail,
-    required double amountKes,
+    required double amount,
     required String phone,
     String sourceCurrency = 'KES',
   }) async {
@@ -442,7 +444,7 @@ class ApiService {
           headers: _headers(authed: true),
           body: jsonEncode({
             'rail': rail,
-            'amountKes': amountKes,
+            'amount': amount,
             'phone': phone,
             'sourceCurrency': sourceCurrency,
           }),
