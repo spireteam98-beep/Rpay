@@ -90,13 +90,6 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
               ),
               const SizedBox(height: 10),
               _channelList(),
-              if (_sourceType != KashAccountType.walletKes) ...[
-                const SizedBox(height: 8),
-                const Text(
-                  'M-Pesa and Till are only available from your KES balance.',
-                  style: TextStyle(color: BybitPalette.muted, fontSize: 11.5),
-                ),
-              ],
               const SizedBox(height: 16),
               if (_rail == 'Wayaki' && appState.frequentRecipients.isNotEmpty) ...[
                 _frequentRecipientsRow(appState),
@@ -273,19 +266,17 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   }
 
   /// Wayaki-to-Wayaki transfer is always available. M-Pesa/Till cash-out is
-  /// KES-wallet-only: the payout draws from Paystack's real account
-  /// balance, which only Paystack top-ups (the same gateway, settling into
-  /// the same real account) actually fund. USD funded via Stripe or Waafi
-  /// settles into a completely separate real-money account with no bridge
-  /// into Paystack, so it can never reliably back an M-Pesa payout even
-  /// though the in-app balance looks sufficient.
+  /// too, from either wallet — the payout draws from Paystack's real
+  /// account balance regardless of which gateway funded the customer's USD
+  /// wallet (Stripe, Waafi, or Paystack itself). If Paystack's own balance
+  /// doesn't cover it, the send fails and refunds cleanly
+  /// (mobileMoney.js's refundFailedWithdrawal) — keeping that real balance
+  /// funded is an operator responsibility, not something enforced here.
   Widget _channelList() {
-    final channels = [
-      const _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
-      if (_sourceType == KashAccountType.walletKes) ...[
-        const _ChannelOption('M-Pesa', Icons.phone_iphone_rounded),
-        const _ChannelOption('M-Pesa Till', Icons.storefront_outlined),
-      ],
+    const channels = [
+      _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
+      _ChannelOption('M-Pesa', Icons.phone_iphone_rounded),
+      _ChannelOption('M-Pesa Till', Icons.storefront_outlined),
     ];
     return Column(children: channels.map(_channelRow).toList());
   }

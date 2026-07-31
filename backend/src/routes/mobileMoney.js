@@ -152,18 +152,14 @@ router.post('/withdrawals', async (req, res, next) => {
     const amount = cleanAmount(req.body?.amount);
     const isTill = rail === 'M-Pesa Till';
     // M-Pesa/Till payouts draw from Paystack's real account balance
-    // (source: 'balance' in paystackTransfers.js) — not from whatever
-    // gateway actually funded the customer's USD wallet (Stripe, Waafi).
-    // Those settle into entirely separate real-money accounts with no
-    // bridge into Paystack, so a USD balance can look sufficient here while
-    // Paystack itself has nothing to pay out with. KES-sourced balance is
-    // the only one Paystack top-ups (the same gateway) actually fund.
-    if (AUTO_PAYOUT_RAILS.includes(rail) && sourceCurrency === 'USD') {
-      return res.status(400).json({
-        error:
-          'M-Pesa and Till payouts can only be sent from your KES balance. USD funded via card or Waafi is not available for M-Pesa payouts.',
-      });
-    }
+    // (source: 'balance' in paystackTransfers.js), regardless of which
+    // gateway funded the customer's wallet (Stripe, Waafi, or Paystack
+    // itself). Stripe/Waafi settle into separate real-money accounts with
+    // no automatic bridge into Paystack, so this can fail at Paystack even
+    // when the in-app balance looks sufficient — refundFailedWithdrawal
+    // below returns the hold to the customer if that happens. Allowed
+    // deliberately: keeping Paystack's real balance funded to cover this is
+    // an operator responsibility, not something this endpoint enforces.
     // Reuses the `phone` column as a generic "payout destination" field —
     // a till number, not a phone, when rail is 'M-Pesa Till'.
     const phone = String((isTill ? req.body?.tillNumber : req.body?.phone) || '').trim();
@@ -273,8 +269,16 @@ router.post('/withdrawals', async (req, res, next) => {
       });
     } catch (err) {
       await refundFailedWithdrawal(req.userId, movement, sourceCurrency, debitAmount, amountUsd, err.message);
+      // Paystack's own wording ("Your balance is not enough to fulfil this
+      // request") refers to its account balance, not the customer's — that
+      // distinction is meaningless to a customer and reads as a raw error
+      // dump, so swap in something clear instead of passing it through.
+      const insufficientFunds = /balance.*not enough|insufficient/i.test(err.message || '');
+      const reason = insufficientFunds
+        ? "our payment processor couldn't complete this payout right now"
+        : err.message;
       return res.status(502).json({
-        error: `Could not send to the ${isTill ? 'till' : 'M-Pesa number'}: ${err.message}. Your balance has been refunded.`,
+        error: `Could not send to the ${isTill ? 'till' : 'M-Pesa number'}: ${reason}. Your balance has been refunded.`,
       });
     }
   } catch (err) {
