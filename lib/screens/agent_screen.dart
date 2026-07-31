@@ -26,7 +26,11 @@ class _AgentScreenState extends State<AgentScreen> {
   Map<String, dynamic>? _agent;
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _cityController = TextEditingController();
   bool _submitting = false;
+  String _countryCode = 'KE';
+
+  static const _countries = {'KE': 'Kenya', 'SO': 'Somalia'};
 
   @override
   void initState() {
@@ -38,6 +42,7 @@ class _AgentScreenState extends State<AgentScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
@@ -60,7 +65,9 @@ class _AgentScreenState extends State<AgentScreen> {
     try {
       final result = await ApiService.registerAgent(
         businessName: name,
+        countryCode: _countryCode,
         phone: _phoneController.text.trim(),
+        city: _cityController.text.trim(),
       );
       if (!mounted) return;
       setState(() {
@@ -172,6 +179,53 @@ class _AgentScreenState extends State<AgentScreen> {
           controller: _phoneController,
           keyboardType: TextInputType.phone,
         ),
+        const SizedBox(height: 16),
+        const Text(
+          'Country',
+          style: TextStyle(
+            color: BybitPalette.muted,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 54,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: BybitPalette.input,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _countryCode,
+              dropdownColor: BybitPalette.surface2,
+              isExpanded: true,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+              items:
+                  _countries.entries
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e.key,
+                          child: Text(e.value),
+                        ),
+                      )
+                      .toList(),
+              onChanged:
+                  (value) => setState(() => _countryCode = value ?? 'KE'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        BybitTextField(
+          label: 'City (optional)',
+          hint: 'e.g. Nairobi',
+          icon: Icons.location_city_outlined,
+          controller: _cityController,
+        ),
         const SizedBox(height: 28),
         BybitPrimaryButton(
           label: _submitting ? 'Registering...' : 'Register as agent',
@@ -219,7 +273,7 @@ class _AgentScreenState extends State<AgentScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: (status == 'SUSPENDED'
+              color: (status == 'SUSPENDED' || status == 'REJECTED'
                       ? BybitPalette.red
                       : BybitPalette.accent)
                   .withOpacity(0.12),
@@ -228,10 +282,12 @@ class _AgentScreenState extends State<AgentScreen> {
             child: Text(
               status == 'SUSPENDED'
                   ? 'Your agent account has been deactivated by an admin. Contact support for help.'
-                  : 'Your agent account is pending admin approval. Assisted deposits and withdrawals will unlock once approved.',
+                  : status == 'REJECTED'
+                  ? 'Your agent application was not approved. Contact support if you\'d like to reapply.'
+                  : 'Your agent application is pending admin approval. Assisted deposits, withdrawals, and the M-Pesa/Till marketplace will unlock once approved.',
               style: TextStyle(
                 color:
-                    status == 'SUSPENDED'
+                    status == 'SUSPENDED' || status == 'REJECTED'
                         ? BybitPalette.red
                         : BybitPalette.accent,
                 fontSize: 12.5,

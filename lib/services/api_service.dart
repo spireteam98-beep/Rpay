@@ -718,10 +718,14 @@ class ApiService {
 
   // ── Agent ────────────────────────────────────────────────────────
 
-  /// Registers the current user as a Wayaki agent.
+  /// Registers the current user as a Wayaki agent. Sits PENDING_REVIEW
+  /// until a location-matched sponsor or admin approves it.
   static Future<Map<String, dynamic>> registerAgent({
     required String businessName,
+    required String countryCode,
     String? phone,
+    String? region,
+    String? city,
   }) async {
     final res = await http
         .post(
@@ -729,7 +733,10 @@ class ApiService {
           headers: _headers(authed: true),
           body: jsonEncode({
             'businessName': businessName,
+            'countryCode': countryCode,
             if (phone != null && phone.isNotEmpty) 'phone': phone,
+            if (region != null && region.isNotEmpty) 'region': region,
+            if (city != null && city.isNotEmpty) 'city': city,
           }),
         )
         .timeout(_timeout);
