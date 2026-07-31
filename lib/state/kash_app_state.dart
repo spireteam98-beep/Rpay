@@ -397,20 +397,23 @@ class KashAppState extends ChangeNotifier {
       }
     }
 
-    // M-Pesa can be funded from either wallet (see SendMoneyScreen._channelList)
-    // — `amount` is in whatever currency the source account is in, sent
-    // as-is; the backend alone converts USD->KES for the actual M-Pesa
-    // payout, using its own exchange rate (see ApiService.submitMobileMoneyWithdrawal
-    // for why this side never does that math). Fires a real Paystack payout
-    // to `recipient` (the phone number typed in), not the local simulated
+    // M-Pesa (phone or Till) can be funded from either wallet (see
+    // SendMoneyScreen._channelList) — `amount` is in whatever currency the
+    // source account is in, sent as-is; the backend alone converts
+    // USD->KES for the actual M-Pesa payout, using its own exchange rate
+    // (see ApiService.submitMobileMoneyWithdrawal for why this side never
+    // does that math). Fires a real Paystack payout to `recipient` (the
+    // phone number or till number typed in), not the local simulated
     // ledger below.
-    if (ApiService.hasSession && rail == 'M-Pesa') {
+    if (ApiService.hasSession && (rail == 'M-Pesa' || rail == 'M-Pesa Till')) {
       final sourceCurrency = sourceType == KashAccountType.walletUsd ? 'USD' : 'KES';
+      final isTill = rail == 'M-Pesa Till';
       try {
         final response = await ApiService.submitMobileMoneyWithdrawal(
           rail: rail,
           amount: amount,
-          phone: recipient.trim(),
+          phone: isTill ? null : recipient.trim(),
+          tillNumber: isTill ? recipient.trim() : null,
           sourceCurrency: sourceCurrency,
         );
         // The payout has already been accepted at this point. Refreshing the
@@ -607,6 +610,7 @@ class KashAppState extends ChangeNotifier {
       // doesn't deduct one either. Left at 0 until an admin-configurable fee
       // is built; don't let this drift from the backend in the meantime.
       case 'M-Pesa':
+      case 'M-Pesa Till':
         return 0;
       case 'Crypto address':
         return 1.25;

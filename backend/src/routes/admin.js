@@ -6,7 +6,7 @@ const ledger = require('../services/ledger');
 const exchange = require('../services/exchange');
 const compliance = require('../services/compliance');
 const { creditAgentCommission } = require('../services/commission');
-const { payoutToMpesa } = require('../services/paystackTransfers');
+const { payoutToMpesa, payoutToTill } = require('../services/paystackTransfers');
 
 // Flat commissions for onboarding events that aren't sized by transaction
 // amount — customer onboarding ($1) already existed in auth.js; merchant
@@ -984,11 +984,12 @@ router.post('/mobile-money/:id/approve-deposit', async (req, res, next) => {
 });
 
 /**
- * Fires a real Paystack Transfer to the withdrawal's M-Pesa number instead
- * of the admin paying out manually off-app. Paystack settles asynchronously
- * — this only gets the payout moving (status PROCESSING or, if Paystack's
- * "Confirm transfers before sending" is still on, PENDING_OTP); the
- * transfer.success/failed webhook below moves it to its final state.
+ * Fires a real Paystack Transfer to the withdrawal's M-Pesa number/till
+ * instead of the admin paying out manually off-app. Paystack settles
+ * asynchronously — this only gets the payout moving (status PROCESSING or,
+ * if Paystack's "Confirm transfers before sending" is still on,
+ * PENDING_OTP); the transfer.success/failed webhook below moves it to its
+ * final state.
  */
 router.post('/mobile-money/:id/complete-withdrawal', async (req, res, next) => {
   try {
@@ -1005,22 +1006,31 @@ router.post('/mobile-money/:id/complete-withdrawal', async (req, res, next) => {
     if (!movement) {
       return res.status(404).json({ error: 'Pending withdrawal request not found' });
     }
-    if (movement.rail !== 'M-Pesa') {
+    const isTill = movement.rail === 'M-Pesa Till';
+    if (movement.rail !== 'M-Pesa' && !isTill) {
       return res.status(400).json({
-        error: `Automated payout only supports M-Pesa via Paystack — this is a ${movement.rail} withdrawal. Complete it manually and use /cancel to release the hold if it can't be paid out.`,
+        error: `Automated payout only supports M-Pesa and M-Pesa Till via Paystack — this is a ${movement.rail} withdrawal. Complete it manually and use /cancel to release the hold if it can't be paid out.`,
       });
     }
 
     const reference = `wd_${String(movement.id).replace(/-/g, '')}_${Date.now()}`;
     let transfer;
     try {
-      transfer = await payoutToMpesa({
-        name: movement.full_name,
-        phone: movement.phone,
-        amountKes: Number(movement.amount_kes),
-        reference,
-        reason: `Wayaki ${movement.rail} withdrawal`,
-      });
+      transfer = isTill
+        ? await payoutToTill({
+            name: movement.full_name,
+            tillNumber: movement.phone,
+            amountKes: Number(movement.amount_kes),
+            reference,
+            reason: `Wayaki ${movement.rail} withdrawal`,
+          })
+        : await payoutToMpesa({
+            name: movement.full_name,
+            phone: movement.phone,
+            amountKes: Number(movement.amount_kes),
+            reference,
+            reason: `Wayaki ${movement.rail} withdrawal`,
+          });
     } catch (err) {
       return res.status(502).json({ error: `Paystack transfer failed: ${err.message}` });
     }

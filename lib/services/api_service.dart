@@ -434,7 +434,8 @@ class ApiService {
   static Future<Map<String, dynamic>?> submitMobileMoneyWithdrawal({
     required String rail,
     required double amount,
-    required String phone,
+    String? phone,
+    String? tillNumber,
     String sourceCurrency = 'KES',
   }) async {
     if (!hasSession) return null;
@@ -445,7 +446,8 @@ class ApiService {
           body: jsonEncode({
             'rail': rail,
             'amount': amount,
-            'phone': phone,
+            if (phone != null) 'phone': phone,
+            if (tillNumber != null) 'tillNumber': tillNumber,
             'sourceCurrency': sourceCurrency,
           }),
         )

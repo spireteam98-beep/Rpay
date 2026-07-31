@@ -91,15 +91,21 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
               const SizedBox(height: 10),
               _channelList(),
               const SizedBox(height: 16),
-              if (_rail != 'M-Pesa' && appState.frequentRecipients.isNotEmpty) ...[
+              if (_rail == 'Wayaki' && appState.frequentRecipients.isNotEmpty) ...[
                 _frequentRecipientsRow(appState),
                 const SizedBox(height: 12),
               ],
               BybitTextField(
-                label:
-                    _rail == 'M-Pesa' ? 'M-Pesa number' : 'Wayaki number or email',
+                label: _recipientLabel,
                 hint: _recipientHint,
-                icon: Icons.qr_code_scanner_rounded,
+                icon:
+                    _rail == 'M-Pesa Till'
+                        ? Icons.storefront_outlined
+                        : Icons.qr_code_scanner_rounded,
+                keyboardType:
+                    _rail == 'M-Pesa Till'
+                        ? TextInputType.number
+                        : TextInputType.text,
                 controller: _recipientController,
               ),
               const SizedBox(height: 20),
@@ -154,10 +160,26 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     );
   }
 
+  String get _recipientLabel {
+    switch (_rail) {
+      case 'M-Pesa':
+        return 'M-Pesa number';
+      case 'M-Pesa Till':
+        return 'Till number';
+      default:
+        return 'Wayaki number or email';
+    }
+  }
+
   String get _recipientHint {
-    return _rail == 'M-Pesa'
-        ? '+254 7XX XXX XXX'
-        : 'Username, phone or email';
+    switch (_rail) {
+      case 'M-Pesa':
+        return '+254 7XX XXX XXX';
+      case 'M-Pesa Till':
+        return 'e.g. 123456';
+      default:
+        return 'Username, phone or email';
+    }
   }
 
   /// Amount input with the source currency picker inline on the same row —
@@ -251,6 +273,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     const channels = [
       _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
       _ChannelOption('M-Pesa', Icons.phone_iphone_rounded),
+      _ChannelOption('M-Pesa Till', Icons.storefront_outlined),
     ];
     return Column(children: channels.map(_channelRow).toList());
   }

@@ -98,4 +98,31 @@ async function payoutToMpesa({ name, phone, amountKes, reference, reason }) {
   return initiateTransfer({ amountKes, recipientCode, reference, reason });
 }
 
-module.exports = { payoutToMpesa, normalizeKenyaPhoneLocal };
+/** Creates a recipient for an M-Pesa Buy Goods Till number — a different
+ * Paystack recipient type ('mobile_money_business', bank_code 'MPTILL')
+ * from a personal phone-number payout. `account_number` here is the till
+ * number itself, not a phone. Confirmed against Paystack's live
+ * GET /bank?currency=KES&type=mobile_money_business — 'MPTILL' is Till,
+ * 'MPPAYBILL' is Paybill (not wired up here, only Till was requested). */
+async function createTillRecipient({ name, tillNumber }) {
+  const data = await paystackFetch('/transferrecipient', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'mobile_money_business',
+      name,
+      account_number: String(tillNumber).trim(),
+      bank_code: 'MPTILL',
+      currency: 'KES',
+    }),
+  });
+  return data.data.recipient_code;
+}
+
+/** Same one-request-per-withdrawal shape as payoutToMpesa, targeting a
+ * Till number instead of a phone number. */
+async function payoutToTill({ name, tillNumber, amountKes, reference, reason }) {
+  const recipientCode = await createTillRecipient({ name, tillNumber });
+  return initiateTransfer({ amountKes, recipientCode, reference, reason });
+}
+
+module.exports = { payoutToMpesa, payoutToTill, normalizeKenyaPhoneLocal };

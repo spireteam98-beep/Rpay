@@ -4,12 +4,13 @@ const { requireAuth } = require('../middleware/auth');
 const config = require('../config');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
-const { payoutToMpesa } = require('../services/paystackTransfers');
+const { payoutToMpesa, payoutToTill } = require('../services/paystackTransfers');
 
 const router = express.Router();
 router.use(requireAuth);
 
-const SUPPORTED_RAILS = ['EVC Plus', 'Zaad', 'Sahal', 'M-Pesa'];
+const SUPPORTED_RAILS = ['EVC Plus', 'Zaad', 'Sahal', 'M-Pesa', 'M-Pesa Till'];
+const AUTO_PAYOUT_RAILS = ['M-Pesa', 'M-Pesa Till'];
 
 function cleanRail(rail) {
   const value = String(rail || '').trim();
@@ -126,11 +127,12 @@ async function refundFailedWithdrawal(userId, movement, sourceCurrency, debitAmo
 }
 
 /**
- * M-Pesa withdrawals go straight to Paystack — no admin approval step, same
- * as Wayaki-to-Wayaki P2P transfers (routes/transfers.js), gated by balance
- * plus the same KYC-tier daily limit check P2P already uses instead of a
- * human review. Other rails (EVC Plus, Zaad, Sahal) have no automated payout
- * provider wired up yet, so they still queue for manual admin payout via
+ * M-Pesa (phone) and M-Pesa Till withdrawals go straight to Paystack — no
+ * admin approval step, same as Wayaki-to-Wayaki P2P transfers
+ * (routes/transfers.js), gated by balance plus the same KYC-tier daily
+ * limit check P2P already uses instead of a human review. Other rails
+ * (EVC Plus, Zaad, Sahal) have no automated payout provider wired up yet,
+ * so they still queue for manual admin payout via
  * POST /admin/mobile-money/:id/complete-withdrawal.
  *
  * `amount` is always in `sourceCurrency` (default 'KES') — never
@@ -148,8 +150,18 @@ router.post('/withdrawals', async (req, res, next) => {
     const rail = cleanRail(req.body?.rail);
     const sourceCurrency = cleanSourceCurrency(req.body?.sourceCurrency);
     const amount = cleanAmount(req.body?.amount);
-    const phone = String(req.body?.phone || '').trim();
-    if (!phone) return res.status(400).json({ error: 'Payout phone is required' });
+    const isTill = rail === 'M-Pesa Till';
+    // Reuses the `phone` column as a generic "payout destination" field —
+    // a till number, not a phone, when rail is 'M-Pesa Till'.
+    const phone = String((isTill ? req.body?.tillNumber : req.body?.phone) || '').trim();
+    if (!phone) {
+      return res.status(400).json({
+        error: isTill ? 'Till number is required' : 'Payout phone is required',
+      });
+    }
+    if (isTill && !/^\d{5,7}$/.test(phone)) {
+      return res.status(400).json({ error: 'Enter a valid 5-7 digit till number' });
+    }
     const amountKes =
       sourceCurrency === 'USD' ? Number((amount * config.kesPerUsd).toFixed(2)) : amount;
     const amountUsd =
@@ -208,7 +220,7 @@ router.post('/withdrawals', async (req, res, next) => {
     );
     await client.query('COMMIT');
 
-    if (rail !== 'M-Pesa') {
+    if (!AUTO_PAYOUT_RAILS.includes(rail)) {
       return res.status(202).json({
         movement,
         message: 'Withdrawal queued for manual mobile-money payout.',
@@ -217,13 +229,21 @@ router.post('/withdrawals', async (req, res, next) => {
 
     const reference = `wd_${String(movement.id).replace(/-/g, '')}_${Date.now()}`;
     try {
-      const transfer = await payoutToMpesa({
-        name: user.full_name,
-        phone,
-        amountKes,
-        reference,
-        reason: `Wayaki ${rail} withdrawal`,
-      });
+      const transfer = isTill
+        ? await payoutToTill({
+            name: user.full_name,
+            tillNumber: phone,
+            amountKes,
+            reference,
+            reason: `Wayaki ${rail} withdrawal`,
+          })
+        : await payoutToMpesa({
+            name: user.full_name,
+            phone,
+            amountKes,
+            reference,
+            reason: `Wayaki ${rail} withdrawal`,
+          });
       const status = transfer.status === 'otp' ? 'PENDING_OTP' : 'PROCESSING';
       await pool.query(
         `UPDATE mobile_money_movements SET status = $1, reference = $2, updated_at = now() WHERE id = $3`,
@@ -234,12 +254,14 @@ router.post('/withdrawals', async (req, res, next) => {
         message:
           status === 'PENDING_OTP'
             ? 'Withdrawal submitted but is waiting on a Paystack confirmation step — contact support.'
-            : 'Withdrawal is on its way to your M-Pesa number.',
+            : isTill
+              ? 'Payment is on its way to the till.'
+              : 'Withdrawal is on its way to your M-Pesa number.',
       });
     } catch (err) {
       await refundFailedWithdrawal(req.userId, movement, sourceCurrency, debitAmount, amountUsd, err.message);
       return res.status(502).json({
-        error: `Could not send to M-Pesa: ${err.message}. Your balance has been refunded.`,
+        error: `Could not send to the ${isTill ? 'till' : 'M-Pesa number'}: ${err.message}. Your balance has been refunded.`,
       });
     }
   } catch (err) {
