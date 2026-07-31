@@ -25,31 +25,44 @@ class TicketClipper extends CustomClipper<Path> {
 
   @override
   Path getClip(Size size) {
-    final w = size.width;
-    final h = size.height;
-    return Path()
-      ..moveTo(0, cornerRadius)
-      ..quadraticBezierTo(0, 0, cornerRadius, 0)
-      ..lineTo(w - cornerRadius, 0)
-      ..quadraticBezierTo(w, 0, w, cornerRadius)
-      ..lineTo(w, notchY - notchRadius)
-      ..arcToPoint(
-        Offset(w, notchY + notchRadius),
-        radius: Radius.circular(notchRadius),
-        clockwise: true,
-      )
-      ..lineTo(w, h - cornerRadius)
-      ..quadraticBezierTo(w, h, w - cornerRadius, h)
-      ..lineTo(cornerRadius, h)
-      ..quadraticBezierTo(0, h, 0, h - cornerRadius)
-      ..lineTo(0, notchY + notchRadius)
-      ..arcToPoint(
-        Offset(0, notchY - notchRadius),
-        radius: Radius.circular(notchRadius),
-        clockwise: true,
-      )
-      ..lineTo(0, cornerRadius)
-      ..close();
+    var ticket = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          Radius.circular(cornerRadius),
+        ),
+      );
+
+    // Deep side notches divide the success header from the receipt body.
+    for (final center in [Offset(0, notchY), Offset(size.width, notchY)]) {
+      ticket = Path.combine(
+        PathOperation.difference,
+        ticket,
+        Path()..addOval(Rect.fromCircle(center: center, radius: notchRadius)),
+      );
+    }
+
+    // Small, evenly spaced cut-outs create the classic printed-receipt edge
+    // visible in the design reference and in saved/shared receipt images.
+    const tearRadius = 8.0;
+    const tearGap = 3.0;
+    final step = (tearRadius * 2) + tearGap;
+    var x = cornerRadius;
+    while (x <= size.width - cornerRadius) {
+      ticket = Path.combine(
+        PathOperation.difference,
+        ticket,
+        Path()
+          ..addOval(
+            Rect.fromCircle(
+              center: Offset(x, size.height),
+              radius: tearRadius,
+            ),
+          ),
+      );
+      x += step;
+    }
+    return ticket;
   }
 
   @override
@@ -167,7 +180,7 @@ class ReceiptTicket extends StatelessWidget {
               child: CustomPaint(painter: const ReceiptDashedLine()),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 30),
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 38),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

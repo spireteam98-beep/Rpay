@@ -413,7 +413,15 @@ class KashAppState extends ChangeNotifier {
           phone: recipient.trim(),
           sourceCurrency: sourceCurrency,
         );
-        await syncFromBackend();
+        // The payout has already been accepted at this point. Refreshing the
+        // wallet is best-effort: a timeout from any of the dashboard's
+        // follow-up endpoints must not turn a successful M-Pesa payout into
+        // a false "could not reach the transfer service" result.
+        try {
+          await syncFromBackend();
+        } catch (_) {
+          // The next normal app refresh will reconcile the balance/ledger.
+        }
         return TransferResult.success(
           response?['message'] as String? ?? 'Withdrawal submitted.',
         );

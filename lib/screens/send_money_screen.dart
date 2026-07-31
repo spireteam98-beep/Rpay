@@ -768,32 +768,36 @@ class _SecurityVerificationSheetState
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Stack(
+              alignment: Alignment.center,
               children: [
                 const Text(
                   'Security Verification',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 19,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                TouchScale(
-                  onTap: () => Navigator.of(context).pop(false),
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: const BoxDecoration(
-                      color: BybitPalette.surface2,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.close_rounded,
-                      color: BybitPalette.muted2,
-                      size: 18,
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TouchScale(
+                    onTap: () => Navigator.of(context).pop(false),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: const BoxDecoration(
+                        color: BybitPalette.surface2,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close_rounded,
+                        color: BybitPalette.muted2,
+                        size: 18,
+                      ),
                     ),
                   ),
                 ),
@@ -802,6 +806,7 @@ class _SecurityVerificationSheetState
             const SizedBox(height: 20),
             const Text(
               'Transaction PIN',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: BybitPalette.muted,
                 fontSize: 12.5,
@@ -810,10 +815,11 @@ class _SecurityVerificationSheetState
             ),
             const SizedBox(height: 12),
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(_pinLength, (index) {
                 final filled = index < _pin.length;
                 return Padding(
-                  padding: const EdgeInsets.only(right: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
                   child: Container(
                     width: 42,
                     height: 48,
@@ -842,6 +848,7 @@ class _SecurityVerificationSheetState
               const SizedBox(height: 12),
               Text(
                 _error!,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: BybitPalette.red,
                   fontSize: 12.5,
