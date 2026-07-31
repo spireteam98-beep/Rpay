@@ -6,11 +6,13 @@ import '../widgets/kash_widgets.dart';
 import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 
-/// Agent-side queue for USD-sourced M-Pesa/Till payout requests (see
-/// backend/src/routes/mobileMoney.js POST /withdrawals) — Paystack can't
-/// reliably fund these since Stripe/Waafi money never reaches its balance,
-/// so an agent sends the real M-Pesa/Till payment themselves, off-app,
-/// using their own float, and marks it complete here for a commission.
+/// Agent-side queue for the M-Pesa/Till FX marketplace (see
+/// backend/src/routes/mobileMoney.js POST /withdrawals and routes/agents.js
+/// mobile-money-queue endpoints) — customers picked this agent's own live
+/// rate, so each request here is already assigned, not up for grabs.
+/// Accept it, send the real M-Pesa/Till payment yourself off-app using
+/// your own float, then mark it complete — the customer's paid USD lands
+/// directly in your own balance as settlement.
 class AgentMobileMoneyQueueScreen extends StatefulWidget {
   const AgentMobileMoneyQueueScreen({super.key});
 
@@ -44,7 +46,7 @@ class _AgentMobileMoneyQueueScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: BybitPalette.bg,
-      appBar: const BybitSubHeader('M-Pesa/Till payouts'),
+      appBar: const BybitSubHeader('M-Pesa/Till requests'),
       body: SafeArea(
         child:
             _loading
@@ -63,7 +65,7 @@ class _AgentMobileMoneyQueueScreenState
                     padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
                     children: [
                       const Text(
-                        'Open requests',
+                        'Your requests',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -72,7 +74,7 @@ class _AgentMobileMoneyQueueScreenState
                       ),
                       const SizedBox(height: 4),
                       const Text(
-                        'Claim one, send the real M-Pesa/Till payment yourself, then mark it complete to earn your commission.',
+                        'Customers picked your rate. Accept, send the real M-Pesa/Till payment yourself, then mark it complete — their payment settles straight into your balance.',
                         style: TextStyle(
                           color: BybitPalette.muted2,
                           fontSize: 13,
@@ -82,7 +84,7 @@ class _AgentMobileMoneyQueueScreenState
                       if (_queue.isEmpty)
                         BybitCard(
                           child: const Text(
-                            'No payout requests right now.',
+                            'No requests right now.',
                             style: TextStyle(
                               color: BybitPalette.muted,
                               fontSize: 13,
@@ -111,9 +113,9 @@ class _AgentMobileMoneyQueueScreenState
     final isTill = rail == 'M-Pesa Till';
     final phone = item['phone'] as String? ?? '';
     final amountKes = (item['amount_kes'] as num?)?.toDouble() ?? 0;
-    final commissionUsd = (item['agent_commission_usd'] as num?)?.toDouble() ?? 0;
+    final lockedRate = double.tryParse(item['locked_rate_kes_per_usd']?.toString() ?? '') ?? 0;
     final status = item['status'] as String? ?? 'PENDING_AGENT';
-    final claimedByMe = status == 'AGENT_CLAIMED';
+    final accepted = status == 'AGENT_CLAIMED';
     final createdAt =
         DateTime.tryParse(item['created_at'] as String? ?? '') ??
         DateTime.now();
@@ -129,8 +131,8 @@ class _AgentMobileMoneyQueueScreenState
                 rail: rail,
                 phone: phone,
                 amountKes: amountKes,
-                commissionUsd: commissionUsd,
-                claimedByMe: claimedByMe,
+                lockedRate: lockedRate,
+                accepted: accepted,
               ),
             ),
           );
@@ -185,15 +187,15 @@ class _AgentMobileMoneyQueueScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color:
-                      claimedByMe
+                      accepted
                           ? BybitPalette.accent.withValues(alpha: 0.14)
                           : BybitPalette.surface2,
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
-                  claimedByMe ? 'CLAIMED BY YOU' : 'OPEN',
+                  accepted ? 'ACCEPTED' : 'NEW',
                   style: TextStyle(
-                    color: claimedByMe ? BybitPalette.accent : BybitPalette.muted2,
+                    color: accepted ? BybitPalette.accent : BybitPalette.muted2,
                     fontSize: 9.5,
                     fontWeight: FontWeight.w900,
                   ),
@@ -212,16 +214,16 @@ class _MobileMoneyPayoutDetailScreen extends StatefulWidget {
   final String rail;
   final String phone;
   final double amountKes;
-  final double commissionUsd;
-  final bool claimedByMe;
+  final double lockedRate;
+  final bool accepted;
 
   const _MobileMoneyPayoutDetailScreen({
     required this.id,
     required this.rail,
     required this.phone,
     required this.amountKes,
-    required this.commissionUsd,
-    required this.claimedByMe,
+    required this.lockedRate,
+    required this.accepted,
   });
 
   @override
@@ -232,13 +234,13 @@ class _MobileMoneyPayoutDetailScreen extends StatefulWidget {
 class _MobileMoneyPayoutDetailScreenState
     extends State<_MobileMoneyPayoutDetailScreen> {
   bool _acting = false;
-  bool _claimed = false;
+  bool _accepted = false;
   final _referenceController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _claimed = widget.claimedByMe;
+    _accepted = widget.accepted;
   }
 
   @override
@@ -247,16 +249,19 @@ class _MobileMoneyPayoutDetailScreenState
     super.dispose();
   }
 
-  Future<void> _claim() async {
+  double get _settlementUsd =>
+      widget.lockedRate > 0 ? widget.amountKes / widget.lockedRate : 0;
+
+  Future<void> _accept() async {
     setState(() => _acting = true);
     try {
-      await ApiService.claimMobileMoneyPayout(widget.id);
+      await ApiService.acceptMobileMoneyPayout(widget.id);
       if (!mounted) return;
       setState(() {
-        _claimed = true;
+        _accepted = true;
         _acting = false;
       });
-      BybitToast.success(context, 'Claimed — send the payment, then mark complete.');
+      BybitToast.success(context, 'Accepted — send the payment, then mark complete.');
     } on ApiException catch (err) {
       if (!mounted) return;
       setState(() => _acting = false);
@@ -264,10 +269,10 @@ class _MobileMoneyPayoutDetailScreenState
     }
   }
 
-  Future<void> _release() async {
+  Future<void> _decline() async {
     setState(() => _acting = true);
     try {
-      await ApiService.releaseMobileMoneyPayout(widget.id);
+      await ApiService.declineMobileMoneyPayout(widget.id);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on ApiException catch (err) {
@@ -287,7 +292,7 @@ class _MobileMoneyPayoutDetailScreenState
     try {
       await ApiService.completeMobileMoneyPayout(widget.id, reference: reference);
       if (!mounted) return;
-      BybitToast.success(context, 'Marked complete — commission credited.');
+      BybitToast.success(context, 'Marked complete — settled to your balance.');
       Navigator.of(context).pop();
     } on ApiException catch (err) {
       if (!mounted) return;
@@ -324,18 +329,39 @@ class _MobileMoneyPayoutDetailScreenState
                 style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
               ),
               const SizedBox(height: 20),
-              BybitInfoLine('Your commission', '\$${widget.commissionUsd.toStringAsFixed(2)}'),
+              BybitInfoLine('Your rate', '${widget.lockedRate.toStringAsFixed(2)} KES/USD'),
+              BybitInfoLine('You receive', '\$${_settlementUsd.toStringAsFixed(2)}'),
               const SizedBox(height: 24),
-              if (!_claimed) ...[
+              if (!_accepted) ...[
                 const Text(
-                  'Claim this request, then send the real M-Pesa/Till payment yourself from your own float.',
+                  'Accept this request, then send the real M-Pesa/Till payment yourself from your own float.',
                   style: TextStyle(color: BybitPalette.muted2, fontSize: 13, height: 1.4),
                 ),
                 const SizedBox(height: 16),
                 BybitPrimaryButton(
-                  label: _acting ? 'Claiming...' : 'Claim this payout',
+                  label: _acting ? 'Accepting...' : 'Accept this request',
                   enabled: !_acting,
-                  onTap: _claim,
+                  onTap: _accept,
+                ),
+                const SizedBox(height: 12),
+                TouchScale(
+                  onTap: _acting ? () {} : _decline,
+                  child: Container(
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: BybitPalette.red.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: const Text(
+                      "Can't fulfill — decline it",
+                      style: TextStyle(
+                        color: BybitPalette.red,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
                 ),
               ] else ...[
                 BybitTextField(
@@ -352,7 +378,7 @@ class _MobileMoneyPayoutDetailScreenState
                 ),
                 const SizedBox(height: 12),
                 TouchScale(
-                  onTap: _acting ? () {} : _release,
+                  onTap: _acting ? () {} : _decline,
                   child: Container(
                     height: 48,
                     alignment: Alignment.center,
@@ -361,7 +387,7 @@ class _MobileMoneyPayoutDetailScreenState
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: const Text(
-                      "Can't fulfill — release it",
+                      "Can't fulfill — decline it",
                       style: TextStyle(
                         color: BybitPalette.red,
                         fontSize: 13.5,

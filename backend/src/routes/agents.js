@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const config = require('../config');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
 const pricing = require('../services/pricing');
@@ -611,49 +612,88 @@ router.post('/withdrawals', async (req, res, next) => {
 });
 
 /**
- * Agent-fulfilled M-Pesa/Till payout queue (see routes/mobileMoney.js
- * POST /withdrawals) — for USD-sourced sends, since Paystack's own balance
- * can't be trusted to cover them. Any ACTIVE, transaction-capable agent
- * can browse and claim from the open pool; once claimed, only that agent
- * (or their cashier) can complete or release it. The agent sends the real
- * M-Pesa/Till payment themselves, off-app, using their own float, then
- * marks it complete with a reference (e.g. the M-Pesa confirmation code)
- * and is credited the commission already computed at request time.
+ * M-Pesa/Till FX marketplace — agents post their own live KES-per-USD
+ * rate (below is Wayaki's Paystack/market rate; the spread they set below
+ * that is their margin) instead of Paystack ever being asked to fund a
+ * USD-sourced M-Pesa/Till send (Stripe/Waafi money never reaches
+ * Paystack's balance, so that was unreliable). Customers browse this list
+ * (GET /mobile-money/fx-offers, routes/mobileMoney.js) and pick one; the
+ * order is pre-assigned to that specific agent at creation, not dropped
+ * into an anonymous pool. See routes/mobileMoney.js POST /withdrawals for
+ * how orders get created against a locked-in rate.
  */
 
-/** GET /agents/mobile-money-queue — the open pool (unclaimed) plus
- * whatever the calling agent has already claimed. */
-router.get('/mobile-money-queue', async (req, res, next) => {
+/** GET /agents/fx-offer — the calling agent's own current rate offer, or
+ * null if they haven't set one. */
+router.get('/fx-offer', async (req, res, next) => {
   try {
     const agentId = req.query?.agentId ? String(req.query.agentId).trim() : null;
     const acting = await resolveActingAgent(pool, req.userId, agentId);
-    if (!acting || acting.agent.status !== 'ACTIVE') {
+    if (!acting) {
       return res.status(404).json({ error: 'You are not an active agent or cashier' });
     }
-    if (!CAN_TRANSACT[acting.agent.tier]) {
-      return res.status(403).json({
-        error: `${acting.agent.tier === 'COUNTRY_AGENT' ? 'Country Agents' : 'Super Agents'} manage their network's float and don't serve customers directly`,
-      });
-    }
-    const rows = await pool.query(
-      `SELECT id, rail, phone, amount_kes, fee_usd, agent_commission_usd, status,
-              agent_id, claimed_at, created_at
-         FROM mobile_money_movements
-        WHERE status = 'PENDING_AGENT'
-           OR (status = 'AGENT_CLAIMED' AND agent_id = $1)
-        ORDER BY created_at ASC
-        LIMIT 100`,
-      [acting.agent.id],
-    );
-    res.json(rows.rows);
+    const offer = (
+      await pool.query('SELECT * FROM agent_fx_offers WHERE agent_id = $1', [acting.agent.id])
+    ).rows[0];
+    res.json(offer || null);
   } catch (err) {
     next(err);
   }
 });
 
-/** POST /agents/mobile-money-queue/:id/claim — atomic; fails cleanly if
- * another agent claimed it first. */
-router.post('/mobile-money-queue/:id/claim', async (req, res, next) => {
+/** PUT /agents/fx-offer { rateKesPerUsd, minUsd, maxUsd, active } — upsert
+ * the calling agent's rate. Only the agent owner can set it (not
+ * cashiers) — this is a pricing/risk decision, not day-to-day cash
+ * handling. */
+router.put('/fx-offer', async (req, res, next) => {
+  try {
+    const owned = await requireOwnAgent(pool, req.userId);
+    if (!owned || owned.status !== 'ACTIVE') {
+      return res.status(404).json({ error: 'You are not an active agent' });
+    }
+    if (!CAN_TRANSACT[owned.tier]) {
+      return res.status(403).json({
+        error: `${owned.tier === 'COUNTRY_AGENT' ? 'Country Agents' : 'Super Agents'} manage their network's float and don't serve customers directly`,
+      });
+    }
+    const rate = Number(req.body?.rateKesPerUsd);
+    const minUsd = Number(req.body?.minUsd ?? 1);
+    const maxUsd = Number(req.body?.maxUsd ?? 1000);
+    const active = req.body?.active !== false;
+    if (!Number.isFinite(rate) || rate <= 0) {
+      return res.status(400).json({ error: 'A positive rateKesPerUsd is required' });
+    }
+    if (!Number.isFinite(minUsd) || !Number.isFinite(maxUsd) || minUsd <= 0 || maxUsd < minUsd) {
+      return res.status(400).json({ error: 'minUsd/maxUsd must be positive with max >= min' });
+    }
+    // Sanity guard: an agent fat-fingering a rate wildly off Wayaki's
+    // reference rate (e.g. typing 1.29 instead of 129, or 12900) would
+    // otherwise sit live in the marketplace and either scam customers or
+    // bankrupt the agent's own float.
+    const reference = config.kesPerUsd;
+    if (rate < reference * 0.5 || rate > reference * 1.1) {
+      return res.status(400).json({
+        error: `Rate looks off — Wayaki's reference rate is ~${reference} KES/USD. Enter something close to (usually just under) that.`,
+      });
+    }
+
+    const offer = await pool.query(
+      `INSERT INTO agent_fx_offers (agent_id, rate_kes_per_usd, min_usd, max_usd, active)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (agent_id) DO UPDATE
+         SET rate_kes_per_usd = $2, min_usd = $3, max_usd = $4, active = $5, updated_at = now()
+       RETURNING *`,
+      [owned.id, rate, minUsd, maxUsd, active],
+    );
+    res.json(offer.rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /agents/mobile-money-queue/:id/accept — the specific agent this
+ * order was assigned to at creation confirms they'll fulfill it. */
+router.post('/mobile-money-queue/:id/accept', async (req, res, next) => {
   const client = await pool.connect();
   try {
     const agentId = req.body?.agentId ? String(req.body.agentId).trim() : null;
@@ -661,26 +701,21 @@ router.post('/mobile-money-queue/:id/claim', async (req, res, next) => {
     if (!acting || acting.agent.status !== 'ACTIVE') {
       return res.status(404).json({ error: 'You are not an active agent or cashier' });
     }
-    if (!CAN_TRANSACT[acting.agent.tier]) {
-      return res.status(403).json({
-        error: `${acting.agent.tier === 'COUNTRY_AGENT' ? 'Country Agents' : 'Super Agents'} manage their network's float and don't serve customers directly`,
-      });
-    }
 
     await client.query('BEGIN');
-    const claimed = await client.query(
+    const accepted = await client.query(
       `UPDATE mobile_money_movements
-          SET status = 'AGENT_CLAIMED', agent_id = $1, claimed_at = now(), updated_at = now()
-        WHERE id = $2 AND status = 'PENDING_AGENT' AND agent_id IS NULL
-        RETURNING id, rail, phone, amount_kes, fee_usd, agent_commission_usd, status, claimed_at`,
-      [acting.agent.id, req.params.id],
+          SET status = 'AGENT_CLAIMED', claimed_at = now(), updated_at = now()
+        WHERE id = $1 AND status = 'PENDING_AGENT' AND agent_id = $2
+        RETURNING id, rail, phone, amount_kes, locked_rate_kes_per_usd, status, claimed_at`,
+      [req.params.id, acting.agent.id],
     );
-    if (claimed.rows.length === 0) {
+    if (accepted.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: 'Already claimed by another agent, or no longer pending' });
+      return res.status(404).json({ error: 'Not assigned to you, or no longer pending' });
     }
     await client.query('COMMIT');
-    res.json({ claimed: claimed.rows[0] });
+    res.json({ accepted: accepted.rows[0] });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
     next(err);
@@ -689,9 +724,10 @@ router.post('/mobile-money-queue/:id/claim', async (req, res, next) => {
   }
 });
 
-/** POST /agents/mobile-money-queue/:id/release — agent gives up a claim
- * they can't fulfill; returns it to the open pool. */
-router.post('/mobile-money-queue/:id/release', async (req, res, next) => {
+/** POST /agents/mobile-money-queue/:id/decline — the assigned agent can't
+ * fulfill it; refunds the customer so they can pick a different offer,
+ * rather than leaving it to sit unfulfilled or silently reassigning it. */
+router.post('/mobile-money-queue/:id/decline', async (req, res, next) => {
   const client = await pool.connect();
   try {
     const agentId = req.body?.agentId ? String(req.body.agentId).trim() : null;
@@ -701,19 +737,55 @@ router.post('/mobile-money-queue/:id/release', async (req, res, next) => {
     }
 
     await client.query('BEGIN');
-    const released = await client.query(
-      `UPDATE mobile_money_movements
-          SET status = 'PENDING_AGENT', agent_id = NULL, claimed_at = NULL, updated_at = now()
-        WHERE id = $1 AND status = 'AGENT_CLAIMED' AND agent_id = $2
-        RETURNING id`,
-      [req.params.id, acting.agent.id],
-    );
-    if (released.rows.length === 0) {
+    const movement = (
+      await client.query(
+        `SELECT * FROM mobile_money_movements
+          WHERE id = $1 AND status IN ('PENDING_AGENT','AGENT_CLAIMED') AND agent_id = $2
+          FOR UPDATE`,
+        [req.params.id, acting.agent.id],
+      )
+    ).rows[0];
+    if (!movement) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Not currently claimed by you' });
+      return res.status(404).json({ error: 'Not assigned to you, or already settled' });
     }
+
+    const sourceCurrency = movement.source_currency || 'USD';
+    const balanceColumn = sourceCurrency === 'USD' ? 'usd_balance' : 'kes_balance';
+    const debitAmount = Number(movement.amount_kes) / Number(movement.locked_rate_kes_per_usd || config.kesPerUsd);
+    await client.query(`UPDATE users SET ${balanceColumn} = ${balanceColumn} + $1 WHERE id = $2`, [
+      debitAmount,
+      movement.user_id,
+    ]);
+    const amountUsd = sourceCurrency === 'USD' ? debitAmount : debitAmount / config.kesPerUsd;
+    await ledger.postWithClient(
+      client,
+      movement.user_id,
+      { title: `${movement.rail} payout declined by agent`, rail: movement.rail },
+      [
+        { accountName: 'Agent payout clearing', direction: 'debit', amountUsd, memo: 'Declined by agent' },
+        {
+          accountName: `Customer ${sourceCurrency} wallet`,
+          direction: 'credit',
+          amountUsd,
+          memo: `${debitAmount.toFixed(2)} ${sourceCurrency} released`,
+        },
+      ],
+    );
+    await client.query(
+      `UPDATE mobile_money_movements
+          SET status = 'FAILED', admin_note = 'Declined by agent', updated_at = now()
+        WHERE id = $1`,
+      [movement.id],
+    );
     await client.query('COMMIT');
-    res.json({ released: true });
+
+    notify.notifyUser(movement.user_id, {
+      title: 'Payout declined',
+      body: `The agent couldn't fulfill your ${movement.rail} request — your balance has been refunded. Try another agent's rate.`,
+    });
+
+    res.json({ declined: true });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
     next(err);
@@ -723,8 +795,10 @@ router.post('/mobile-money-queue/:id/release', async (req, res, next) => {
 });
 
 /** POST /agents/mobile-money-queue/:id/complete { reference } — the agent
- * confirms they've sent the real M-Pesa/Till payment; credits their
- * commission and notifies the customer. */
+ * confirms they've sent the real M-Pesa/Till payment. Settlement is a
+ * direct swap: the customer's paid amount (already debited at request
+ * time) credits the agent-owner's own USD balance — the agent's margin
+ * was already baked into the rate they offered, not a separate fee. */
 router.post('/mobile-money-queue/:id/complete', async (req, res, next) => {
   const client = await pool.connect();
   try {
@@ -749,7 +823,7 @@ router.post('/mobile-money-queue/:id/complete', async (req, res, next) => {
     ).rows[0];
     if (!movement) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Not currently claimed by you' });
+      return res.status(404).json({ error: 'Not currently accepted by you' });
     }
 
     await client.query(
@@ -759,10 +833,23 @@ router.post('/mobile-money-queue/:id/complete', async (req, res, next) => {
       [reference, movement.id],
     );
 
-    const commissionAmount = Number(movement.agent_commission_usd || 0);
-    if (commissionAmount > 0) {
-      await creditAgentCommission(client, acting.agent, 'mobile_money_payout', 'USD', commissionAmount, movement.user_id);
-    }
+    // The customer paid in USD (this marketplace is USD-sourced by
+    // design) — that amount becomes the agent-owner's own real balance in
+    // exchange for the real KES they just sent.
+    const settlementUsd = Number(movement.amount_kes) / Number(movement.locked_rate_kes_per_usd);
+    await client.query('UPDATE users SET usd_balance = usd_balance + $1 WHERE id = $2', [
+      settlementUsd,
+      acting.agent.user_id,
+    ]);
+    await ledger.postWithClient(
+      client,
+      acting.agent.user_id,
+      { title: `M-Pesa/Till FX fulfilled for customer`, rail: 'Agent FX' },
+      [
+        { accountName: 'Agent payout clearing', direction: 'debit', amountUsd: settlementUsd, memo: reference },
+        { accountName: 'Customer USD wallet', direction: 'credit', amountUsd: settlementUsd, memo: reference },
+      ],
+    );
     await client.query('COMMIT');
 
     notify.notifyUser(movement.user_id, {
@@ -770,12 +857,39 @@ router.post('/mobile-money-queue/:id/complete', async (req, res, next) => {
       body: `Your ${movement.amount_kes} KES ${movement.rail} payment has been sent by an agent.`,
     });
 
-    res.json({ completed: true, commission: { currency: 'USD', amount: commissionAmount } });
+    res.json({ completed: true, settlement: { currency: 'USD', amount: settlementUsd } });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
     next(err);
   } finally {
     client.release();
+  }
+});
+
+/** GET /agents/mobile-money-queue — orders currently assigned to the
+ * calling agent (awaiting accept, or already accepted and being
+ * fulfilled). Orders are pre-assigned to a specific agent at creation
+ * (the customer picked their rate offer) — there's no open/unclaimed pool
+ * to browse here anymore. */
+router.get('/mobile-money-queue', async (req, res, next) => {
+  try {
+    const agentId = req.query?.agentId ? String(req.query.agentId).trim() : null;
+    const acting = await resolveActingAgent(pool, req.userId, agentId);
+    if (!acting || acting.agent.status !== 'ACTIVE') {
+      return res.status(404).json({ error: 'You are not an active agent or cashier' });
+    }
+    const rows = await pool.query(
+      `SELECT id, rail, phone, amount_kes, locked_rate_kes_per_usd, status,
+              agent_id, claimed_at, created_at
+         FROM mobile_money_movements
+        WHERE agent_id = $1 AND status IN ('PENDING_AGENT','AGENT_CLAIMED')
+        ORDER BY created_at ASC
+        LIMIT 100`,
+      [acting.agent.id],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
   }
 });
 

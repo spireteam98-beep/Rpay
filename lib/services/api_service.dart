@@ -437,6 +437,7 @@ class ApiService {
     String? phone,
     String? tillNumber,
     String sourceCurrency = 'KES',
+    String? fxOfferId,
   }) async {
     if (!hasSession) return null;
     final res = await http
@@ -449,6 +450,7 @@ class ApiService {
             if (phone != null) 'phone': phone,
             if (tillNumber != null) 'tillNumber': tillNumber,
             'sourceCurrency': sourceCurrency,
+            if (fxOfferId != null) 'fxOfferId': fxOfferId,
           }),
         )
         // Longer than the default _timeout: an M-Pesa payout makes two
@@ -1221,10 +1223,66 @@ class ApiService {
     throw ApiException(body['error'] as String? ?? 'Could not reject order');
   }
 
-  // ── Agent mobile-money queue ────────────────────────────────────
+  // ── M-Pesa/Till FX marketplace ──────────────────────────────────
 
-  /// Open pool of USD-sourced M-Pesa/Till payout requests, plus whatever
-  /// the calling agent has already claimed.
+  /// Customer-facing: live agent rate offers, sorted best-for-the-customer
+  /// first. Pass [amountUsd] to filter to offers whose min/max cover it.
+  static Future<Map<String, dynamic>?> fxOffers({double? amountUsd}) async {
+    if (!hasSession) return null;
+    try {
+      final uri = Uri.parse('$baseUrl/mobile-money/fx-offers').replace(
+        queryParameters:
+            amountUsd != null ? {'amountUsd': amountUsd.toString()} : null,
+      );
+      final res = await http.get(uri, headers: _headers(authed: true)).timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Agent-facing: the calling agent's own current rate offer, or null.
+  static Future<Map<String, dynamic>?> myFxOffer() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/agents/fx-offer'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      final body = jsonDecode(res.body);
+      return body == null ? null : body as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Agent-facing: set/update the calling agent's live rate.
+  static Future<Map<String, dynamic>> setFxOffer({
+    required double rateKesPerUsd,
+    required double minUsd,
+    required double maxUsd,
+    bool active = true,
+  }) async {
+    final res = await http
+        .put(
+          Uri.parse('$baseUrl/agents/fx-offer'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'rateKesPerUsd': rateKesPerUsd,
+            'minUsd': minUsd,
+            'maxUsd': maxUsd,
+            'active': active,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not set your rate');
+  }
+
+  /// Orders currently assigned to the calling agent (awaiting accept, or
+  /// already accepted and being fulfilled).
   static Future<List<dynamic>?> mobileMoneyQueue() async {
     if (!hasSession) return null;
     try {
@@ -1241,28 +1299,28 @@ class ApiService {
     }
   }
 
-  static Future<void> claimMobileMoneyPayout(String movementId) async {
+  static Future<void> acceptMobileMoneyPayout(String movementId) async {
     final res = await http
         .post(
-          Uri.parse('$baseUrl/agents/mobile-money-queue/$movementId/claim'),
+          Uri.parse('$baseUrl/agents/mobile-money-queue/$movementId/accept'),
           headers: _headers(authed: true),
         )
         .timeout(_timeout);
     if (res.statusCode == 200) return;
     final body = jsonDecode(res.body) as Map<String, dynamic>;
-    throw ApiException(body['error'] as String? ?? 'Could not claim this payout');
+    throw ApiException(body['error'] as String? ?? 'Could not accept this payout');
   }
 
-  static Future<void> releaseMobileMoneyPayout(String movementId) async {
+  static Future<void> declineMobileMoneyPayout(String movementId) async {
     final res = await http
         .post(
-          Uri.parse('$baseUrl/agents/mobile-money-queue/$movementId/release'),
+          Uri.parse('$baseUrl/agents/mobile-money-queue/$movementId/decline'),
           headers: _headers(authed: true),
         )
         .timeout(_timeout);
     if (res.statusCode == 200) return;
     final body = jsonDecode(res.body) as Map<String, dynamic>;
-    throw ApiException(body['error'] as String? ?? 'Could not release this payout');
+    throw ApiException(body['error'] as String? ?? 'Could not decline this payout');
   }
 
   static Future<void> completeMobileMoneyPayout(

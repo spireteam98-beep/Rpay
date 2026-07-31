@@ -397,6 +397,7 @@ class KashAppState extends ChangeNotifier {
     required String rail,
     required String recipient,
     required double amount,
+    String? fxOfferId,
   }) async {
     if (amount <= 0) {
       return const TransferResult.failure('Enter an amount greater than 0.');
@@ -430,13 +431,12 @@ class KashAppState extends ChangeNotifier {
     }
 
     // M-Pesa (phone or Till) can be funded from either wallet (see
-    // SendMoneyScreen._channelList) — `amount` is in whatever currency the
-    // source account is in, sent as-is; the backend alone converts
-    // USD->KES for the actual M-Pesa payout, using its own exchange rate
-    // (see ApiService.submitMobileMoneyWithdrawal for why this side never
-    // does that math). Fires a real Paystack payout to `recipient` (the
-    // phone number or till number typed in), not the local simulated
-    // ledger below.
+    // SendMoneyScreen._channelList). KES-sourced amounts go straight to
+    // Paystack, using the backend's own exchange rate (see
+    // ApiService.submitMobileMoneyWithdrawal for why this side never does
+    // that math). USD-sourced sends go through the agent FX marketplace
+    // instead — `fxOfferId` (the specific agent rate the customer picked)
+    // is required for those and ignored otherwise.
     if (ApiService.hasSession && (rail == 'M-Pesa' || rail == 'M-Pesa Till')) {
       final sourceCurrency = sourceType == KashAccountType.walletUsd ? 'USD' : 'KES';
       final isTill = rail == 'M-Pesa Till';
@@ -447,6 +447,7 @@ class KashAppState extends ChangeNotifier {
           phone: isTill ? null : recipient.trim(),
           tillNumber: isTill ? recipient.trim() : null,
           sourceCurrency: sourceCurrency,
+          fxOfferId: fxOfferId,
         );
         // The payout has already been accepted at this point. Refreshing the
         // wallet is best-effort: a timeout from any of the dashboard's

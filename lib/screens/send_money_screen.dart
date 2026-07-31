@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -29,6 +31,18 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
   );
   bool _submitting = false;
 
+  // M-Pesa/Till sent from the USD wallet routes through the agent FX
+  // marketplace (routes/mobileMoney.js GET /fx-offers) instead of Paystack
+  // — the customer must pick a specific agent's live rate before sending.
+  List<dynamic> _fxOffers = [];
+  bool _loadingOffers = false;
+  Map<String, dynamic>? _selectedOffer;
+  Timer? _offersDebounce;
+
+  bool get _isMarketplacePath =>
+      _sourceType == KashAccountType.walletUsd &&
+      (_rail == 'M-Pesa' || _rail == 'M-Pesa Till');
+
   @override
   void initState() {
     super.initState();
@@ -36,13 +50,48 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     if (widget.initialRecipient != null) {
       _recipientController.text = widget.initialRecipient!;
     }
+    _amountController.addListener(_onAmountChanged);
+    _maybeLoadOffers();
   }
 
   @override
   void dispose() {
+    _offersDebounce?.cancel();
+    _amountController.removeListener(_onAmountChanged);
     _recipientController.dispose();
     _amountController.dispose();
     super.dispose();
+  }
+
+  void _onAmountChanged() {
+    _offersDebounce?.cancel();
+    _offersDebounce = Timer(const Duration(milliseconds: 400), _maybeLoadOffers);
+  }
+
+  Future<void> _maybeLoadOffers() async {
+    if (!_isMarketplacePath) {
+      if (_fxOffers.isNotEmpty || _selectedOffer != null) {
+        setState(() {
+          _fxOffers = [];
+          _selectedOffer = null;
+        });
+      }
+      return;
+    }
+    final amount = double.tryParse(_amountController.text.trim());
+    setState(() => _loadingOffers = true);
+    final result = await ApiService.fxOffers(amountUsd: amount);
+    if (!mounted) return;
+    final offers = (result?['offers'] as List?) ?? const [];
+    setState(() {
+      _fxOffers = offers;
+      _loadingOffers = false;
+      // Keep the current selection only if it's still in the list.
+      if (_selectedOffer != null &&
+          !offers.any((o) => o['id'] == _selectedOffer!['id'])) {
+        _selectedOffer = null;
+      }
+    });
   }
 
   @override
@@ -108,6 +157,19 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
                         : TextInputType.text,
                 controller: _recipientController,
               ),
+              if (_isMarketplacePath) ...[
+                const SizedBox(height: 20),
+                const Text(
+                  'Choose an agent rate',
+                  style: TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _fxOffersList(),
+              ],
               const SizedBox(height: 20),
               _summary(appState, source),
               const SizedBox(height: 24),
@@ -263,6 +325,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       _sourceType = next.type;
       _rail = 'Wayaki';
     });
+    _maybeLoadOffers();
   }
 
   /// Wayaki-to-Wayaki transfer is always available. M-Pesa/Till cash-out is
@@ -286,7 +349,10 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TouchScale(
-        onTap: () => setState(() => _rail = option.name),
+        onTap: () {
+          setState(() => _rail = option.name);
+          _maybeLoadOffers();
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.all(14),
@@ -340,7 +406,125 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     );
   }
 
+  /// Live agent rate offers for the FX marketplace — best rate first
+  /// (already sorted server-side). Tapping one selects it; the selected
+  /// agent and locked rate are what actually fulfills the send.
+  Widget _fxOffersList() {
+    if (_loadingOffers) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: CircularProgressIndicator(color: BybitPalette.accent, strokeWidth: 2),
+        ),
+      );
+    }
+    if (_fxOffers.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: BybitPalette.surface2,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Text(
+          'No agents are offering this amount right now — try a different amount, or check back later.',
+          style: TextStyle(color: BybitPalette.muted, fontSize: 12.5, height: 1.4),
+        ),
+      );
+    }
+    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+    return Column(
+      children:
+          _fxOffers.map((raw) {
+            final offer = Map<String, dynamic>.from(raw as Map);
+            final rate = double.tryParse(offer['rate_kes_per_usd'].toString()) ?? 0;
+            final businessName = offer['business_name'] as String? ?? 'Agent';
+            final selected = _selectedOffer != null && _selectedOffer!['id'] == offer['id'];
+            final kesTotal = amount * rate;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TouchScale(
+                onTap: () => setState(() => _selectedOffer = offer),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: BybitPalette.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: selected ? BybitPalette.accent : const Color(0xFF242832),
+                      width: selected ? 1.6 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              businessName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${rate.toStringAsFixed(2)} KES per USD',
+                              style: const TextStyle(color: BybitPalette.muted, fontSize: 11.5),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (amount > 0)
+                        Text(
+                          '≈ ${NumberFormat('#,##0.00').format(kesTotal)} KES',
+                          style: const TextStyle(
+                            color: BybitPalette.accent,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                        color: selected ? BybitPalette.accent : BybitPalette.muted2,
+                        size: 20,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+    );
+  }
+
   Widget _summary(KashAppState appState, KashAccount source) {
+    if (_isMarketplacePath) {
+      final amount = double.tryParse(_amountController.text.trim()) ?? 0;
+      final rate =
+          _selectedOffer != null
+              ? double.tryParse(_selectedOffer!['rate_kes_per_usd'].toString()) ?? 0
+              : 0;
+      return BybitCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            BybitInfoLine('Available', source.balance),
+            BybitInfoLine(
+              'They receive',
+              _selectedOffer == null
+                  ? 'Pick an agent rate above'
+                  : '${NumberFormat('#,##0.00').format(amount * rate)} KES',
+            ),
+          ],
+        ),
+      );
+    }
     final fee = appState.transferFee(_rail);
     return BybitCard(
       padding: const EdgeInsets.all(14),
@@ -401,6 +585,10 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       _showErrorSnackBar('Enter a recipient and a positive amount');
       return;
     }
+    if (_isMarketplacePath && _selectedOffer == null) {
+      _showErrorSnackBar('Pick an agent rate before sending');
+      return;
+    }
 
     final fee = appState.transferFee(_rail);
     final confirmed = await showModalBottomSheet<bool>(
@@ -441,6 +629,7 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       rail: _rail,
       recipient: recipient,
       amount: amount,
+      fxOfferId: _isMarketplacePath ? (_selectedOffer?['id'] as String?) : null,
     );
     if (!mounted) return;
     setState(() => _submitting = false);

@@ -567,13 +567,17 @@ async function migrate() {
 
   // Agent-fulfilled M-Pesa/Till payouts — for USD-sourced withdrawals,
   // where Paystack's own balance can't be trusted to cover the payout
-  // (Stripe/Waafi money never reaches it), the request queues here instead
-  // of calling Paystack directly. Any active agent can claim it and send
-  // the real M-Pesa/Till payment themselves (their own float), same
-  // economics as the existing in-person agent withdrawal
-  // (routes/agents.js WITHDRAWAL_AGENT_FEE_SHARE) just decoupled in time.
-  // status flow: PENDING_AGENT (unclaimed) -> AGENT_CLAIMED -> COMPLETED,
-  // or back to PENDING_AGENT (agent_id cleared) if the agent releases it.
+  // (Stripe/Waafi money never reaches it). A real P2P FX marketplace, not
+  // an anonymous queue: agents post their own live KES-per-USD rate
+  // (agent_fx_offers below), the customer browses and picks one, and the
+  // order is pre-assigned to that specific agent at creation — they accept
+  // or decline, then send the real M-Pesa/Till payment themselves (their
+  // own float) and mark it complete. Settlement is a direct swap: the
+  // customer's paid USD credits the agent's own usd_balance once
+  // completed — the agent's margin is baked into the rate they set, not a
+  // separate fee. status flow: PENDING_AGENT (awaiting the assigned
+  // agent's accept) -> AGENT_CLAIMED (accepted, fulfilling) -> COMPLETED,
+  // or FAILED (declined/refunded).
   await pool.query(`
     ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS source_currency TEXT;
     ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS fee_usd NUMERIC(18,2);
@@ -581,6 +585,7 @@ async function migrate() {
     ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS agent_id UUID REFERENCES agents(id);
     ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
     ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS agent_reference TEXT;
+    ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS locked_rate_kes_per_usd NUMERIC(10,4);
     CREATE INDEX IF NOT EXISTS idx_mobile_money_pending_agent
       ON mobile_money_movements(status, created_at)
       WHERE status = 'PENDING_AGENT';
@@ -588,6 +593,22 @@ async function migrate() {
     ALTER TABLE agent_commissions
       ADD CONSTRAINT agent_commissions_kind_check
       CHECK (kind IN ('deposit','withdrawal','onboarding','merchant_onboarding','card_issuance','p2p','override','mobile_money_payout'));
+
+    CREATE TABLE IF NOT EXISTS agent_fx_offers (
+      id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      agent_id          UUID NOT NULL UNIQUE REFERENCES agents(id),
+      rate_kes_per_usd  NUMERIC(10,4) NOT NULL CHECK (rate_kes_per_usd > 0),
+      min_usd           NUMERIC(18,2) NOT NULL DEFAULT 1,
+      max_usd           NUMERIC(18,2) NOT NULL DEFAULT 1000,
+      active            BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_fx_offers_active
+      ON agent_fx_offers(active, rate_kes_per_usd DESC)
+      WHERE active = TRUE;
+    ALTER TABLE mobile_money_movements
+      ADD COLUMN IF NOT EXISTS agent_fx_offer_id UUID REFERENCES agent_fx_offers(id);
   `);
 
   // Sole super-admin: keep this the only account with role='admin'. Runs

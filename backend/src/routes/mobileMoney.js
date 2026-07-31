@@ -4,7 +4,6 @@ const { requireAuth } = require('../middleware/auth');
 const config = require('../config');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
-const pricing = require('../services/pricing');
 const { payoutToMpesa, payoutToTill } = require('../services/paystackTransfers');
 
 const router = express.Router();
@@ -45,7 +44,7 @@ router.get('/movements', async (req, res, next) => {
   try {
     const rows = await pool.query(
       `SELECT id, type, rail, phone, amount_kes, reference, status, admin_note,
-              source_currency, fee_usd, agent_reference, created_at, updated_at
+              source_currency, locked_rate_kes_per_usd, agent_reference, created_at, updated_at
          FROM mobile_money_movements
         WHERE user_id = $1
         ORDER BY created_at DESC
@@ -129,6 +128,35 @@ async function refundFailedWithdrawal(userId, movement, sourceCurrency, debitAmo
 }
 
 /**
+ * GET /mobile-money/fx-offers?amountUsd=10 — the customer-facing
+ * marketplace listing for USD-sourced M-Pesa/Till: every active agent's
+ * live rate, sorted best-for-the-customer first (highest KES per USD).
+ * `amountUsd`, when given, filters out offers whose min/max don't cover
+ * it — same rate schedule POST /withdrawals validates against at order
+ * time.
+ */
+router.get('/fx-offers', async (req, res, next) => {
+  try {
+    const amountUsd = Number(req.query?.amountUsd);
+    const hasAmount = Number.isFinite(amountUsd) && amountUsd > 0;
+    const rows = await pool.query(
+      `SELECT o.id, o.rate_kes_per_usd, o.min_usd, o.max_usd,
+              a.id AS agent_id, a.business_name, a.agent_code
+         FROM agent_fx_offers o
+         JOIN agents a ON a.id = o.agent_id
+        WHERE o.active = TRUE AND a.status = 'ACTIVE'
+          AND ($1::numeric IS NULL OR ($1 >= o.min_usd AND $1 <= o.max_usd))
+        ORDER BY o.rate_kes_per_usd DESC
+        LIMIT 50`,
+      [hasAmount ? amountUsd : null],
+    );
+    res.json({ referenceRateKesPerUsd: config.kesPerUsd, offers: rows.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * KES-sourced M-Pesa (phone) and M-Pesa Till withdrawals go straight to
  * Paystack — no approval step, same as Wayaki-to-Wayaki P2P transfers
  * (routes/transfers.js), gated by balance plus the same KYC-tier daily
@@ -136,27 +164,26 @@ async function refundFailedWithdrawal(userId, movement, sourceCurrency, debitAmo
  * because Paystack top-ups are the only thing that actually fund
  * Paystack's own payable balance.
  *
- * USD-sourced M-Pesa/Till withdrawals queue for an agent instead
- * (routes/agents.js mobile-money-queue endpoints) — Stripe/Waafi money
- * never reaches Paystack's balance, so an automated Paystack call here
- * would just fail unpredictably. An agent claims the request and sends the
- * real M-Pesa/Till payment themselves, earning a fee-based commission —
- * same economics as the existing in-person agent withdrawal, just
- * decoupled in time via a claim/complete queue instead of synchronous.
+ * USD-sourced M-Pesa/Till withdrawals go through the agent FX marketplace
+ * instead (GET /fx-offers above, routes/agents.js mobile-money-queue
+ * endpoints) — Stripe/Waafi money never reaches Paystack's balance, so an
+ * automated Paystack call here would just fail unpredictably. The
+ * customer picks a specific agent's rate offer (`fxOfferId`), which locks
+ * in that agent and rate for this order; the agent accepts and sends the
+ * real M-Pesa/Till payment themselves, off their own float. Settlement
+ * (routes/agents.js .../complete) is a direct swap — the agent's margin
+ * is baked into the rate they set, not a separate fee.
  *
  * Other rails (EVC Plus, Zaad, Sahal) have no automated or agent payout
  * wired up yet, so they still queue for manual admin payout via
  * POST /admin/mobile-money/:id/complete-withdrawal.
  *
  * `amount` is always in `sourceCurrency` (default 'KES') — never
- * pre-converted by the client. This endpoint alone derives amountKes (what
- * actually lands on M-Pesa — Paystack/agents only ever send KES) and
- * amountUsd from it using this server's own config.kesPerUsd. That's
- * deliberate: if the client converted USD->KES itself using a
- * cached/stale rate, converting back here to check the balance wouldn't
- * round-trip exactly, and a real $3.00 balance could come back needing
- * $3.02 — a false "not enough balance" purely from rate drift between
- * client and server.
+ * pre-converted by the client. For the KES-sourced Paystack path this
+ * endpoint alone derives amountKes/amountUsd using this server's own
+ * config.kesPerUsd (never the client's, to avoid stale-rate round-trip
+ * drift); for the agent-fulfilled path amountKes is derived from the
+ * picked offer's locked rate instead.
  */
 router.post('/withdrawals', async (req, res, next) => {
   const client = await pool.connect();
@@ -176,25 +203,49 @@ router.post('/withdrawals', async (req, res, next) => {
     if (isTill && !/^\d{5,7}$/.test(phone)) {
       return res.status(400).json({ error: 'Enter a valid 5-7 digit till number' });
     }
-    const amountKes =
-      sourceCurrency === 'USD' ? Number((amount * config.kesPerUsd).toFixed(2)) : amount;
-    const amountUsd =
-      sourceCurrency === 'USD' ? amount : Number((amount / config.kesPerUsd).toFixed(2));
 
     const isAgentFulfilled = AUTO_PAYOUT_RAILS.includes(rail) && sourceCurrency === 'USD';
-    // Only the agent-fulfilled path charges a fee — same tiered schedule as
-    // the in-person agent withdrawal, funding the agent's commission for
-    // providing real M-Pesa/Till liquidity out of their own float.
-    // KES-sourced sends stay free, same as before.
-    let feeUsd = 0;
-    let agentCommissionUsd = 0;
+
+    let amountKes;
+    let amountUsd;
+    let agentId = null;
+    let fxOfferId = null;
+    let lockedRate = null;
+
     if (isAgentFulfilled) {
-      feeUsd = Number(pricing.withdrawalFee(amount, 'USD').toFixed(2));
-      agentCommissionUsd = Number((feeUsd * pricing.WITHDRAWAL_AGENT_FEE_SHARE).toFixed(2));
+      fxOfferId = String(req.body?.fxOfferId || '').trim();
+      if (!fxOfferId) {
+        return res.status(400).json({ error: 'Pick an agent rate offer first' });
+      }
+      const offer = (
+        await pool.query(
+          `SELECT o.*, a.status AS agent_status
+             FROM agent_fx_offers o JOIN agents a ON a.id = o.agent_id
+            WHERE o.id = $1`,
+          [fxOfferId],
+        )
+      ).rows[0];
+      if (!offer || !offer.active || offer.agent_status !== 'ACTIVE') {
+        return res.status(404).json({ error: 'That rate offer is no longer available' });
+      }
+      if (amount < Number(offer.min_usd) || amount > Number(offer.max_usd)) {
+        return res.status(400).json({
+          error: `This agent accepts $${offer.min_usd}-$${offer.max_usd} — enter an amount in that range`,
+        });
+      }
+      lockedRate = Number(offer.rate_kes_per_usd);
+      amountKes = Number((amount * lockedRate).toFixed(2));
+      amountUsd = amount;
+      agentId = offer.agent_id;
+    } else {
+      amountKes = sourceCurrency === 'USD' ? Number((amount * config.kesPerUsd).toFixed(2)) : amount;
+      amountUsd = sourceCurrency === 'USD' ? amount : Number((amount / config.kesPerUsd).toFixed(2));
     }
-    // What actually gets debited from the source wallet — `amount` plus
-    // the agent fee when one applies.
-    const debitAmount = Number((amount + feeUsd).toFixed(2));
+
+    // No separate fee — for the agent-fulfilled path the agent's margin is
+    // already baked into the rate they offered, so the customer is only
+    // ever debited the raw amount they asked to send.
+    const debitAmount = amount;
     const balanceColumn = sourceCurrency === 'USD' ? 'usd_balance' : 'kes_balance';
 
     await client.query('BEGIN');
@@ -210,11 +261,7 @@ router.post('/withdrawals', async (req, res, next) => {
     }
     if (Number(user.balance) < debitAmount) {
       await client.query('ROLLBACK');
-      return res.status(400).json({
-        error: isAgentFulfilled
-          ? `Not enough ${sourceCurrency} balance (need ${debitAmount} — ${amount} plus a ${feeUsd} agent fee)`
-          : `Not enough ${sourceCurrency} balance`,
-      });
+      return res.status(400).json({ error: `Not enough ${sourceCurrency} balance` });
     }
 
     const limit = await compliance.checkUserLimit(client, req.userId, amountUsd, `${rail} withdrawal`);
@@ -230,10 +277,11 @@ router.post('/withdrawals', async (req, res, next) => {
     const status = isAgentFulfilled ? 'PENDING_AGENT' : 'PENDING_PAYOUT';
     const inserted = await client.query(
       `INSERT INTO mobile_money_movements
-        (user_id, type, rail, phone, amount_kes, status, source_currency, fee_usd, agent_commission_usd)
-       VALUES ($1,'WITHDRAWAL',$2,$3,$4,$5,$6,$7,$8)
-       RETURNING id, type, rail, phone, amount_kes, status, fee_usd, created_at`,
-      [req.userId, rail, phone, amountKes, status, sourceCurrency, feeUsd || null, agentCommissionUsd || null],
+        (user_id, type, rail, phone, amount_kes, status, source_currency,
+         agent_id, agent_fx_offer_id, locked_rate_kes_per_usd)
+       VALUES ($1,'WITHDRAWAL',$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, type, rail, phone, amount_kes, status, locked_rate_kes_per_usd, created_at`,
+      [req.userId, rail, phone, amountKes, status, sourceCurrency, agentId, fxOfferId, lockedRate],
     );
     const movement = inserted.rows[0];
     await ledger.postWithClient(
@@ -244,15 +292,13 @@ router.post('/withdrawals', async (req, res, next) => {
         {
           accountName: `Customer ${sourceCurrency} wallet`,
           direction: 'debit',
-          amountUsd: amountUsd + feeUsd,
-          memo: isAgentFulfilled
-            ? `${debitAmount} ${sourceCurrency} held (${amount} + ${feeUsd} agent fee) for ${amountKes} KES payout`
-            : `${debitAmount} ${sourceCurrency} held for ${amountKes} KES payout`,
+          amountUsd,
+          memo: `${debitAmount} ${sourceCurrency} held for ${amountKes} KES payout`,
         },
         {
           accountName: isAgentFulfilled ? 'Agent payout clearing' : 'Mobile money payout clearing',
           direction: 'credit',
-          amountUsd: amountUsd + feeUsd,
+          amountUsd,
           memo: phone,
         },
       ],
@@ -262,7 +308,7 @@ router.post('/withdrawals', async (req, res, next) => {
     if (isAgentFulfilled) {
       return res.status(202).json({
         movement,
-        message: `Queued for an agent to send your ${isTill ? 'Till payment' : 'M-Pesa'} — you'll be notified once it's sent.`,
+        message: `Sent to the agent — you'll be notified once they confirm and send your ${isTill ? 'Till payment' : 'M-Pesa'}.`,
       });
     }
 
