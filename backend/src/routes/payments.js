@@ -4,6 +4,7 @@ const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const config = require('../config');
 const ledger = require('../services/ledger');
+const notify = require('../services/notify');
 
 const router = express.Router();
 
@@ -72,6 +73,10 @@ router.post('/webhooks/paystack', async (req, res, next) => {
           channel: req.body?.data?.channel,
         },
       });
+      notify.notifyUser(topUp.user_id, {
+        title: 'Deposit received',
+        body: `${topUp.amount} ${topUp.currency} was added to your Wayaki wallet.`,
+      });
       return res.sendStatus(200);
     }
 
@@ -96,6 +101,10 @@ router.post('/webhooks/paystack', async (req, res, next) => {
           `UPDATE mobile_money_movements SET status = 'COMPLETED', updated_at = now() WHERE id = $1`,
           [movement.id],
         );
+        notify.notifyUser(movement.user_id, {
+          title: 'Withdrawal complete',
+          body: `Your ${movement.amount_kes} KES ${movement.rail} payout has arrived.`,
+        });
         return res.sendStatus(200);
       }
 
@@ -140,6 +149,10 @@ router.post('/webhooks/paystack', async (req, res, next) => {
       } finally {
         client.release();
       }
+      notify.notifyUser(movement.user_id, {
+        title: 'Withdrawal failed',
+        body: `Your ${movement.amount_kes} KES ${movement.rail} withdrawal could not be delivered — the balance has been refunded to your wallet.`,
+      });
       return res.sendStatus(200);
     }
 

@@ -15,10 +15,12 @@ import 'auth/welcome_screen.dart';
 /// locked, shown but not editable, per compliance — it's the account's
 /// KYC-linked identifier), Linked accounts (the same three real wallet
 /// accounts shown elsewhere),
-/// Notifications (client-side preference toggles, no backend dispatch
-/// system to wire them to), Support (the shared contact dialog), and Delete
-/// account (in-app deletion request, required by App Store Guideline
-/// 5.1.1(v) — see POST /auth/delete-account).
+/// Notifications (push via Telegram and email are real — synced to the
+/// backend and sent on actual events like money received or a withdrawal
+/// completing/failing, see services/notify.js; SMS stays a local-only
+/// toggle since no SMS provider is configured), Support (the shared
+/// contact dialog), and Delete account (in-app deletion request, required
+/// by App Store Guideline 5.1.1(v) — see POST /auth/delete-account).
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -767,7 +769,7 @@ class _NotificationsScreen extends StatelessWidget {
                 context,
                 Icons.notifications_none_rounded,
                 'Push notifications',
-                'Alerts for transfers and activity',
+                'Sent via Telegram when signed in through the bot',
                 appState.notifyPush,
                 (v) => appState.setNotificationPrefs(push: v),
               ),
@@ -775,7 +777,7 @@ class _NotificationsScreen extends StatelessWidget {
                 context,
                 Icons.sms_outlined,
                 'SMS notifications',
-                'Text alerts for money movement',
+                'Not available yet — no SMS provider configured',
                 appState.notifySms,
                 (v) => appState.setNotificationPrefs(sms: v),
               ),
@@ -783,7 +785,7 @@ class _NotificationsScreen extends StatelessWidget {
                 context,
                 Icons.email_outlined,
                 'Email notifications',
-                'Statements and account updates',
+                'Sent to your verified email for transfers and payouts',
                 appState.notifyEmail,
                 (v) => appState.setNotificationPrefs(email: v),
               ),

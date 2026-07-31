@@ -516,6 +516,21 @@ async function migrate() {
       WHERE phone IS NOT NULL;
   `);
 
+  // Profile photo — public GCS URL, see services/storage.js and
+  // routes/auth.js POST /auth/avatar.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+  `);
+
+  // Server-side notification preferences — the Settings screen's toggles
+  // used to be local-only (never synced), so real notifications had no way
+  // to know whether a user actually wanted one. See services/notify.js and
+  // routes/auth.js POST /auth/notification-prefs.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_push BOOLEAN NOT NULL DEFAULT TRUE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_email BOOLEAN NOT NULL DEFAULT FALSE;
+  `);
+
   // Wallet ID: at signup a user picks which identifier (phone, email, or a
   // custom handle) they hand out to receive money — see routes/auth.js
   // POST /auth/wallet-id and the p2p transfer recipient lookup, which now

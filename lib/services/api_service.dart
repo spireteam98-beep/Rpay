@@ -1300,6 +1300,49 @@ class ApiService {
 
   // ── Profile ──────────────────────────────────────────────────────
 
+  /// Syncs which channels the backend is allowed to actually send real
+  /// notifications on (services/notify.js). Best-effort — a sync failure
+  /// shouldn't block the UI toggle from flipping locally.
+  static Future<void> setNotificationPrefs({
+    required bool push,
+    required bool email,
+  }) async {
+    if (!hasSession) return;
+    try {
+      await http
+          .post(
+            Uri.parse('$baseUrl/auth/notification-prefs'),
+            headers: _headers(authed: true),
+            body: jsonEncode({'push': push, 'email': email}),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  /// Uploads a profile photo. [bytes] is the raw (not base64-encoded)
+  /// image data; [contentType] must be image/jpeg, image/png, or
+  /// image/webp. Returns the new public avatar URL.
+  static Future<String> uploadAvatar({
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/auth/avatar'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'imageBase64': base64Encode(bytes),
+            'contentType': contentType,
+          }),
+        )
+        .timeout(const Duration(seconds: 45));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body['avatarUrl'] as String;
+    throw ApiException(body['error'] as String? ?? 'Could not upload photo');
+  }
+
   static Future<void> updateFullName(String fullName) async {
     final res = await http
         .patch(

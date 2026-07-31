@@ -55,6 +55,7 @@ class KashAppState extends ChangeNotifier {
   String _profileName = 'Mohamed Ali';
   String _phoneNumber = '+252 61 000 0000';
   String _email = '';
+  String? _avatarUrl;
   String? _username;
   String _walletIdType = 'phone';
   bool _phoneVerified = false;
@@ -129,6 +130,7 @@ class KashAppState extends ChangeNotifier {
       _profileName = me['full_name'] as String? ?? _profileName;
       _phoneNumber = me['phone'] as String? ?? _phoneNumber;
       _email = me['email'] as String? ?? _email;
+      _avatarUrl = me['avatar_url'] as String?;
       _username = me['username'] as String?;
       _walletIdType = me['wallet_id_type'] as String? ?? _walletIdType;
       _phoneVerified = me['phone_verified'] == true;
@@ -137,6 +139,8 @@ class KashAppState extends ChangeNotifier {
       _role = me['role'] as String? ?? _role;
       _hasPin = me['has_pin'] == true;
       _hasPassword = me['has_password'] == true;
+      if (me.containsKey('notify_push')) _notifyPush = me['notify_push'] == true;
+      if (me.containsKey('notify_email')) _notifyEmail = me['notify_email'] == true;
     }
 
     _accounts =
@@ -230,6 +234,7 @@ class KashAppState extends ChangeNotifier {
   String get profileName => _profileName;
   String get phoneNumber => _phoneNumber;
   String get email => _email;
+  String? get avatarUrl => _avatarUrl;
   String? get username => _username;
   String get walletIdType => _walletIdType;
 
@@ -327,6 +332,12 @@ class KashAppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateAvatarLocal(String avatarUrl) {
+    _avatarUrl = avatarUrl;
+    _persist();
+    notifyListeners();
+  }
+
   void submitKyc({required bool fullVerification}) {
     _kycSubmitted = fullVerification;
     _persist();
@@ -357,6 +368,9 @@ class KashAppState extends ChangeNotifier {
     if (email != null) _notifyEmail = email;
     _persist();
     notifyListeners();
+    // Real notifications (services/notify.js) are gated server-side on
+    // these — without this sync the backend never learns a toggle changed.
+    ApiService.setNotificationPrefs(push: _notifyPush, email: _notifyEmail);
   }
 
   // ── Money movement ──────────────────────────────────────────────
@@ -728,6 +742,7 @@ class KashAppState extends ChangeNotifier {
       'profileName': _profileName,
       'phoneNumber': _phoneNumber,
       'email': _email,
+      'avatarUrl': _avatarUrl,
       'username': _username,
       'walletIdType': _walletIdType,
       'phoneVerified': _phoneVerified,
@@ -775,6 +790,7 @@ class KashAppState extends ChangeNotifier {
       _profileName = state['profileName'] as String? ?? _profileName;
       _phoneNumber = state['phoneNumber'] as String? ?? _phoneNumber;
       _email = state['email'] as String? ?? _email;
+      _avatarUrl = state['avatarUrl'] as String?;
       _username = state['username'] as String?;
       _walletIdType = state['walletIdType'] as String? ?? _walletIdType;
       _phoneVerified = state['phoneVerified'] as bool? ?? false;

@@ -3,6 +3,7 @@ const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
+const notify = require('../services/notify');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -79,9 +80,10 @@ router.post('/', async (req, res, next) => {
 
     const column = balanceColumn(currency);
     const sender = (
-      await client.query(`SELECT ${column} AS balance FROM users WHERE id = $1 FOR UPDATE`, [
-        req.userId,
-      ])
+      await client.query(
+        `SELECT ${column} AS balance, full_name FROM users WHERE id = $1 FOR UPDATE`,
+        [req.userId],
+      )
     ).rows[0];
     await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [receiver.id]);
     if (Number(sender.balance) < amount) {
@@ -139,6 +141,11 @@ router.post('/', async (req, res, next) => {
     } catch (_) {
       // ignore
     }
+
+    notify.notifyUser(receiver.id, {
+      title: 'Money received',
+      body: `You received ${amount} ${currency} from ${sender.full_name} on Wayaki.`,
+    });
 
     res.status(201).json({ transfer: transfer.rows[0] });
   } catch (err) {

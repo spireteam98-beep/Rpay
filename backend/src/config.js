@@ -119,6 +119,12 @@ const config = {
   // disabled rather than a hard boot failure, since the rest of the API
   // works fine without it.
   telegramBotToken: (process.env.TELEGRAM_BOT_TOKEN || '').trim(),
+
+  // Public GCS bucket for profile avatars (see services/storage.js). Uses
+  // Application Default Credentials — Cloud Run's runtime service account
+  // already has Editor on this project, so no separate key file is needed
+  // in production; local dev needs `gcloud auth application-default login`.
+  avatarBucket: (process.env.AVATAR_BUCKET || 'wayaki-avatars').trim(),
 };
 
 if (config.network !== 'testnet' && config.network !== 'mainnet') {

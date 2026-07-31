@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
+import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 import 'admin_console_screen.dart';
 import 'auth/welcome_screen.dart';
@@ -12,8 +14,45 @@ import 'kyc_limits_screen.dart';
 import 'security_screen.dart';
 import 'settings_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  bool _uploadingAvatar = false;
+
+  Future<void> _pickAndUploadAvatar() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+      maxWidth: 800,
+    );
+    if (file == null || !mounted) return;
+
+    setState(() => _uploadingAvatar = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final contentType = file.mimeType ?? 'image/jpeg';
+      final url = await ApiService.uploadAvatar(
+        bytes: bytes,
+        contentType: contentType,
+      );
+      if (!mounted) return;
+      context.read<KashAppState>().updateAvatarLocal(url);
+      BybitToast.success(context, 'Profile photo updated');
+    } on ApiException catch (err) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(err.message)));
+    } finally {
+      if (mounted) setState(() => _uploadingAvatar = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,17 +77,73 @@ class ProfileScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: const BoxDecoration(
-                        color: BybitPalette.surface2,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.person_rounded,
-                        color: BybitPalette.accent,
-                        size: 28,
+                    TouchScale(
+                      onTap: _uploadingAvatar ? () {} : _pickAndUploadAvatar,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 58,
+                            height: 58,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: const BoxDecoration(
+                              color: BybitPalette.surface2,
+                              shape: BoxShape.circle,
+                            ),
+                            child:
+                                _uploadingAvatar
+                                    ? const Center(
+                                      child: SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: BybitPalette.accent,
+                                        ),
+                                      ),
+                                    )
+                                    : (appState.avatarUrl?.isNotEmpty ?? false)
+                                    ? Image.network(
+                                      appState.avatarUrl!,
+                                      fit: BoxFit.cover,
+                                      width: 58,
+                                      height: 58,
+                                      errorBuilder:
+                                          (_, __, ___) => const Icon(
+                                            Icons.person_rounded,
+                                            color: BybitPalette.accent,
+                                            size: 28,
+                                          ),
+                                    )
+                                    : const Icon(
+                                      Icons.person_rounded,
+                                      color: BybitPalette.accent,
+                                      size: 28,
+                                    ),
+                          ),
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: BybitPalette.accent,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: BybitPalette.surface,
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt_rounded,
+                                color: Colors.black,
+                                size: 12,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 18),

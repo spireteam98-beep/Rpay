@@ -6,6 +6,7 @@ const { signToken, requireAuth } = require('../middleware/auth');
 const custody = require('../services/custody');
 const config = require('../config');
 const email = require('../services/email');
+const storage = require('../services/storage');
 const { creditAgentCommission } = require('../services/commission');
 
 const router = express.Router();
@@ -571,7 +572,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
     const result = await pool.query(
       `SELECT id, full_name, email, phone, kyc_tier, phone_verified, eth_address,
               usd_balance, kes_balance, role, email_verified, created_at,
-              username, wallet_id_type,
+              username, wallet_id_type, avatar_url, notify_push, notify_email,
               (pin_hash IS NOT NULL) AS has_pin,
               (password_hash IS NOT NULL) AS has_password
          FROM users WHERE id = $1`,
@@ -597,6 +598,50 @@ router.patch('/profile', requireAuth, async (req, res, next) => {
     await pool.query('UPDATE users SET full_name = $1 WHERE id = $2', [fullName, req.userId]);
     res.json({ fullName });
   } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/notification-prefs { push, email } — syncs which channels
+ * services/notify.js is allowed to actually use for this user. Previously
+ * these were local-only toggles the backend never saw, so a real
+ * notification had no way to respect a user turning one off.
+ */
+router.post('/notification-prefs', requireAuth, async (req, res, next) => {
+  try {
+    const push = req.body?.push !== false;
+    const emailEnabled = req.body?.email === true;
+    await pool.query(
+      'UPDATE users SET notify_push = $1, notify_email = $2 WHERE id = $3',
+      [push, emailEnabled, req.userId],
+    );
+    res.json({ push, email: emailEnabled });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/avatar { imageBase64, contentType } — uploads a profile photo
+ * to GCS (services/storage.js validates size/type) and stores its public
+ * URL. `imageBase64` is the raw base64 payload — callers must strip any
+ * `data:image/...;base64,` prefix before sending.
+ */
+router.post('/avatar', requireAuth, async (req, res, next) => {
+  try {
+    const imageBase64 = String(req.body?.imageBase64 || '');
+    const contentType = String(req.body?.contentType || '');
+    if (!imageBase64 || !contentType) {
+      return res.status(400).json({ error: 'imageBase64 and contentType are required' });
+    }
+    const url = await storage.uploadAvatar(req.userId, imageBase64, contentType);
+    await pool.query('UPDATE users SET avatar_url = $1 WHERE id = $2', [url, req.userId]);
+    res.json({ avatarUrl: url });
+  } catch (err) {
+    if (err.message?.includes('must be') || err.message?.includes('Empty')) {
+      return res.status(400).json({ error: err.message });
+    }
     next(err);
   }
 });
