@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const config = require('../config');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
+const pricing = require('../services/pricing');
 const { payoutToMpesa, payoutToTill } = require('../services/paystackTransfers');
 
 const router = express.Router();
@@ -43,7 +44,8 @@ router.get('/rails', (_req, res) => {
 router.get('/movements', async (req, res, next) => {
   try {
     const rows = await pool.query(
-      `SELECT id, type, rail, phone, amount_kes, reference, status, admin_note, created_at, updated_at
+      `SELECT id, type, rail, phone, amount_kes, reference, status, admin_note,
+              source_currency, fee_usd, agent_reference, created_at, updated_at
          FROM mobile_money_movements
         WHERE user_id = $1
         ORDER BY created_at DESC
@@ -127,22 +129,34 @@ async function refundFailedWithdrawal(userId, movement, sourceCurrency, debitAmo
 }
 
 /**
- * M-Pesa (phone) and M-Pesa Till withdrawals go straight to Paystack — no
- * admin approval step, same as Wayaki-to-Wayaki P2P transfers
+ * KES-sourced M-Pesa (phone) and M-Pesa Till withdrawals go straight to
+ * Paystack — no approval step, same as Wayaki-to-Wayaki P2P transfers
  * (routes/transfers.js), gated by balance plus the same KYC-tier daily
- * limit check P2P already uses instead of a human review. Other rails
- * (EVC Plus, Zaad, Sahal) have no automated payout provider wired up yet,
- * so they still queue for manual admin payout via
+ * limit check P2P already uses instead of a human review. That's reliable
+ * because Paystack top-ups are the only thing that actually fund
+ * Paystack's own payable balance.
+ *
+ * USD-sourced M-Pesa/Till withdrawals queue for an agent instead
+ * (routes/agents.js mobile-money-queue endpoints) — Stripe/Waafi money
+ * never reaches Paystack's balance, so an automated Paystack call here
+ * would just fail unpredictably. An agent claims the request and sends the
+ * real M-Pesa/Till payment themselves, earning a fee-based commission —
+ * same economics as the existing in-person agent withdrawal, just
+ * decoupled in time via a claim/complete queue instead of synchronous.
+ *
+ * Other rails (EVC Plus, Zaad, Sahal) have no automated or agent payout
+ * wired up yet, so they still queue for manual admin payout via
  * POST /admin/mobile-money/:id/complete-withdrawal.
  *
  * `amount` is always in `sourceCurrency` (default 'KES') — never
  * pre-converted by the client. This endpoint alone derives amountKes (what
- * actually lands on M-Pesa — Paystack only sends KES) and amountUsd from it
- * using this server's own config.kesPerUsd. That's deliberate: if the
- * client converted USD->KES itself using a cached/stale rate, converting
- * back here to check the balance wouldn't round-trip exactly, and a real
- * $3.00 balance could come back needing $3.02 — a false "not enough
- * balance" purely from rate drift between client and server.
+ * actually lands on M-Pesa — Paystack/agents only ever send KES) and
+ * amountUsd from it using this server's own config.kesPerUsd. That's
+ * deliberate: if the client converted USD->KES itself using a
+ * cached/stale rate, converting back here to check the balance wouldn't
+ * round-trip exactly, and a real $3.00 balance could come back needing
+ * $3.02 — a false "not enough balance" purely from rate drift between
+ * client and server.
  */
 router.post('/withdrawals', async (req, res, next) => {
   const client = await pool.connect();
@@ -151,15 +165,6 @@ router.post('/withdrawals', async (req, res, next) => {
     const sourceCurrency = cleanSourceCurrency(req.body?.sourceCurrency);
     const amount = cleanAmount(req.body?.amount);
     const isTill = rail === 'M-Pesa Till';
-    // M-Pesa/Till payouts draw from Paystack's real account balance
-    // (source: 'balance' in paystackTransfers.js), regardless of which
-    // gateway funded the customer's wallet (Stripe, Waafi, or Paystack
-    // itself). Stripe/Waafi settle into separate real-money accounts with
-    // no automatic bridge into Paystack, so this can fail at Paystack even
-    // when the in-app balance looks sufficient — refundFailedWithdrawal
-    // below returns the hold to the customer if that happens. Allowed
-    // deliberately: keeping Paystack's real balance funded to cover this is
-    // an operator responsibility, not something this endpoint enforces.
     // Reuses the `phone` column as a generic "payout destination" field —
     // a till number, not a phone, when rail is 'M-Pesa Till'.
     const phone = String((isTill ? req.body?.tillNumber : req.body?.phone) || '').trim();
@@ -175,9 +180,21 @@ router.post('/withdrawals', async (req, res, next) => {
       sourceCurrency === 'USD' ? Number((amount * config.kesPerUsd).toFixed(2)) : amount;
     const amountUsd =
       sourceCurrency === 'USD' ? amount : Number((amount / config.kesPerUsd).toFixed(2));
-    // What actually gets debited from the source wallet — always just
-    // `amount`, since it's already in sourceCurrency.
-    const debitAmount = amount;
+
+    const isAgentFulfilled = AUTO_PAYOUT_RAILS.includes(rail) && sourceCurrency === 'USD';
+    // Only the agent-fulfilled path charges a fee — same tiered schedule as
+    // the in-person agent withdrawal, funding the agent's commission for
+    // providing real M-Pesa/Till liquidity out of their own float.
+    // KES-sourced sends stay free, same as before.
+    let feeUsd = 0;
+    let agentCommissionUsd = 0;
+    if (isAgentFulfilled) {
+      feeUsd = Number(pricing.withdrawalFee(amount, 'USD').toFixed(2));
+      agentCommissionUsd = Number((feeUsd * pricing.WITHDRAWAL_AGENT_FEE_SHARE).toFixed(2));
+    }
+    // What actually gets debited from the source wallet — `amount` plus
+    // the agent fee when one applies.
+    const debitAmount = Number((amount + feeUsd).toFixed(2));
     const balanceColumn = sourceCurrency === 'USD' ? 'usd_balance' : 'kes_balance';
 
     await client.query('BEGIN');
@@ -193,7 +210,11 @@ router.post('/withdrawals', async (req, res, next) => {
     }
     if (Number(user.balance) < debitAmount) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: `Not enough ${sourceCurrency} balance` });
+      return res.status(400).json({
+        error: isAgentFulfilled
+          ? `Not enough ${sourceCurrency} balance (need ${debitAmount} — ${amount} plus a ${feeUsd} agent fee)`
+          : `Not enough ${sourceCurrency} balance`,
+      });
     }
 
     const limit = await compliance.checkUserLimit(client, req.userId, amountUsd, `${rail} withdrawal`);
@@ -206,11 +227,13 @@ router.post('/withdrawals', async (req, res, next) => {
       debitAmount,
       req.userId,
     ]);
+    const status = isAgentFulfilled ? 'PENDING_AGENT' : 'PENDING_PAYOUT';
     const inserted = await client.query(
-      `INSERT INTO mobile_money_movements (user_id, type, rail, phone, amount_kes, status)
-       VALUES ($1,'WITHDRAWAL',$2,$3,$4,'PENDING_PAYOUT')
-       RETURNING id, type, rail, phone, amount_kes, status, created_at`,
-      [req.userId, rail, phone, amountKes],
+      `INSERT INTO mobile_money_movements
+        (user_id, type, rail, phone, amount_kes, status, source_currency, fee_usd, agent_commission_usd)
+       VALUES ($1,'WITHDRAWAL',$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, type, rail, phone, amount_kes, status, fee_usd, created_at`,
+      [req.userId, rail, phone, amountKes, status, sourceCurrency, feeUsd || null, agentCommissionUsd || null],
     );
     const movement = inserted.rows[0];
     await ledger.postWithClient(
@@ -221,13 +244,27 @@ router.post('/withdrawals', async (req, res, next) => {
         {
           accountName: `Customer ${sourceCurrency} wallet`,
           direction: 'debit',
-          amountUsd,
-          memo: `${debitAmount} ${sourceCurrency} held for ${amountKes} KES payout`,
+          amountUsd: amountUsd + feeUsd,
+          memo: isAgentFulfilled
+            ? `${debitAmount} ${sourceCurrency} held (${amount} + ${feeUsd} agent fee) for ${amountKes} KES payout`
+            : `${debitAmount} ${sourceCurrency} held for ${amountKes} KES payout`,
         },
-        { accountName: 'Mobile money payout clearing', direction: 'credit', amountUsd, memo: phone },
+        {
+          accountName: isAgentFulfilled ? 'Agent payout clearing' : 'Mobile money payout clearing',
+          direction: 'credit',
+          amountUsd: amountUsd + feeUsd,
+          memo: phone,
+        },
       ],
     );
     await client.query('COMMIT');
+
+    if (isAgentFulfilled) {
+      return res.status(202).json({
+        movement,
+        message: `Queued for an agent to send your ${isTill ? 'Till payment' : 'M-Pesa'} — you'll be notified once it's sent.`,
+      });
+    }
 
     if (!AUTO_PAYOUT_RAILS.includes(rail)) {
       return res.status(202).json({

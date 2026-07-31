@@ -27,6 +27,12 @@ const WITHDRAWAL_FEE_BANDS_KES = [
 const MIN_WITHDRAWAL_KES = 50;
 const MAX_WITHDRAWAL_KES = 250000;
 
+// Share of the withdrawal fee the agent keeps for providing the cash/float
+// — the remainder is Wayaki's take. Shared between routes/agents.js
+// (in-person withdrawals) and routes/mobileMoney.js (the remote
+// agent-fulfilled M-Pesa/Till queue for USD-sourced sends).
+const WITHDRAWAL_AGENT_FEE_SHARE = 0.7;
+
 /** Withdrawal fee in KES for a KES cash-out amount at an agent. */
 function withdrawalFeeKes(amountKes) {
   if (amountKes < MIN_WITHDRAWAL_KES) {
@@ -46,4 +52,10 @@ function withdrawalFee(amount, currency) {
   return currency === 'KES' ? feeKes : feeKes / config.kesPerUsd;
 }
 
-module.exports = { withdrawalFee, withdrawalFeeKes, MIN_WITHDRAWAL_KES, MAX_WITHDRAWAL_KES };
+module.exports = {
+  withdrawalFee,
+  withdrawalFeeKes,
+  MIN_WITHDRAWAL_KES,
+  MAX_WITHDRAWAL_KES,
+  WITHDRAWAL_AGENT_FEE_SHARE,
+};

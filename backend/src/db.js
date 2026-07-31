@@ -565,6 +565,31 @@ async function migrate() {
       ON frequent_recipients(user_id, last_used_at DESC);
   `);
 
+  // Agent-fulfilled M-Pesa/Till payouts — for USD-sourced withdrawals,
+  // where Paystack's own balance can't be trusted to cover the payout
+  // (Stripe/Waafi money never reaches it), the request queues here instead
+  // of calling Paystack directly. Any active agent can claim it and send
+  // the real M-Pesa/Till payment themselves (their own float), same
+  // economics as the existing in-person agent withdrawal
+  // (routes/agents.js WITHDRAWAL_AGENT_FEE_SHARE) just decoupled in time.
+  // status flow: PENDING_AGENT (unclaimed) -> AGENT_CLAIMED -> COMPLETED,
+  // or back to PENDING_AGENT (agent_id cleared) if the agent releases it.
+  await pool.query(`
+    ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS source_currency TEXT;
+    ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS fee_usd NUMERIC(18,2);
+    ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS agent_commission_usd NUMERIC(18,2);
+    ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS agent_id UUID REFERENCES agents(id);
+    ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;
+    ALTER TABLE mobile_money_movements ADD COLUMN IF NOT EXISTS agent_reference TEXT;
+    CREATE INDEX IF NOT EXISTS idx_mobile_money_pending_agent
+      ON mobile_money_movements(status, created_at)
+      WHERE status = 'PENDING_AGENT';
+    ALTER TABLE agent_commissions DROP CONSTRAINT IF EXISTS agent_commissions_kind_check;
+    ALTER TABLE agent_commissions
+      ADD CONSTRAINT agent_commissions_kind_check
+      CHECK (kind IN ('deposit','withdrawal','onboarding','merchant_onboarding','card_issuance','p2p','override','mobile_money_payout'));
+  `);
+
   // Sole super-admin: keep this the only account with role='admin'. Runs
   // every boot so it's self-healing across environments/DB resets.
   await pool.query(

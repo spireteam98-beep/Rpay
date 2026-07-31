@@ -6,6 +6,7 @@ const compliance = require('../services/compliance');
 const pricing = require('../services/pricing');
 const { creditAgentCommission } = require('../services/commission');
 const { RECRUIT_TIER, CAN_TRANSACT, TIER_LIMITS_USD } = require('../services/agentTiers');
+const notify = require('../services/notify');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -18,7 +19,7 @@ const DEPOSIT_COMMISSION_RATE = 0.01;
 // Withdrawals charge the customer the tiered fee in services/pricing.js
 // (mirrors M-Pesa's agent-withdrawal tariff). The agent keeps the bulk of
 // that fee for doing the cash handling; Wayaki keeps the rest.
-const WITHDRAWAL_AGENT_FEE_SHARE = 0.70;
+const { WITHDRAWAL_AGENT_FEE_SHARE } = pricing;
 
 function cleanCurrency(value) {
   const currency = String(value || 'KES').toUpperCase();
@@ -49,6 +50,33 @@ async function findCustomer(client, identifier) {
 async function requireOwnAgent(client, userId) {
   const rows = await client.query('SELECT * FROM agents WHERE user_id = $1', [userId]);
   return rows.rows[0] || null;
+}
+
+/**
+ * Resolves who req.userId is acting as for a deposit/withdrawal: the
+ * agent's owner, or an ACTIVE cashier scoped to that specific agent.
+ * When agentId is omitted, falls back to "my own agent" — the original
+ * owner-only behavior, unchanged for anyone not using cashiers.
+ */
+async function resolveActingAgent(client, userId, agentId) {
+  if (!agentId) {
+    const owned = await requireOwnAgent(client, userId);
+    return owned ? { agent: owned, role: 'OWNER' } : null;
+  }
+  const owned = (
+    await client.query('SELECT * FROM agents WHERE id = $1 AND user_id = $2', [agentId, userId])
+  ).rows[0];
+  if (owned) return { agent: owned, role: 'OWNER' };
+
+  const cashier = (
+    await client.query(
+      `SELECT a.* FROM agents a
+         JOIN agent_staff s ON s.agent_id = a.id
+        WHERE a.id = $1 AND s.user_id = $2 AND s.status = 'ACTIVE'`,
+      [agentId, userId],
+    )
+  ).rows[0];
+  return cashier ? { agent: cashier, role: 'CASHIER' } : null;
 }
 
 /**
@@ -320,6 +348,90 @@ router.get('/commissions', async (req, res, next) => {
   }
 });
 
+/** POST /agents/staff — owner adds a cashier to their own agent, scoped to deposit/withdraw only. */
+router.post('/staff', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const agent = await requireOwnAgent(client, req.userId);
+    if (!agent) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'You are not registered as an agent' });
+    }
+    const user = await findCustomer(client, req.body?.identifier);
+    if (!user) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'No user found with that email or phone' });
+    }
+    const inserted = await client.query(
+      `INSERT INTO agent_staff (agent_id, user_id, added_by)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (agent_id, user_id) DO UPDATE SET status = 'ACTIVE'
+       RETURNING *`,
+      [agent.id, user.id, req.userId],
+    );
+    await client.query('COMMIT');
+    res.status(201).json({ cashier: inserted.rows[0] });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/** GET /agents/staff — owner lists their cashiers. */
+router.get('/staff', async (req, res, next) => {
+  try {
+    const agent = await requireOwnAgent(pool, req.userId);
+    if (!agent) return res.status(404).json({ error: 'You are not registered as an agent' });
+    const rows = await pool.query(
+      `SELECT s.*, u.full_name, u.email, u.phone
+         FROM agent_staff s
+         JOIN users u ON u.id = s.user_id
+        WHERE s.agent_id = $1
+        ORDER BY s.created_at DESC`,
+      [agent.id],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /agents/staff/:staffId/remove — owner deactivates a cashier. */
+router.post('/staff/:staffId/remove', async (req, res, next) => {
+  try {
+    const agent = await requireOwnAgent(pool, req.userId);
+    if (!agent) return res.status(404).json({ error: 'You are not registered as an agent' });
+    const rows = await pool.query(
+      `UPDATE agent_staff SET status = 'SUSPENDED' WHERE id = $1 AND agent_id = $2 RETURNING *`,
+      [req.params.staffId, agent.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Cashier not found' });
+    res.json({ cashier: rows.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /agents/cashier-of — agents I've been added as a cashier for. */
+router.get('/cashier-of', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `SELECT a.id, a.business_name, a.agent_code, a.tier, a.status AS agent_status, s.status AS staff_status
+         FROM agent_staff s
+         JOIN agents a ON a.id = s.agent_id
+        WHERE s.user_id = $1
+        ORDER BY s.created_at DESC`,
+      [req.userId],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /agents/deposits — agent hands the customer cash, system credits their wallet. */
 router.post('/deposits', async (req, res, next) => {
   const client = await pool.connect();
@@ -330,12 +442,15 @@ router.post('/deposits', async (req, res, next) => {
       return res.status(400).json({ error: 'Positive amount is required' });
     }
 
+    const agentId = req.body?.agentId ? String(req.body.agentId).trim() : null;
+
     await client.query('BEGIN');
-    const agent = await requireOwnAgent(client, req.userId);
-    if (!agent || agent.status !== 'ACTIVE') {
+    const acting = await resolveActingAgent(client, req.userId, agentId);
+    if (!acting || acting.agent.status !== 'ACTIVE') {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'You are not an active agent' });
+      return res.status(404).json({ error: 'You are not an active agent or cashier' });
     }
+    const agent = acting.agent;
     if (!CAN_TRANSACT[agent.tier]) {
       await client.query('ROLLBACK');
       return res.status(403).json({
@@ -416,13 +531,15 @@ router.post('/withdrawals', async (req, res, next) => {
       return res.status(400).json({ error: err.message });
     }
     const totalDebit = amount + fee;
+    const agentId = req.body?.agentId ? String(req.body.agentId).trim() : null;
 
     await client.query('BEGIN');
-    const agent = await requireOwnAgent(client, req.userId);
-    if (!agent || agent.status !== 'ACTIVE') {
+    const acting = await resolveActingAgent(client, req.userId, agentId);
+    if (!acting || acting.agent.status !== 'ACTIVE') {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'You are not an active agent' });
+      return res.status(404).json({ error: 'You are not an active agent or cashier' });
     }
+    const agent = acting.agent;
     if (!CAN_TRANSACT[agent.tier]) {
       await client.query('ROLLBACK');
       return res.status(403).json({
@@ -485,6 +602,175 @@ router.post('/withdrawals', async (req, res, next) => {
       debited: { customerId: customer.id, customerName: customer.full_name, currency, amount, fee, total: totalDebit },
       commission: { currency, amount: commissionAmount },
     });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * Agent-fulfilled M-Pesa/Till payout queue (see routes/mobileMoney.js
+ * POST /withdrawals) — for USD-sourced sends, since Paystack's own balance
+ * can't be trusted to cover them. Any ACTIVE, transaction-capable agent
+ * can browse and claim from the open pool; once claimed, only that agent
+ * (or their cashier) can complete or release it. The agent sends the real
+ * M-Pesa/Till payment themselves, off-app, using their own float, then
+ * marks it complete with a reference (e.g. the M-Pesa confirmation code)
+ * and is credited the commission already computed at request time.
+ */
+
+/** GET /agents/mobile-money-queue — the open pool (unclaimed) plus
+ * whatever the calling agent has already claimed. */
+router.get('/mobile-money-queue', async (req, res, next) => {
+  try {
+    const agentId = req.query?.agentId ? String(req.query.agentId).trim() : null;
+    const acting = await resolveActingAgent(pool, req.userId, agentId);
+    if (!acting || acting.agent.status !== 'ACTIVE') {
+      return res.status(404).json({ error: 'You are not an active agent or cashier' });
+    }
+    if (!CAN_TRANSACT[acting.agent.tier]) {
+      return res.status(403).json({
+        error: `${acting.agent.tier === 'COUNTRY_AGENT' ? 'Country Agents' : 'Super Agents'} manage their network's float and don't serve customers directly`,
+      });
+    }
+    const rows = await pool.query(
+      `SELECT id, rail, phone, amount_kes, fee_usd, agent_commission_usd, status,
+              agent_id, claimed_at, created_at
+         FROM mobile_money_movements
+        WHERE status = 'PENDING_AGENT'
+           OR (status = 'AGENT_CLAIMED' AND agent_id = $1)
+        ORDER BY created_at ASC
+        LIMIT 100`,
+      [acting.agent.id],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /agents/mobile-money-queue/:id/claim — atomic; fails cleanly if
+ * another agent claimed it first. */
+router.post('/mobile-money-queue/:id/claim', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const agentId = req.body?.agentId ? String(req.body.agentId).trim() : null;
+    const acting = await resolveActingAgent(client, req.userId, agentId);
+    if (!acting || acting.agent.status !== 'ACTIVE') {
+      return res.status(404).json({ error: 'You are not an active agent or cashier' });
+    }
+    if (!CAN_TRANSACT[acting.agent.tier]) {
+      return res.status(403).json({
+        error: `${acting.agent.tier === 'COUNTRY_AGENT' ? 'Country Agents' : 'Super Agents'} manage their network's float and don't serve customers directly`,
+      });
+    }
+
+    await client.query('BEGIN');
+    const claimed = await client.query(
+      `UPDATE mobile_money_movements
+          SET status = 'AGENT_CLAIMED', agent_id = $1, claimed_at = now(), updated_at = now()
+        WHERE id = $2 AND status = 'PENDING_AGENT' AND agent_id IS NULL
+        RETURNING id, rail, phone, amount_kes, fee_usd, agent_commission_usd, status, claimed_at`,
+      [acting.agent.id, req.params.id],
+    );
+    if (claimed.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Already claimed by another agent, or no longer pending' });
+    }
+    await client.query('COMMIT');
+    res.json({ claimed: claimed.rows[0] });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/** POST /agents/mobile-money-queue/:id/release — agent gives up a claim
+ * they can't fulfill; returns it to the open pool. */
+router.post('/mobile-money-queue/:id/release', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const agentId = req.body?.agentId ? String(req.body.agentId).trim() : null;
+    const acting = await resolveActingAgent(client, req.userId, agentId);
+    if (!acting) {
+      return res.status(404).json({ error: 'You are not an active agent or cashier' });
+    }
+
+    await client.query('BEGIN');
+    const released = await client.query(
+      `UPDATE mobile_money_movements
+          SET status = 'PENDING_AGENT', agent_id = NULL, claimed_at = NULL, updated_at = now()
+        WHERE id = $1 AND status = 'AGENT_CLAIMED' AND agent_id = $2
+        RETURNING id`,
+      [req.params.id, acting.agent.id],
+    );
+    if (released.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Not currently claimed by you' });
+    }
+    await client.query('COMMIT');
+    res.json({ released: true });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/** POST /agents/mobile-money-queue/:id/complete { reference } — the agent
+ * confirms they've sent the real M-Pesa/Till payment; credits their
+ * commission and notifies the customer. */
+router.post('/mobile-money-queue/:id/complete', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const agentId = req.body?.agentId ? String(req.body.agentId).trim() : null;
+    const reference = String(req.body?.reference || '').trim();
+    if (!reference) {
+      return res.status(400).json({ error: 'A reference (e.g. the M-Pesa confirmation code) is required' });
+    }
+    const acting = await resolveActingAgent(client, req.userId, agentId);
+    if (!acting) {
+      return res.status(404).json({ error: 'You are not an active agent or cashier' });
+    }
+
+    await client.query('BEGIN');
+    const movement = (
+      await client.query(
+        `SELECT * FROM mobile_money_movements
+          WHERE id = $1 AND status = 'AGENT_CLAIMED' AND agent_id = $2
+          FOR UPDATE`,
+        [req.params.id, acting.agent.id],
+      )
+    ).rows[0];
+    if (!movement) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Not currently claimed by you' });
+    }
+
+    await client.query(
+      `UPDATE mobile_money_movements
+          SET status = 'COMPLETED', agent_reference = $1, updated_at = now()
+        WHERE id = $2`,
+      [reference, movement.id],
+    );
+
+    const commissionAmount = Number(movement.agent_commission_usd || 0);
+    if (commissionAmount > 0) {
+      await creditAgentCommission(client, acting.agent, 'mobile_money_payout', 'USD', commissionAmount, movement.user_id);
+    }
+    await client.query('COMMIT');
+
+    notify.notifyUser(movement.user_id, {
+      title: movement.rail === 'M-Pesa Till' ? 'Till payment sent' : 'M-Pesa payment sent',
+      body: `Your ${movement.amount_kes} KES ${movement.rail} payment has been sent by an agent.`,
+    });
+
+    res.json({ completed: true, commission: { currency: 'USD', amount: commissionAmount } });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
     next(err);

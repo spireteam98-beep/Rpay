@@ -1221,6 +1221,66 @@ class ApiService {
     throw ApiException(body['error'] as String? ?? 'Could not reject order');
   }
 
+  // ── Agent mobile-money queue ────────────────────────────────────
+
+  /// Open pool of USD-sourced M-Pesa/Till payout requests, plus whatever
+  /// the calling agent has already claimed.
+  static Future<List<dynamic>?> mobileMoneyQueue() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/agents/mobile-money-queue'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> claimMobileMoneyPayout(String movementId) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/agents/mobile-money-queue/$movementId/claim'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    throw ApiException(body['error'] as String? ?? 'Could not claim this payout');
+  }
+
+  static Future<void> releaseMobileMoneyPayout(String movementId) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/agents/mobile-money-queue/$movementId/release'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    throw ApiException(body['error'] as String? ?? 'Could not release this payout');
+  }
+
+  static Future<void> completeMobileMoneyPayout(
+    String movementId, {
+    required String reference,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/agents/mobile-money-queue/$movementId/complete'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'reference': reference}),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) return;
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    throw ApiException(body['error'] as String? ?? 'Could not complete this payout');
+  }
+
   // ── Pay bills ────────────────────────────────────────────────────
 
   /// Pays a biller (KPLC, water, DSTV, etc.) directly from the wallet.

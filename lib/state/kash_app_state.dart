@@ -12,11 +12,29 @@ class TransferResult {
   final bool success;
   final String message;
   final String? transactionId;
+  // Set when the send is still awaiting fulfillment (e.g. queued for an
+  // agent) rather than already complete — lets the UI avoid claiming
+  // "Payment Success" for something that hasn't actually happened yet.
+  final bool pending;
+  // The real fee actually charged, in the source currency — set for paths
+  // (like the agent-fulfilled queue) where it isn't the fixed 0 that
+  // KashAppState.transferFee() assumes for every M-Pesa/Till send.
+  final double? feeCharged;
 
-  const TransferResult._(this.success, this.message, this.transactionId);
+  const TransferResult._(
+    this.success,
+    this.message,
+    this.transactionId, {
+    this.pending = false,
+    this.feeCharged,
+  });
 
-  const TransferResult.success(String message, {String? transactionId})
-    : this._(true, message, transactionId);
+  const TransferResult.success(
+    String message, {
+    String? transactionId,
+    bool pending = false,
+    double? feeCharged,
+  }) : this._(true, message, transactionId, pending: pending, feeCharged: feeCharged);
 
   const TransferResult.failure(String message) : this._(false, message, null);
 }
@@ -439,8 +457,13 @@ class KashAppState extends ChangeNotifier {
         } catch (_) {
           // The next normal app refresh will reconcile the balance/ledger.
         }
+        final movement = response?['movement'] as Map<String, dynamic>?;
+        final status = movement?['status'] as String?;
+        final feeUsd = double.tryParse(movement?['fee_usd']?.toString() ?? '');
         return TransferResult.success(
           response?['message'] as String? ?? 'Withdrawal submitted.',
+          pending: status == 'PENDING_AGENT',
+          feeCharged: feeUsd,
         );
       } on ApiException catch (err) {
         return TransferResult.failure(err.message);

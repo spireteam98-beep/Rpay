@@ -450,14 +450,20 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
       return;
     }
 
-    final fee = appState.transferFee(_rail);
+    // result.feeCharged is the real fee the backend actually charged (set
+    // for the agent-fulfilled M-Pesa/Till queue) — appState.transferFee()
+    // only knows the fixed 0 that applies to every other rail/path.
+    final fee = result.feeCharged ?? appState.transferFee(_rail);
     await showReceiptDialog(
       context,
-      statusTitle: 'Payment Success',
+      statusTitle: result.pending ? 'Payment Queued' : 'Payment Success',
       reference: result.transactionId ?? _nextFallbackReference(),
       dateTime: DateFormat('d MMM yyyy, hh:mm a').format(DateTime.now()),
       paymentMethod: _rail,
-      details: [ReceiptLine('Sent to', recipient)],
+      details: [
+        ReceiptLine('Sent to', recipient),
+        if (result.pending) ReceiptLine('Status', 'Waiting for an agent'),
+      ],
       amountLines: [
         ReceiptLine('Amount', '${source.currency} ${amount.toStringAsFixed(2)}'),
         ReceiptLine('Fee', fee == 0 ? 'Free' : '${source.currency} ${fee.toStringAsFixed(2)}'),
