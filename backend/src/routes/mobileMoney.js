@@ -151,6 +151,19 @@ router.post('/withdrawals', async (req, res, next) => {
     const sourceCurrency = cleanSourceCurrency(req.body?.sourceCurrency);
     const amount = cleanAmount(req.body?.amount);
     const isTill = rail === 'M-Pesa Till';
+    // M-Pesa/Till payouts draw from Paystack's real account balance
+    // (source: 'balance' in paystackTransfers.js) — not from whatever
+    // gateway actually funded the customer's USD wallet (Stripe, Waafi).
+    // Those settle into entirely separate real-money accounts with no
+    // bridge into Paystack, so a USD balance can look sufficient here while
+    // Paystack itself has nothing to pay out with. KES-sourced balance is
+    // the only one Paystack top-ups (the same gateway) actually fund.
+    if (AUTO_PAYOUT_RAILS.includes(rail) && sourceCurrency === 'USD') {
+      return res.status(400).json({
+        error:
+          'M-Pesa and Till payouts can only be sent from your KES balance. USD funded via card or Waafi is not available for M-Pesa payouts.',
+      });
+    }
     // Reuses the `phone` column as a generic "payout destination" field —
     // a till number, not a phone, when rail is 'M-Pesa Till'.
     const phone = String((isTill ? req.body?.tillNumber : req.body?.phone) || '').trim();

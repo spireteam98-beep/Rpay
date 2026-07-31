@@ -90,6 +90,13 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
               ),
               const SizedBox(height: 10),
               _channelList(),
+              if (_sourceType != KashAccountType.walletKes) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'M-Pesa and Till are only available from your KES balance.',
+                  style: TextStyle(color: BybitPalette.muted, fontSize: 11.5),
+                ),
+              ],
               const SizedBox(height: 16),
               if (_rail == 'Wayaki' && appState.frequentRecipients.isNotEmpty) ...[
                 _frequentRecipientsRow(appState),
@@ -265,15 +272,20 @@ class _SendMoneyScreenState extends State<SendMoneyScreen> {
     });
   }
 
-  /// Wayaki-to-Wayaki transfer is always available. M-Pesa cash-out is too,
-  /// from either wallet — a USD-sourced payout converts to KES at the live
-  /// rate before it's sent (KashAppState.submitTransfer), since M-Pesa only
-  /// ever settles in KES regardless of which balance it's drawn from.
+  /// Wayaki-to-Wayaki transfer is always available. M-Pesa/Till cash-out is
+  /// KES-wallet-only: the payout draws from Paystack's real account
+  /// balance, which only Paystack top-ups (the same gateway, settling into
+  /// the same real account) actually fund. USD funded via Stripe or Waafi
+  /// settles into a completely separate real-money account with no bridge
+  /// into Paystack, so it can never reliably back an M-Pesa payout even
+  /// though the in-app balance looks sufficient.
   Widget _channelList() {
-    const channels = [
-      _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
-      _ChannelOption('M-Pesa', Icons.phone_iphone_rounded),
-      _ChannelOption('M-Pesa Till', Icons.storefront_outlined),
+    final channels = [
+      const _ChannelOption('Wayaki', Icons.account_balance_wallet_rounded),
+      if (_sourceType == KashAccountType.walletKes) ...[
+        const _ChannelOption('M-Pesa', Icons.phone_iphone_rounded),
+        const _ChannelOption('M-Pesa Till', Icons.storefront_outlined),
+      ],
     ];
     return Column(children: channels.map(_channelRow).toList());
   }

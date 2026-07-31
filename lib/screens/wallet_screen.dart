@@ -29,20 +29,31 @@ class _WalletScreenState extends State<WalletScreen> {
       backgroundColor: BybitPalette.bg,
       body: SafeArea(
         bottom: false,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _topBalanceCard(context, appState),
-              const SizedBox(height: 20),
-              _peopleRow(context, appState),
-              _accountsHeader(context, appState),
-              const SizedBox(height: 14),
-              _accountTabs(context, appState.visibleAccounts),
-              _recentActivityCard(context, appState),
-            ],
+        // A one-off sync failure at app launch (weak connection, etc.)
+        // otherwise leaves balances/activity stuck stale for the rest of
+        // the session — syncFromBackend only runs once, in
+        // MainNavigation.initState, with no other way to retry it.
+        child: RefreshIndicator(
+          color: BybitPalette.accent,
+          backgroundColor: BybitPalette.surface,
+          onRefresh: () => appState.syncFromBackend(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.only(bottom: 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _topBalanceCard(context, appState),
+                const SizedBox(height: 20),
+                _peopleRow(context, appState),
+                _accountsHeader(context, appState),
+                const SizedBox(height: 14),
+                _accountTabs(context, appState.visibleAccounts),
+                _recentActivityCard(context, appState),
+              ],
+            ),
           ),
         ),
       ),
