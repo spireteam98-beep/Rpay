@@ -61,6 +61,11 @@ const config = {
   network: (process.env.NETWORK || 'testnet').trim(),
   port: parseInt(process.env.PORT || '8080', 10),
   kesPerUsd: Number(process.env.KES_PER_USD || '129'),
+  // Test phase: agent applications skip the email/phone/KYC gate so testers
+  // can apply freely. Set REQUIRE_VERIFIED_AGENT_APPLY=true once ready to
+  // enforce it again for real applicants — see routes/agents.js POST /.
+  requireVerifiedAgentApply:
+    (process.env.REQUIRE_VERIFIED_AGENT_APPLY || 'false').trim().toLowerCase() === 'true',
   emailProvider: (process.env.EMAIL_PROVIDER || 'resend').trim(),
   resendApiUrl: (process.env.RESEND_API_URL || 'https://api.resend.com/emails').trim(),
   resendApiKey: (process.env.RESEND_API_KEY || '').trim(),

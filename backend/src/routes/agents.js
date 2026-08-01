@@ -151,7 +151,10 @@ router.post('/', async (req, res, next) => {
     const user = (
       await client.query('SELECT email_verified, phone_verified, kyc_tier FROM users WHERE id = $1', [req.userId])
     ).rows[0];
-    if (!user.email_verified || !user.phone_verified || Number(user.kyc_tier) < 2) {
+    if (
+      config.requireVerifiedAgentApply &&
+      (!user.email_verified || !user.phone_verified || Number(user.kyc_tier) < 2)
+    ) {
       await client.query('ROLLBACK');
       return res.status(403).json({
         error: 'Verify your email and phone and complete KYC before applying to become an agent',
