@@ -726,6 +726,8 @@ class ApiService {
     String? phone,
     String? region,
     String? city,
+    bool wantsProvideKes = true,
+    bool wantsProvideUsd = false,
   }) async {
     final res = await http
         .post(
@@ -737,6 +739,8 @@ class ApiService {
             if (phone != null && phone.isNotEmpty) 'phone': phone,
             if (region != null && region.isNotEmpty) 'region': region,
             if (city != null && city.isNotEmpty) 'city': city,
+            'wantsProvideKes': wantsProvideKes,
+            'wantsProvideUsd': wantsProvideUsd,
           }),
         )
         .timeout(_timeout);
@@ -941,16 +945,49 @@ class ApiService {
     throw ApiException(body['error'] as String? ?? 'Could not update tier');
   }
 
-  static Future<Map<String, dynamic>> adminApproveAgent(String id) async {
+  /// Approves a pending agent. Omit [canProvideKes]/[canProvideUsd] to grant
+  /// exactly what the applicant requested; pass either to override.
+  static Future<Map<String, dynamic>> adminApproveAgent(
+    String id, {
+    bool? canProvideKes,
+    bool? canProvideUsd,
+  }) async {
     final res = await http
         .post(
           Uri.parse('$baseUrl/admin/agents/$id/approve'),
           headers: _headers(authed: true),
+          body: jsonEncode({
+            if (canProvideKes != null) 'canProvideKes': canProvideKes,
+            if (canProvideUsd != null) 'canProvideUsd': canProvideUsd,
+          }),
         )
         .timeout(_timeout);
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode == 200) return body;
     throw ApiException(body['error'] as String? ?? 'Could not approve agent');
+  }
+
+  /// Grants or revokes a specific product on an already-reviewed agent
+  /// without re-running the whole approval flow. Omit a field to leave it
+  /// unchanged.
+  static Future<Map<String, dynamic>> adminSetAgentCapabilities(
+    String id, {
+    bool? canProvideKes,
+    bool? canProvideUsd,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/admin/agents/$id/capabilities'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            if (canProvideKes != null) 'canProvideKes': canProvideKes,
+            if (canProvideUsd != null) 'canProvideUsd': canProvideUsd,
+          }),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not update products');
   }
 
   static Future<Map<String, dynamic>> adminDeactivateAgent(String id) async {
@@ -1249,7 +1286,8 @@ class ApiService {
     }
   }
 
-  /// Agent-facing: the calling agent's own current rate offer, or null.
+  /// Agent-facing: the calling agent's own current rate offers, keyed by
+  /// direction ('AGENT_PROVIDES_KES' / 'AGENT_PROVIDES_USD'), null where unset.
   static Future<Map<String, dynamic>?> myFxOffer() async {
     if (!hasSession) return null;
     try {
@@ -1264,8 +1302,9 @@ class ApiService {
     }
   }
 
-  /// Agent-facing: set/update the calling agent's live rate.
+  /// Agent-facing: set/update the calling agent's live rate for one direction.
   static Future<Map<String, dynamic>> setFxOffer({
+    required String direction,
     required double rateKesPerUsd,
     required double minUsd,
     required double maxUsd,
@@ -1276,6 +1315,7 @@ class ApiService {
           Uri.parse('$baseUrl/agents/fx-offer'),
           headers: _headers(authed: true),
           body: jsonEncode({
+            'direction': direction,
             'rateKesPerUsd': rateKesPerUsd,
             'minUsd': minUsd,
             'maxUsd': maxUsd,
@@ -1344,6 +1384,178 @@ class ApiService {
     if (res.statusCode == 200) return;
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     throw ApiException(body['error'] as String? ?? 'Could not complete this payout');
+  }
+
+  // ── USD top-up marketplace (agent provides USD, customer pays KES) ──
+
+  /// Customer-facing: live agent USD-sell offers, cheapest first.
+  static Future<Map<String, dynamic>?> usdTopupOffers({double? amountUsd}) async {
+    if (!hasSession) return null;
+    try {
+      final uri = Uri.parse('$baseUrl/usd-topup/offers').replace(
+        queryParameters:
+            amountUsd != null ? {'amountUsd': amountUsd.toString()} : null,
+      );
+      final res = await http.get(uri, headers: _headers(authed: true)).timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Opens a USD top-up order against a chosen agent's rate.
+  static Future<Map<String, dynamic>> createUsdTopupOrder({
+    required String agentFxOfferId,
+    required double amountUsd,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/usd-topup/orders'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'agentFxOfferId': agentFxOfferId, 'amountUsd': amountUsd}),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not create order');
+  }
+
+  static Future<List<dynamic>?> myUsdTopupOrders() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/usd-topup/orders/mine'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> usdTopupOrder(String orderId) async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/usd-topup/orders/$orderId'), headers: _headers(authed: true))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Uploads a payment screenshot (data URL) as proof the agent was paid.
+  static Future<Map<String, dynamic>> uploadUsdTopupProof({
+    required String orderId,
+    required String proofImageDataUrl,
+    String? reference,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/usd-topup/orders/$orderId/proof'),
+          headers: _headers(authed: true),
+          body: jsonEncode({
+            'proofImage': proofImageDataUrl,
+            if (reference != null && reference.isNotEmpty) 'reference': reference,
+          }),
+        )
+        .timeout(const Duration(seconds: 40));
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not upload proof');
+  }
+
+  static Future<Map<String, dynamic>> cancelUsdTopupOrder(String orderId) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/usd-topup/orders/$orderId/cancel'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not cancel order');
+  }
+
+  /// USD top-up orders assigned to the caller's agent profile.
+  static Future<List<dynamic>?> assignedUsdTopupOrders({String? status}) async {
+    if (!hasSession) return null;
+    try {
+      final uri = Uri.parse('$baseUrl/usd-topup/orders/assigned').replace(
+        queryParameters:
+            (status != null && status.isNotEmpty) ? {'status': status} : null,
+      );
+      final res = await http.get(uri, headers: _headers(authed: true)).timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>> confirmUsdTopupOrder(String orderId) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/usd-topup/orders/$orderId/confirm'),
+          headers: _headers(authed: true),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not release this order');
+  }
+
+  static Future<Map<String, dynamic>> rejectUsdTopupOrder(
+    String orderId, {
+    String? note,
+  }) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/usd-topup/orders/$orderId/reject'),
+          headers: _headers(authed: true),
+          body: jsonEncode({if (note != null && note.isNotEmpty) 'note': note}),
+        )
+        .timeout(_timeout);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return body;
+    throw ApiException(body['error'] as String? ?? 'Could not reject order');
+  }
+
+  /// The chat thread for a USD top-up order, visible to the customer or
+  /// the assigned agent.
+  static Future<List<dynamic>?> usdTopupOrderMessages(String orderId) async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/usd-topup/orders/$orderId/messages'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>> sendUsdTopupOrderMessage(
+    String orderId,
+    String body,
+  ) async {
+    final res = await http
+        .post(
+          Uri.parse('$baseUrl/usd-topup/orders/$orderId/messages'),
+          headers: _headers(authed: true),
+          body: jsonEncode({'body': body}),
+        )
+        .timeout(_timeout);
+    final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 201) return decoded;
+    throw ApiException(decoded['error'] as String? ?? 'Could not send message');
   }
 
   // ── Pay bills ────────────────────────────────────────────────────

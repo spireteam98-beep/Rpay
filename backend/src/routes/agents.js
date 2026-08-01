@@ -135,9 +135,16 @@ router.post('/', async (req, res, next) => {
     const countryCode = String(req.body?.countryCode || '').trim().toUpperCase();
     const region = String(req.body?.region || '').trim() || null;
     const city = String(req.body?.city || '').trim() || null;
+    // What the applicant is asking to offer — reviewed and granted (or not)
+    // by whoever approves the application; see can_provide_kes/usd below.
+    const wantsProvideKes = req.body?.wantsProvideKes !== false;
+    const wantsProvideUsd = req.body?.wantsProvideUsd === true;
     if (!businessName) return res.status(400).json({ error: 'Business name is required' });
     if (!/^[A-Z]{2}$/.test(countryCode)) {
       return res.status(400).json({ error: 'Share your location — a valid 2-letter countryCode is required' });
+    }
+    if (!wantsProvideKes && !wantsProvideUsd) {
+      return res.status(400).json({ error: 'Choose at least one product to offer' });
     }
 
     await client.query('BEGIN');
@@ -162,12 +169,14 @@ router.post('/', async (req, res, next) => {
     const inserted = await client.query(
       `INSERT INTO agents
         (user_id, business_name, agent_code, phone, status, tier, parent_agent_id,
-         country_code, region, city, min_float_usd, daily_limit_usd)
-       VALUES ($1,$2,$3,$4,'PENDING_REVIEW','AGENT',$5,$6,$7,$8,$9,$10)
+         country_code, region, city, min_float_usd, daily_limit_usd,
+         wants_provide_kes, wants_provide_usd)
+       VALUES ($1,$2,$3,$4,'PENDING_REVIEW','AGENT',$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
       [
         req.userId, businessName, agentCode(), phone, sponsor?.id || null,
         countryCode, region, city, limits.minFloatUsd, limits.dailyLimitUsd,
+        wantsProvideKes, wantsProvideUsd,
       ],
     );
     await client.query('COMMIT');
@@ -290,13 +299,21 @@ router.get('/applications', async (req, res, next) => {
   }
 });
 
-/** POST /agents/applications/:id/approve — sponsor approves an application routed to them. */
+/**
+ * POST /agents/applications/:id/approve — sponsor approves an application
+ * routed to them, granting exactly the products the applicant requested
+ * (wants_provide_kes/usd). A sponsor greenlights that this applicant should
+ * operate at all; which specific products stay enabled afterward is Wayaki
+ * admin's ongoing call via PUT /admin/agents/:id/capabilities.
+ */
 router.post('/applications/:id/approve', async (req, res, next) => {
   try {
     const me = await requireOwnAgent(pool, req.userId);
     if (!me) return res.status(404).json({ error: 'You are not registered as an agent' });
     const rows = await pool.query(
-      `UPDATE agents SET status = 'ACTIVE', approved_by = $1, approved_at = now()
+      `UPDATE agents
+          SET status = 'ACTIVE', approved_by = $1, approved_at = now(),
+              can_provide_kes = wants_provide_kes, can_provide_usd = wants_provide_usd
         WHERE id = $2 AND parent_agent_id = $3 AND status = 'PENDING_REVIEW'
         RETURNING *`,
       [req.userId, req.params.id, me.id],
@@ -623,8 +640,13 @@ router.post('/withdrawals', async (req, res, next) => {
  * how orders get created against a locked-in rate.
  */
 
-/** GET /agents/fx-offer — the calling agent's own current rate offer, or
- * null if they haven't set one. */
+const DIRECTIONS = ['AGENT_PROVIDES_KES', 'AGENT_PROVIDES_USD'];
+function capabilityFor(agent, direction) {
+  return direction === 'AGENT_PROVIDES_USD' ? agent.can_provide_usd : agent.can_provide_kes;
+}
+
+/** GET /agents/fx-offer — the calling agent's own current rate offers, keyed
+ * by direction ({ AGENT_PROVIDES_KES, AGENT_PROVIDES_USD }), null where not set. */
 router.get('/fx-offer', async (req, res, next) => {
   try {
     const agentId = req.query?.agentId ? String(req.query.agentId).trim() : null;
@@ -632,19 +654,23 @@ router.get('/fx-offer', async (req, res, next) => {
     if (!acting) {
       return res.status(404).json({ error: 'You are not an active agent or cashier' });
     }
-    const offer = (
+    const rows = (
       await pool.query('SELECT * FROM agent_fx_offers WHERE agent_id = $1', [acting.agent.id])
-    ).rows[0];
-    res.json(offer || null);
+    ).rows;
+    const byDirection = { AGENT_PROVIDES_KES: null, AGENT_PROVIDES_USD: null };
+    for (const row of rows) byDirection[row.direction] = row;
+    res.json(byDirection);
   } catch (err) {
     next(err);
   }
 });
 
-/** PUT /agents/fx-offer { rateKesPerUsd, minUsd, maxUsd, active } — upsert
- * the calling agent's rate. Only the agent owner can set it (not
- * cashiers) — this is a pricing/risk decision, not day-to-day cash
- * handling. */
+/** PUT /agents/fx-offer { direction, rateKesPerUsd, minUsd, maxUsd, active }
+ * — upsert the calling agent's rate for one direction. Only the agent owner
+ * can set it (not cashiers) — this is a pricing/risk decision, not
+ * day-to-day cash handling. Requires the direction to have been granted by
+ * whoever approved the application (can_provide_kes/usd) — an agent can't
+ * unilaterally light up a product nobody signed off on. */
 router.put('/fx-offer', async (req, res, next) => {
   try {
     const owned = await requireOwnAgent(pool, req.userId);
@@ -654,6 +680,18 @@ router.put('/fx-offer', async (req, res, next) => {
     if (!CAN_TRANSACT[owned.tier]) {
       return res.status(403).json({
         error: `${owned.tier === 'COUNTRY_AGENT' ? 'Country Agents' : 'Super Agents'} manage their network's float and don't serve customers directly`,
+      });
+    }
+    const direction = String(req.body?.direction || '').trim().toUpperCase();
+    if (!DIRECTIONS.includes(direction)) {
+      return res.status(400).json({ error: `direction must be one of ${DIRECTIONS.join(', ')}` });
+    }
+    if (!capabilityFor(owned, direction)) {
+      return res.status(403).json({
+        error:
+          direction === 'AGENT_PROVIDES_USD'
+            ? 'Providing USD is not enabled on your account yet — ask Wayaki admin to grant it'
+            : 'Providing KES is not enabled on your account yet — ask Wayaki admin to grant it',
       });
     }
     const rate = Number(req.body?.rateKesPerUsd);
@@ -678,12 +716,12 @@ router.put('/fx-offer', async (req, res, next) => {
     }
 
     const offer = await pool.query(
-      `INSERT INTO agent_fx_offers (agent_id, rate_kes_per_usd, min_usd, max_usd, active)
-       VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (agent_id) DO UPDATE
-         SET rate_kes_per_usd = $2, min_usd = $3, max_usd = $4, active = $5, updated_at = now()
+      `INSERT INTO agent_fx_offers (agent_id, direction, rate_kes_per_usd, min_usd, max_usd, active)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (agent_id, direction) DO UPDATE
+         SET rate_kes_per_usd = $3, min_usd = $4, max_usd = $5, active = $6, updated_at = now()
        RETURNING *`,
-      [owned.id, rate, minUsd, maxUsd, active],
+      [owned.id, direction, rate, minUsd, maxUsd, active],
     );
     res.json(offer.rows[0]);
   } catch (err) {

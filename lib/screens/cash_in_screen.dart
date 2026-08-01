@@ -8,6 +8,7 @@ import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/payment_method_form.dart';
 import '../widgets/touch_scale.dart';
+import 'buy_usd_screen.dart';
 import 'p2p_buy_screen.dart';
 
 enum _CashInStep { method, amount, process }
@@ -96,6 +97,10 @@ class _CashInScreenState extends State<CashInScreen> {
     Navigator.of(context).push(kashRoute(const P2pBuyScreen()));
   }
 
+  void _openBuyUsd() {
+    Navigator.of(context).push(kashRoute(const BuyUsdScreen()));
+  }
+
   /// Steps one screen backward. Returns true if there was nowhere left to
   /// go, meaning the caller should pop the whole route instead.
   bool _stepBack() {
@@ -151,6 +156,7 @@ class _CashInScreenState extends State<CashInScreen> {
                   key: const ValueKey('method'),
                   onSelect: _goToAmount,
                   onP2p: _openP2p,
+                  onBuyUsd: _openBuyUsd,
                 ),
                 _CashInStep.amount => _AmountStep(
                   key: const ValueKey('amount'),
@@ -225,11 +231,13 @@ class _StepDots extends StatelessWidget {
 class _MethodListStep extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final VoidCallback onP2p;
+  final VoidCallback onBuyUsd;
 
   const _MethodListStep({
     super.key,
     required this.onSelect,
     required this.onP2p,
+    required this.onBuyUsd,
   });
 
   @override
@@ -261,6 +269,13 @@ class _MethodListStep extends StatelessWidget {
           subtitle: 'Buy from a verified agent nearby',
           badge: 'P2P',
           onTap: onP2p,
+        ),
+        _MethodTile(
+          icon: Icons.attach_money_rounded,
+          title: 'Buy USD via agent',
+          subtitle: 'Pay an agent KES, they top up your USD wallet',
+          badge: 'P2P',
+          onTap: onBuyUsd,
         ),
       ],
     );

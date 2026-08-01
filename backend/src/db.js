@@ -611,6 +611,84 @@ async function migrate() {
       ADD COLUMN IF NOT EXISTS agent_fx_offer_id UUID REFERENCES agent_fx_offers(id);
   `);
 
+  // Per-agent product controls: which direction(s) of the FX marketplace an
+  // agent is allowed to operate. "wants_*" is what the applicant requested
+  // at apply time (shown to whoever reviews the application); "can_*" is
+  // what's actually been granted — defaults to FALSE even on approval, so
+  // approving an agent is a deliberate product decision, not a blanket
+  // unlock. can_provide_kes is nullable-then-backfilled rather than
+  // defaulted straight to a value, so agents approved before this migration
+  // (who could only ever operate the KES-out direction) keep working
+  // without every restart re-granting a capability an admin later revoked.
+  await pool.query(`
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS wants_provide_kes BOOLEAN NOT NULL DEFAULT TRUE;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS wants_provide_usd BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS can_provide_usd BOOLEAN NOT NULL DEFAULT FALSE;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS can_provide_kes BOOLEAN;
+    UPDATE agents SET can_provide_kes = TRUE WHERE status = 'ACTIVE' AND can_provide_kes IS NULL;
+    UPDATE agents SET can_provide_kes = FALSE WHERE can_provide_kes IS NULL;
+    ALTER TABLE agents ALTER COLUMN can_provide_kes SET DEFAULT FALSE;
+    ALTER TABLE agents ALTER COLUMN can_provide_kes SET NOT NULL;
+  `);
+
+  // agent_fx_offers becomes direction-aware: an agent can post up to two
+  // live rates, one per direction they're allowed to operate (see can_*
+  // above). Replaces the old one-offer-per-agent UNIQUE(agent_id) with
+  // UNIQUE(agent_id, direction).
+  await pool.query(`
+    ALTER TABLE agent_fx_offers ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'AGENT_PROVIDES_KES';
+    ALTER TABLE agent_fx_offers DROP CONSTRAINT IF EXISTS agent_fx_offers_direction_check;
+    ALTER TABLE agent_fx_offers ADD CONSTRAINT agent_fx_offers_direction_check
+      CHECK (direction IN ('AGENT_PROVIDES_KES','AGENT_PROVIDES_USD'));
+    ALTER TABLE agent_fx_offers DROP CONSTRAINT IF EXISTS agent_fx_offers_agent_id_key;
+    ALTER TABLE agent_fx_offers DROP CONSTRAINT IF EXISTS agent_fx_offers_agent_direction_key;
+    ALTER TABLE agent_fx_offers ADD CONSTRAINT agent_fx_offers_agent_direction_key UNIQUE (agent_id, direction);
+  `);
+
+  // Reverse-direction marketplace: agent provides USD (credits the
+  // customer's Wayaki wallet), customer provides real KES. Real Binance-P2P
+  // escrow semantics: the agent's USD is reserved (debited into escrow) the
+  // moment the order is created — not just checked-and-debited at the end —
+  // so a customer who starts paying is guaranteed the USD is actually
+  // available, and an agent can't overcommit the same float across several
+  // orders at once. status flow: PENDING_PAYMENT (escrowed, customer
+  // hasn't paid yet) -> PROOF_SUBMITTED (customer sent KES, uploaded
+  // proof) -> RELEASED (agent verified receipt, escrow pays out to the
+  // customer) or REJECTED (bad/missing proof, escrow refunds the agent,
+  // customer can resubmit) or CANCELLED (customer backed out, escrow
+  // refunds the agent).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS agent_usd_topup_orders (
+      id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      customer_id              UUID NOT NULL REFERENCES users(id),
+      agent_id                 UUID NOT NULL REFERENCES agents(id),
+      agent_fx_offer_id        UUID REFERENCES agent_fx_offers(id),
+      rail                     TEXT NOT NULL DEFAULT 'M-Pesa',
+      amount_usd               NUMERIC(18,2) NOT NULL CHECK (amount_usd > 0),
+      amount_kes               NUMERIC(18,2) NOT NULL CHECK (amount_kes > 0),
+      locked_rate_kes_per_usd  NUMERIC(10,4) NOT NULL,
+      status                   TEXT NOT NULL DEFAULT 'PENDING_PAYMENT'
+                                CHECK (status IN ('PENDING_PAYMENT','PROOF_SUBMITTED','RELEASED','REJECTED','CANCELLED')),
+      payment_proof            TEXT,
+      payment_reference        TEXT,
+      admin_note               TEXT,
+      created_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at               TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_usd_topup_customer ON agent_usd_topup_orders(customer_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_agent_usd_topup_agent ON agent_usd_topup_orders(agent_id, status, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS agent_usd_topup_order_messages (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      order_id   UUID NOT NULL REFERENCES agent_usd_topup_orders(id),
+      sender_id  UUID NOT NULL REFERENCES users(id),
+      body       TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_usd_topup_order_messages_order
+      ON agent_usd_topup_order_messages(order_id, created_at);
+  `);
+
   // Sole super-admin: keep this the only account with role='admin'. Runs
   // every boot so it's self-healing across environments/DB resets.
   await pool.query(

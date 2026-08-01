@@ -144,7 +144,8 @@ router.get('/fx-offers', async (req, res, next) => {
               a.id AS agent_id, a.business_name, a.agent_code
          FROM agent_fx_offers o
          JOIN agents a ON a.id = o.agent_id
-        WHERE o.active = TRUE AND a.status = 'ACTIVE'
+        WHERE o.direction = 'AGENT_PROVIDES_KES' AND o.active = TRUE
+          AND a.status = 'ACTIVE' AND a.can_provide_kes = TRUE
           AND ($1::numeric IS NULL OR ($1 >= o.min_usd AND $1 <= o.max_usd))
         ORDER BY o.rate_kes_per_usd DESC
         LIMIT 50`,
@@ -219,13 +220,19 @@ router.post('/withdrawals', async (req, res, next) => {
       }
       const offer = (
         await pool.query(
-          `SELECT o.*, a.status AS agent_status
+          `SELECT o.*, a.status AS agent_status, a.can_provide_kes
              FROM agent_fx_offers o JOIN agents a ON a.id = o.agent_id
             WHERE o.id = $1`,
           [fxOfferId],
         )
       ).rows[0];
-      if (!offer || !offer.active || offer.agent_status !== 'ACTIVE') {
+      if (
+        !offer ||
+        offer.direction !== 'AGENT_PROVIDES_KES' ||
+        !offer.active ||
+        offer.agent_status !== 'ACTIVE' ||
+        !offer.can_provide_kes
+      ) {
         return res.status(404).json({ error: 'That rate offer is no longer available' });
       }
       if (amount < Number(offer.min_usd) || amount > Number(offer.max_usd)) {

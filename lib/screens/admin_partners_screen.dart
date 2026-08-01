@@ -328,6 +328,64 @@ class _AgentsTabState extends State<_AgentsTab> {
     );
   }
 
+  Future<void> _openApproveSheet(Map<String, dynamic> agent) async {
+    final id = agent['id'] as String;
+    final result = await showModalBottomSheet<_ProductChoice>(
+      context: context,
+      backgroundColor: BybitPalette.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder:
+          (_) => _ProductsSheet(
+            title: 'Approve ${agent['business_name'] ?? 'agent'}',
+            subtitle: 'Choose which products they\'re approved to operate.',
+            confirmLabel: 'Approve',
+            initialKes: agent['wants_provide_kes'] == true,
+            initialUsd: agent['wants_provide_usd'] == true,
+          ),
+    );
+    if (result == null) return;
+    await _act(
+      id,
+      () => ApiService.adminApproveAgent(
+        id,
+        canProvideKes: result.kes,
+        canProvideUsd: result.usd,
+      ),
+    );
+  }
+
+  Future<void> _openCapabilitiesSheet(Map<String, dynamic> agent) async {
+    final id = agent['id'] as String;
+    final result = await showModalBottomSheet<_ProductChoice>(
+      context: context,
+      backgroundColor: BybitPalette.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder:
+          (_) => _ProductsSheet(
+            title: 'Edit products',
+            subtitle: 'Grant or revoke what this agent can operate.',
+            confirmLabel: 'Save',
+            initialKes: agent['can_provide_kes'] == true,
+            initialUsd: agent['can_provide_usd'] == true,
+          ),
+    );
+    if (result == null) return;
+    await _act(
+      id,
+      () => ApiService.adminSetAgentCapabilities(
+        id,
+        canProvideKes: result.kes,
+        canProvideUsd: result.usd,
+      ),
+    );
+  }
+
   Widget _agentCard(Map<String, dynamic> agent) {
     final id = agent['id'] as String;
     final status = agent['status'] as String? ?? 'PENDING';
@@ -335,6 +393,10 @@ class _AgentsTabState extends State<_AgentsTab> {
     final parentName = agent['parent_name'] as String?;
     final busy = _busy.contains(id);
     final commission = (agent['commission_balance'] as num?)?.toDouble() ?? 0;
+    final wantsKes = agent['wants_provide_kes'] == true;
+    final wantsUsd = agent['wants_provide_usd'] == true;
+    final canKes = agent['can_provide_kes'] == true;
+    final canUsd = agent['can_provide_usd'] == true;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: BybitCard(
@@ -391,6 +453,15 @@ class _AgentsTabState extends State<_AgentsTab> {
               ],
             ),
             const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _productChip('KES', status == 'ACTIVE' ? canKes : wantsKes),
+                _productChip('USD', status == 'ACTIVE' ? canUsd : wantsUsd),
+              ],
+            ),
+            const SizedBox(height: 10),
             BybitInfoLine(
               'Commission earned',
               '\$${commission.toStringAsFixed(2)}',
@@ -404,7 +475,7 @@ class _AgentsTabState extends State<_AgentsTab> {
                       'Approve',
                       BybitPalette.green,
                       busy,
-                      () => _act(id, () => ApiService.adminApproveAgent(id)),
+                      () => _openApproveSheet(agent),
                     ),
                   ),
                 if (status != 'ACTIVE') const SizedBox(width: 10),
@@ -419,6 +490,15 @@ class _AgentsTabState extends State<_AgentsTab> {
                   ),
               ],
             ),
+            if (status == 'ACTIVE') ...[
+              const SizedBox(height: 10),
+              _actionButton(
+                'Edit products',
+                BybitPalette.accent,
+                busy,
+                () => _openCapabilitiesSheet(agent),
+              ),
+            ],
             if (tier == 'AGENT') ...[
               const SizedBox(height: 10),
               _actionButton(
@@ -432,6 +512,25 @@ class _AgentsTabState extends State<_AgentsTab> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _productChip(String label, bool enabled) {
+    final color = enabled ? BybitPalette.green : BybitPalette.muted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -470,6 +569,161 @@ class _AgentsTabState extends State<_AgentsTab> {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+      ),
+    );
+  }
+}
+
+class _ProductChoice {
+  final bool kes;
+  final bool usd;
+  const _ProductChoice({required this.kes, required this.usd});
+}
+
+/// Checkbox sheet for granting/revoking the two FX-marketplace products —
+/// used both at approval time and for editing an already-active agent.
+/// Approving an agent without deciding what they're allowed to sell doesn't
+/// make sense, so this is always shown rather than defaulted silently.
+class _ProductsSheet extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final String confirmLabel;
+  final bool initialKes;
+  final bool initialUsd;
+
+  const _ProductsSheet({
+    required this.title,
+    required this.subtitle,
+    required this.confirmLabel,
+    required this.initialKes,
+    required this.initialUsd,
+  });
+
+  @override
+  State<_ProductsSheet> createState() => _ProductsSheetState();
+}
+
+class _ProductsSheetState extends State<_ProductsSheet> {
+  late bool _kes = widget.initialKes;
+  late bool _usd = widget.initialUsd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        20,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.subtitle,
+            style: const TextStyle(color: BybitPalette.muted2, fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          _checkRow(
+            'Provide KES',
+            'Customer pays USD, agent sends real M-Pesa/Till KES',
+            _kes,
+            (v) => setState(() => _kes = v),
+          ),
+          const SizedBox(height: 10),
+          _checkRow(
+            'Provide USD',
+            'Customer pays real KES, agent tops up their USD wallet',
+            _usd,
+            (v) => setState(() => _usd = v),
+          ),
+          const SizedBox(height: 22),
+          BybitPrimaryButton(
+            label: widget.confirmLabel,
+            onTap:
+                () => Navigator.of(
+                  context,
+                ).pop(_ProductChoice(kes: _kes, usd: _usd)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _checkRow(
+    String title,
+    String subtitle,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
+    return TouchScale(
+      onTap: () => onChanged(!value),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: BybitPalette.surface2,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: value ? BybitPalette.accent : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              margin: const EdgeInsets.only(top: 1),
+              decoration: BoxDecoration(
+                color: value ? BybitPalette.accent : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: value ? BybitPalette.accent : BybitPalette.muted,
+                  width: 1.5,
+                ),
+              ),
+              child:
+                  value
+                      ? const Icon(Icons.check_rounded, color: Colors.black, size: 16)
+                      : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: BybitPalette.muted,
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -354,17 +354,26 @@ router.post('/agents', async (req, res, next) => {
       return res.status(409).json({ error: 'This user is already registered as an agent' });
     }
 
+    // Admin-onboarded agents are pre-approved, so capabilities are granted
+    // up front too — defaults to the KES-out product only, matching what
+    // the self-serve apply form defaults to; admin can pass explicit
+    // overrides or adjust later via POST /agents/:id/capabilities.
+    const canProvideKes = req.body?.canProvideKes !== false;
+    const canProvideUsd = req.body?.canProvideUsd === true;
+
     const limits = TIER_LIMITS_USD[tier] || {};
     try {
       const inserted = await pool.query(
         `INSERT INTO agents
           (user_id, business_name, agent_code, phone, status, tier, parent_agent_id,
-           country_code, region, city, min_float_usd, daily_limit_usd, approved_by, approved_at)
-         VALUES ($1,$2,$3,$4,'ACTIVE',$5,$6,$7,$8,$9,$10,$11,$12,now())
+           country_code, region, city, min_float_usd, daily_limit_usd, approved_by, approved_at,
+           wants_provide_kes, wants_provide_usd, can_provide_kes, can_provide_usd)
+         VALUES ($1,$2,$3,$4,'ACTIVE',$5,$6,$7,$8,$9,$10,$11,$12,now(),$13,$14,$13,$14)
          RETURNING *`,
         [
           user.id, businessName, generateAgentCode(), phone, tier, parent?.id || null,
           countryCode, region, city, limits.minFloatUsd || null, limits.dailyLimitUsd || null, req.userId,
+          canProvideKes, canProvideUsd,
         ],
       );
       res.status(201).json({ agent: inserted.rows[0] });
@@ -444,13 +453,55 @@ router.post('/agents/:id/tier', async (req, res, next) => {
   }
 });
 
+/**
+ * POST /admin/agents/:id/approve { canProvideKes?, canProvideUsd? } —
+ * approving an agent without deciding what they're allowed to sell doesn't
+ * make sense, so this always sets can_provide_kes/usd, not just status.
+ * Omit either field to default to what the applicant requested
+ * (wants_provide_kes/usd); pass it explicitly to override — e.g. approve
+ * the agent but decline the USD-provision product they also asked for.
+ */
 router.post('/agents/:id/approve', async (req, res, next) => {
   try {
+    const canProvideKes = req.body?.canProvideKes;
+    const canProvideUsd = req.body?.canProvideUsd;
     const rows = await pool.query(
-      `UPDATE agents SET status = 'ACTIVE', approved_by = $1, approved_at = now()
-        WHERE id = $2
+      `UPDATE agents
+          SET status = 'ACTIVE', approved_by = $1, approved_at = now(),
+              can_provide_kes = COALESCE($2::boolean, wants_provide_kes),
+              can_provide_usd = COALESCE($3::boolean, wants_provide_usd)
+        WHERE id = $4
         RETURNING *`,
-      [req.userId, req.params.id],
+      [req.userId, canProvideKes ?? null, canProvideUsd ?? null, req.params.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    res.json({ agent: rows.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /admin/agents/:id/capabilities { canProvideKes?, canProvideUsd? } —
+ * ongoing product control independent of approval: grant or revoke a
+ * specific product on an already-ACTIVE agent (or correct what a
+ * one-tap approve granted) without re-running the whole approval flow.
+ * Omitted fields are left unchanged.
+ */
+router.post('/agents/:id/capabilities', async (req, res, next) => {
+  try {
+    const canProvideKes = req.body?.canProvideKes;
+    const canProvideUsd = req.body?.canProvideUsd;
+    if (canProvideKes === undefined && canProvideUsd === undefined) {
+      return res.status(400).json({ error: 'Pass canProvideKes and/or canProvideUsd' });
+    }
+    const rows = await pool.query(
+      `UPDATE agents
+          SET can_provide_kes = COALESCE($1::boolean, can_provide_kes),
+              can_provide_usd = COALESCE($2::boolean, can_provide_usd)
+        WHERE id = $3
+        RETURNING *`,
+      [canProvideKes ?? null, canProvideUsd ?? null, req.params.id],
     );
     if (rows.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
     res.json({ agent: rows.rows[0] });

@@ -10,6 +10,7 @@ import 'agent_fx_rate_screen.dart';
 import 'agent_mobile_money_queue_screen.dart';
 import 'agent_network_screen.dart';
 import 'agent_p2p_queue_screen.dart';
+import 'agent_usd_topup_queue_screen.dart';
 
 /// Agent hub: onboard as an agent, share a referral code that onboards new
 /// customers, and assist walk-in customers with cash deposits/withdrawals —
@@ -29,6 +30,8 @@ class _AgentScreenState extends State<AgentScreen> {
   final _cityController = TextEditingController();
   bool _submitting = false;
   String _countryCode = 'KE';
+  bool _wantsProvideKes = true;
+  bool _wantsProvideUsd = false;
 
   static const _countries = {'KE': 'Kenya', 'SO': 'Somalia'};
 
@@ -61,6 +64,10 @@ class _AgentScreenState extends State<AgentScreen> {
       BybitToast.error(context, 'Enter your business name');
       return;
     }
+    if (!_wantsProvideKes && !_wantsProvideUsd) {
+      BybitToast.error(context, 'Choose at least one product to offer');
+      return;
+    }
     setState(() => _submitting = true);
     try {
       final result = await ApiService.registerAgent(
@@ -68,6 +75,8 @@ class _AgentScreenState extends State<AgentScreen> {
         countryCode: _countryCode,
         phone: _phoneController.text.trim(),
         city: _cityController.text.trim(),
+        wantsProvideKes: _wantsProvideKes,
+        wantsProvideUsd: _wantsProvideUsd,
       );
       if (!mounted) return;
       setState(() {
@@ -226,6 +235,34 @@ class _AgentScreenState extends State<AgentScreen> {
           icon: Icons.location_city_outlined,
           controller: _cityController,
         ),
+        const SizedBox(height: 20),
+        const Text(
+          'What will you offer?',
+          style: TextStyle(
+            color: BybitPalette.muted,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Whoever reviews your application decides which of these you\'re approved for — you can ask to change this later.',
+          style: TextStyle(color: BybitPalette.muted2, fontSize: 12, height: 1.4),
+        ),
+        const SizedBox(height: 10),
+        _ProductCheckbox(
+          title: 'Provide KES',
+          subtitle: 'Customers pay you USD, you send real M-Pesa/Till KES',
+          value: _wantsProvideKes,
+          onChanged: (v) => setState(() => _wantsProvideKes = v),
+        ),
+        const SizedBox(height: 10),
+        _ProductCheckbox(
+          title: 'Provide USD',
+          subtitle: 'Customers pay you real KES, you top up their USD wallet',
+          value: _wantsProvideUsd,
+          onChanged: (v) => setState(() => _wantsProvideUsd = v),
+        ),
         const SizedBox(height: 28),
         BybitPrimaryButton(
           label: _submitting ? 'Registering...' : 'Register as agent',
@@ -241,6 +278,9 @@ class _AgentScreenState extends State<AgentScreen> {
     final balance = (agent['commission_balance'] as num?)?.toDouble() ?? 0;
     final status = agent['status'] as String? ?? 'PENDING';
     final isActive = status == 'ACTIVE';
+    final canProvideKes = agent['can_provide_kes'] == true;
+    final canProvideUsd = agent['can_provide_usd'] == true;
+    final wantsProvideUsd = agent['wants_provide_usd'] == true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -295,6 +335,23 @@ class _AgentScreenState extends State<AgentScreen> {
                 height: 1.4,
               ),
             ),
+          ),
+        ],
+        if (isActive) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _ProductPill(label: 'Provide KES', enabled: canProvideKes),
+              _ProductPill(label: 'Provide USD', enabled: canProvideUsd),
+              if (wantsProvideUsd && !canProvideUsd)
+                const _ProductPill(
+                  label: 'USD requested — pending',
+                  enabled: false,
+                  pending: true,
+                ),
+            ],
           ),
         ],
         const SizedBox(height: 20),
@@ -429,46 +486,90 @@ class _AgentScreenState extends State<AgentScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
-          TouchScale(
-            onTap:
-                () => Navigator.of(
-                  context,
-                ).push(kashRoute(const AgentMobileMoneyQueueScreen())),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              decoration: BoxDecoration(
-                color: BybitPalette.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF242832)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.phone_iphone_rounded,
-                    color: BybitPalette.accent,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'M-Pesa/Till requests to fulfill',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
+          if (canProvideKes) ...[
+            const SizedBox(height: 10),
+            TouchScale(
+              onTap:
+                  () => Navigator.of(
+                    context,
+                  ).push(kashRoute(const AgentMobileMoneyQueueScreen())),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: BybitPalette.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF242832)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.phone_iphone_rounded,
+                      color: BybitPalette.accent,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'M-Pesa/Till requests to fulfill',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: BybitPalette.muted,
-                  ),
-                ],
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: BybitPalette.muted,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
+          if (canProvideUsd) ...[
+            const SizedBox(height: 10),
+            TouchScale(
+              onTap:
+                  () => Navigator.of(
+                    context,
+                  ).push(kashRoute(const AgentUsdTopupQueueScreen())),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: BybitPalette.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF242832)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.attach_money_rounded,
+                      color: BybitPalette.accent,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'USD top-up requests to review',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: BybitPalette.muted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           TouchScale(
             onTap:
@@ -493,7 +594,7 @@ class _AgentScreenState extends State<AgentScreen> {
                   const SizedBox(width: 10),
                   const Expanded(
                     child: Text(
-                      'Set your M-Pesa/Till rate',
+                      'Set your FX rates',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 13.5,
@@ -874,6 +975,132 @@ class _AssistSheetState extends State<_AssistSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProductCheckbox extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _ProductCheckbox({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TouchScale(
+      onTap: () => onChanged(!value),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: BybitPalette.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: value ? BybitPalette.accent : const Color(0xFF242832),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              margin: const EdgeInsets.only(top: 2),
+              decoration: BoxDecoration(
+                color: value ? BybitPalette.accent : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: value ? BybitPalette.accent : BybitPalette.muted,
+                  width: 1.5,
+                ),
+              ),
+              child:
+                  value
+                      ? const Icon(Icons.check_rounded, color: Colors.black, size: 16)
+                      : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: BybitPalette.muted,
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductPill extends StatelessWidget {
+  final String label;
+  final bool enabled;
+  final bool pending;
+
+  const _ProductPill({
+    required this.label,
+    required this.enabled,
+    this.pending = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        enabled
+            ? BybitPalette.green
+            : pending
+            ? BybitPalette.accent
+            : BybitPalette.muted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            enabled ? Icons.check_circle_rounded : Icons.circle_outlined,
+            color: color,
+            size: 12,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
