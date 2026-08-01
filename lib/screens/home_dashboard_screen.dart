@@ -29,44 +29,6 @@ class HomeDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = context.watch<KashAppState>();
 
-    // Admins land on ops tasks here instead of the consumer P2P/deposit
-    // grid — this tab was sitting unused for them since the same content
-    // was only reachable by digging into Profile -> Admin console.
-    if (appState.isAdmin) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                child: _topBar(context, appState),
-              ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
-                child: Text(
-                  'Admin',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.6,
-                  ),
-                ),
-              ),
-              const Expanded(
-                child: AdminConsoleBody(
-                  padding: EdgeInsets.fromLTRB(20, 12, 20, 96),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -81,7 +43,7 @@ class HomeDashboardScreen extends StatelessWidget {
               const SizedBox(height: 22),
               _balanceBlock(context, appState),
               const SizedBox(height: 22),
-              _actionGrid(context),
+              _actionGrid(context, isAdmin: appState.isAdmin),
               const SizedBox(height: 24),
               _homeHero(appState),
               const SizedBox(height: 14),
@@ -300,7 +262,7 @@ class HomeDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _actionGrid(BuildContext context) {
+  Widget _actionGrid(BuildContext context, {required bool isAdmin}) {
     final actions = [
       _DashAction(Icons.bolt_rounded, 'P2P SuperDeal', const BuyScreen()),
       _DashAction(
@@ -331,6 +293,12 @@ class HomeDashboardScreen extends StatelessWidget {
         const ProfileScreen(),
       ),
       _DashAction(Icons.support_agent_rounded, 'Agent', const AgentScreen()),
+      if (isAdmin)
+        _DashAction(
+          Icons.admin_panel_settings_outlined,
+          'Admin',
+          const AdminConsoleScreen(),
+        ),
     ];
 
     return GridView.builder(
