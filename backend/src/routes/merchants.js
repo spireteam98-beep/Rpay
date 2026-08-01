@@ -17,8 +17,53 @@ function balanceColumn(currency) {
   return currency === 'KES' ? 'kes_balance' : 'usd_balance';
 }
 
+// Plain 6-digit, like a real M-Pesa till number — no letter prefix, so it
+// reads as "the business ID" rather than an internal code.
 function tillNumber() {
-  return `KF${Math.floor(100000 + Math.random() * 900000)}`;
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+/** A 6-digit space is small enough that collisions are plausible at scale,
+ * so check-and-retry rather than trusting one random draw. */
+async function uniqueTillNumber(client) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = tillNumber();
+    const exists = await client.query('SELECT 1 FROM merchants WHERE till_number = $1', [candidate]);
+    if (exists.rows.length === 0) return candidate;
+  }
+  throw new Error('Could not generate a unique till number — try again');
+}
+
+async function findUserByIdentifier(client, identifier) {
+  const value = String(identifier || '').trim();
+  if (!value) return null;
+  const rows = await client.query(
+    `SELECT id, full_name, email, phone FROM users
+      WHERE LOWER(email) = LOWER($1) OR phone = $1
+      LIMIT 1`,
+    [value],
+  );
+  return rows.rows[0] || null;
+}
+
+/**
+ * Resolves who req.userId is acting as for a merchant action: the
+ * merchant's owner, or an ACTIVE teller scoped to that specific merchant.
+ * Tellers can accept/request payments on the till; they're never given
+ * the owner's personal settlement wallet balance through any route.
+ */
+async function resolveMerchantAccess(client, userId, merchantId) {
+  const merchant = (await client.query('SELECT * FROM merchants WHERE id = $1', [merchantId])).rows[0];
+  if (!merchant) return null;
+  if (merchant.owner_id === userId) return { merchant, role: 'OWNER' };
+
+  const teller = (
+    await client.query(
+      `SELECT 1 FROM merchant_staff WHERE merchant_id = $1 AND user_id = $2 AND status = 'ACTIVE'`,
+      [merchantId, userId],
+    )
+  ).rows[0];
+  return teller ? { merchant, role: 'TELLER' } : null;
 }
 
 router.get('/me', async (req, res, next) => {
@@ -29,6 +74,107 @@ router.get('/me', async (req, res, next) => {
       [req.userId],
     );
     res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /merchants/staff-of — merchants I've been added as a teller for. */
+router.get('/staff-of', async (req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `SELECT m.id, m.name, m.till_number, m.status AS merchant_status, s.status AS staff_status
+         FROM merchant_staff s
+         JOIN merchants m ON m.id = s.merchant_id
+        WHERE s.user_id = $1
+        ORDER BY s.created_at DESC`,
+      [req.userId],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /merchants/:merchantId/staff — owner adds a teller, scoped to accepting payments only. */
+router.post('/:merchantId/staff', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const merchant = (
+      await client.query('SELECT id FROM merchants WHERE id = $1 AND owner_id = $2', [
+        req.params.merchantId,
+        req.userId,
+      ])
+    ).rows[0];
+    if (!merchant) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Merchant not found' });
+    }
+    const user = await findUserByIdentifier(client, req.body?.identifier);
+    if (!user) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'No user found with that email or phone' });
+    }
+    const inserted = await client.query(
+      `INSERT INTO merchant_staff (merchant_id, user_id, added_by)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (merchant_id, user_id) DO UPDATE SET status = 'ACTIVE'
+       RETURNING *`,
+      [merchant.id, user.id, req.userId],
+    );
+    await client.query('COMMIT');
+    res.status(201).json({ teller: inserted.rows[0] });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/** GET /merchants/:merchantId/staff — owner lists their tellers. */
+router.get('/:merchantId/staff', async (req, res, next) => {
+  try {
+    const merchant = (
+      await pool.query('SELECT id FROM merchants WHERE id = $1 AND owner_id = $2', [
+        req.params.merchantId,
+        req.userId,
+      ])
+    ).rows[0];
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const rows = await pool.query(
+      `SELECT s.*, u.full_name, u.email, u.phone
+         FROM merchant_staff s
+         JOIN users u ON u.id = s.user_id
+        WHERE s.merchant_id = $1
+        ORDER BY s.created_at DESC`,
+      [merchant.id],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /merchants/:merchantId/staff/:staffId/remove — owner deactivates a teller. */
+router.post('/:merchantId/staff/:staffId/remove', async (req, res, next) => {
+  try {
+    const merchant = (
+      await pool.query('SELECT id FROM merchants WHERE id = $1 AND owner_id = $2', [
+        req.params.merchantId,
+        req.userId,
+      ])
+    ).rows[0];
+    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+
+    const rows = await pool.query(
+      `UPDATE merchant_staff SET status = 'SUSPENDED' WHERE id = $1 AND merchant_id = $2 RETURNING *`,
+      [req.params.staffId, merchant.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Teller not found' });
+    res.json({ teller: rows.rows[0] });
   } catch (err) {
     next(err);
   }
@@ -58,7 +204,7 @@ router.post('/', async (req, res, next) => {
       `INSERT INTO merchants (owner_id, name, till_number, business_type, phone, status, referred_by_agent_id)
        VALUES ($1,$2,$3,$4,$5,'PENDING',$6)
        RETURNING id, name, till_number, business_type, phone, status, created_at`,
-      [req.userId, name, tillNumber(), businessType, phone, referringAgent?.id || null],
+      [req.userId, name, await uniqueTillNumber(pool), businessType, phone, referringAgent?.id || null],
     );
     res.status(201).json({ merchant: inserted.rows[0] });
   } catch (err) {
@@ -74,19 +220,14 @@ router.post('/:merchantId/payment-links', async (req, res, next) => {
     if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ error: 'Positive amount is required' });
     }
-    const merchant = (
-      await pool.query('SELECT id FROM merchants WHERE id = $1 AND owner_id = $2', [
-        req.params.merchantId,
-        req.userId,
-      ])
-    ).rows[0];
-    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+    const access = await resolveMerchantAccess(pool, req.userId, req.params.merchantId);
+    if (!access) return res.status(404).json({ error: 'Merchant not found' });
 
     const link = await pool.query(
       `INSERT INTO payment_links (merchant_id, currency, amount, description)
        VALUES ($1,$2,$3,$4)
        RETURNING *`,
-      [merchant.id, currency, amount, description || null],
+      [access.merchant.id, currency, amount, description || null],
     );
     res.status(201).json({ paymentLink: link.rows[0] });
   } catch (err) {
@@ -180,6 +321,29 @@ router.post('/pay-link/:linkId', async (req, res, next) => {
     next(err);
   } finally {
     client.release();
+  }
+});
+
+/**
+ * GET /merchants/by-till/:tillNumber — looks up a merchant's public-facing
+ * name/status by till number, so the payer sees who they're about to pay
+ * before entering an amount. Used by the QR-code link (see merchant_screen.dart)
+ * and the pay-by-till screen; only exposes what a payer needs, never balances.
+ */
+router.get('/by-till/:tillNumber', async (req, res, next) => {
+  try {
+    const merchant = (
+      await pool.query(
+        `SELECT id, name, till_number, business_type, status FROM merchants WHERE till_number = $1`,
+        [req.params.tillNumber],
+      )
+    ).rows[0];
+    if (!merchant || merchant.status !== 'ACTIVE') {
+      return res.status(404).json({ error: 'Merchant not found or not active' });
+    }
+    res.json(merchant);
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -281,13 +445,8 @@ router.post('/pay/:tillNumber', async (req, res, next) => {
 /** GET /merchants/:merchantId/payments — recent payments received. */
 router.get('/:merchantId/payments', async (req, res, next) => {
   try {
-    const merchant = (
-      await pool.query('SELECT id FROM merchants WHERE id = $1 AND owner_id = $2', [
-        req.params.merchantId,
-        req.userId,
-      ])
-    ).rows[0];
-    if (!merchant) return res.status(404).json({ error: 'Merchant not found' });
+    const access = await resolveMerchantAccess(pool, req.userId, req.params.merchantId);
+    if (!access) return res.status(404).json({ error: 'Merchant not found' });
 
     const rows = await pool.query(
       `SELECT p.*, u.full_name AS payer_name
@@ -296,7 +455,7 @@ router.get('/:merchantId/payments', async (req, res, next) => {
         WHERE p.merchant_id = $1
         ORDER BY p.created_at DESC
         LIMIT 50`,
-      [merchant.id],
+      [access.merchant.id],
     );
     res.json(rows.rows);
   } catch (err) {

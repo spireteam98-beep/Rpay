@@ -7,6 +7,13 @@ import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
 
+/// The shareable, scannable URL for a till — encoded into the QR code and
+/// shown as a copyable link. Any phone's camera app can open this directly
+/// (unlike the old custom `wayaki:` URI scheme, which nothing could open);
+/// the web app reads the `pay` query param on load and routes to
+/// PayMerchantScreen — see main.dart.
+String paymentLink(String till) => 'https://wayaki.com/app/?pay=$till';
+
 /// Business onboarding + the merchant's till number, QR code and recent
 /// payments received — the software side of merchant payment acceptance.
 /// (Physical POS terminal distribution is a hardware/ops process outside
@@ -210,7 +217,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
               ],
             ),
             child: QrImageView(
-              data: 'wayaki:pay?till=$till',
+              data: paymentLink(till),
               size: 220,
               backgroundColor: Colors.white,
             ),
@@ -218,7 +225,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
         ),
         const SizedBox(height: 20),
         const Text(
-          'Till / merchant number',
+          'Business ID',
           style: TextStyle(
             color: BybitPalette.muted,
             fontSize: 13,
@@ -229,7 +236,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
         TouchScale(
           onTap: () {
             Clipboard.setData(ClipboardData(text: till));
-            BybitToast.show(context, 'Till number copied');
+            BybitToast.show(context, 'Business ID copied');
           },
           child: Container(
             width: double.infinity,
@@ -252,6 +259,53 @@ class _MerchantScreenState extends State<MerchantScreen> {
                     ),
                   ),
                 ),
+                const Icon(
+                  Icons.copy_rounded,
+                  color: BybitPalette.accent,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Payment link',
+          style: TextStyle(
+            color: BybitPalette.muted,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TouchScale(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: paymentLink(till)));
+            BybitToast.show(context, 'Payment link copied');
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: BybitPalette.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF242832)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    paymentLink(till),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 const Icon(
                   Icons.copy_rounded,
                   color: BybitPalette.accent,
@@ -295,7 +349,7 @@ class _MerchantScreenState extends State<MerchantScreen> {
                     );
                     final payer =
                         payment['payer_name'] as String? ?? 'Customer';
-                    final amount = (payment['amount'] as num?)?.toDouble() ?? 0;
+                    final amount = double.tryParse(payment['amount']?.toString() ?? '') ?? 0;
                     final currency = payment['currency'] as String? ?? 'USD';
                     final createdAt =
                         DateTime.tryParse(

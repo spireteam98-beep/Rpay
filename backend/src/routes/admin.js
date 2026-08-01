@@ -296,8 +296,18 @@ function generateAgentCode() {
   return `AG${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
+// Plain 6-digit, like a real M-Pesa till number — matches routes/merchants.js.
 function generateTillNumber() {
-  return `KF${Math.floor(100000 + Math.random() * 900000)}`;
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+async function uniqueTillNumber(client) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = generateTillNumber();
+    const exists = await client.query('SELECT 1 FROM merchants WHERE till_number = $1', [candidate]);
+    if (exists.rows.length === 0) return candidate;
+  }
+  throw new Error('Could not generate a unique till number — try again');
 }
 
 async function findUserByIdentifier(identifier) {
@@ -676,7 +686,7 @@ router.post('/merchants', async (req, res, next) => {
       `INSERT INTO merchants (owner_id, name, till_number, business_type, phone, status, approved_by, approved_at, referred_by_agent_id)
        VALUES ($1,$2,$3,$4,$5,'ACTIVE',$6,now(),$7)
        RETURNING *`,
-      [user.id, name, generateTillNumber(), businessType, phone, req.userId, referringAgent?.id || null],
+      [user.id, name, await uniqueTillNumber(client), businessType, phone, req.userId, referringAgent?.id || null],
     );
     if (referringAgent) {
       await creditAgentCommission(

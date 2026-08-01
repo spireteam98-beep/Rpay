@@ -7,10 +7,17 @@ import 'screens/auth/welcome_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/main_navigation.dart';
+import 'screens/pay_merchant_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/telegram_service.dart';
 import 'state/kash_app_state.dart';
+
+/// Set once a merchant payment link's `?pay=<till>` has been handed off to
+/// the navigator, so a rebuild of CryptoExchangeApp (e.g. from the
+/// ChangeNotifierProvider above it) doesn't push the pay screen twice.
+bool _didHandlePayLink = false;
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -141,6 +148,23 @@ class CryptoExchangeApp extends StatelessWidget {
           );
         }
 
+        // A merchant payment link (wayaki.com/app/?pay=<till>) opened by an
+        // already-signed-in user should land straight on the pay screen,
+        // not the wallet home. Signed-out visitors just see the normal
+        // welcome/login flow for now — the link isn't preserved across
+        // that round trip yet.
+        final payTill = Uri.base.queryParameters['pay'];
+        if (AuthService.isSignedIn && payTill != null && payTill.isNotEmpty && !_didHandlePayLink) {
+          _didHandlePayLink = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _rootNavigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (_) => PayMerchantScreen(tillNumber: payTill),
+              ),
+            );
+          });
+        }
+
         return ChangeNotifierProvider(
           create:
               (_) => KashAppState(
@@ -148,6 +172,7 @@ class CryptoExchangeApp extends StatelessWidget {
                 phoneNumber: AuthService.storedPhone,
               ),
           child: MaterialApp(
+            navigatorKey: _rootNavigatorKey,
             title: 'Wayaki',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme,

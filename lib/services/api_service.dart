@@ -695,6 +695,24 @@ class ApiService {
     }
   }
 
+  /// Looks up a merchant's public name/status by till number, so a payer
+  /// sees who they're about to pay before entering an amount.
+  static Future<Map<String, dynamic>?> merchantByTill(String tillNumber) async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/merchants/by-till/$tillNumber'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Pays a merchant directly by till number — the QR-scan-to-pay flow.
   static Future<Map<String, dynamic>> payMerchantTill({
     required String tillNumber,
