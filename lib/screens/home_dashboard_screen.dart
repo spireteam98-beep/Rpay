@@ -5,6 +5,7 @@ import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
 import '../widgets/touch_scale.dart';
+import 'admin_console_screen.dart';
 import 'agent_screen.dart';
 import 'bill_pay_screen.dart';
 import 'buy_screen.dart';
@@ -27,6 +28,44 @@ class HomeDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<KashAppState>();
+
+    // Admins land on ops tasks here instead of the consumer P2P/deposit
+    // grid — this tab was sitting unused for them since the same content
+    // was only reachable by digging into Profile -> Admin console.
+    if (appState.isAdmin) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                child: _topBar(context, appState),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 18, 20, 0),
+                child: Text(
+                  'Admin',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+              ),
+              const Expanded(
+                child: AdminConsoleBody(
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, 96),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
