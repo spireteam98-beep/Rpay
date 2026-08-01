@@ -82,6 +82,10 @@ class _AgentScreenState extends State<AgentScreen> {
       setState(() {
         _agent = Map<String, dynamic>.from(result['agent'] as Map);
       });
+      BybitToast.success(
+        context,
+        'Application submitted — waiting for admin approval.',
+      );
     } on ApiException catch (err) {
       if (!mounted) return;
       BybitToast.error(context, err.message);
@@ -275,7 +279,7 @@ class _AgentScreenState extends State<AgentScreen> {
 
   Widget _dashboard(Map<String, dynamic> agent) {
     final code = agent['agent_code'] as String? ?? '';
-    final balance = (agent['commission_balance'] as num?)?.toDouble() ?? 0;
+    final balance = double.tryParse(agent['commission_balance']?.toString() ?? '') ?? 0;
     final status = agent['status'] as String? ?? 'PENDING';
     final isActive = status == 'ACTIVE';
     final canProvideKes = agent['can_provide_kes'] == true;
@@ -687,7 +691,7 @@ class _AgentScreenState extends State<AgentScreen> {
                     final relatedUser =
                         commission['related_user_name'] as String?;
                     final amount =
-                        (commission['amount'] as num?)?.toDouble() ?? 0;
+                        double.tryParse(commission['amount']?.toString() ?? '') ?? 0;
                     final currency = commission['currency'] as String? ?? 'USD';
                     final createdAt =
                         DateTime.tryParse(

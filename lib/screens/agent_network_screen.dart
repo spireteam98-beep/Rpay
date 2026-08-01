@@ -222,7 +222,7 @@ class _AgentNetworkScreenState extends State<AgentNetworkScreen> {
             : status == 'SUSPENDED'
             ? BybitPalette.red
             : BybitPalette.accent;
-    final balance = (agent['commission_balance'] as num?)?.toDouble() ?? 0;
+    final balance = double.tryParse(agent['commission_balance']?.toString() ?? '') ?? 0;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),

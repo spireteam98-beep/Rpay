@@ -392,7 +392,7 @@ class _AgentsTabState extends State<_AgentsTab> {
     final tier = agent['tier'] as String? ?? 'AGENT';
     final parentName = agent['parent_name'] as String?;
     final busy = _busy.contains(id);
-    final commission = (agent['commission_balance'] as num?)?.toDouble() ?? 0;
+    final commission = double.tryParse(agent['commission_balance']?.toString() ?? '') ?? 0;
     final wantsKes = agent['wants_provide_kes'] == true;
     final wantsUsd = agent['wants_provide_usd'] == true;
     final canKes = agent['can_provide_kes'] == true;
