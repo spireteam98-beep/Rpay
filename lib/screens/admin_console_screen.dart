@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/api_service.dart';
 import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/kash_widgets.dart';
@@ -103,6 +104,8 @@ class AdminConsoleBody extends StatelessWidget {
             ],
           ),
         ),
+        const SizedBox(height: 18),
+        const _PlatformBalanceCard(),
         const SizedBox(height: 18),
         Row(
           children: [
@@ -265,6 +268,198 @@ class AdminConsoleBody extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+double _num(dynamic value) => double.tryParse(value?.toString() ?? '') ?? 0;
+
+/// Total custodial funds Wayaki is holding across every wallet, broken
+/// down by customer/agent/merchant — see backend routes/admin.js GET
+/// /platform-balance for how each bucket is computed.
+class _PlatformBalanceCard extends StatefulWidget {
+  const _PlatformBalanceCard();
+
+  @override
+  State<_PlatformBalanceCard> createState() => _PlatformBalanceCardState();
+}
+
+class _PlatformBalanceCardState extends State<_PlatformBalanceCard> {
+  bool _loading = true;
+  Map<String, dynamic>? _data;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final data = await ApiService.adminPlatformBalance();
+    if (!mounted) return;
+    setState(() {
+      _data = data;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = _data;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: BybitPalette.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF242832)),
+      ),
+      child:
+          _loading
+              ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: CircularProgressIndicator(color: BybitPalette.accent),
+                ),
+              )
+              : data == null
+              ? Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      "Couldn't load platform balance.",
+                      style: TextStyle(
+                        color: BybitPalette.muted,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ),
+                  TouchScale(
+                    onTap: _load,
+                    child: const Icon(
+                      Icons.refresh_rounded,
+                      color: BybitPalette.accent,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              )
+              : _content(data),
+    );
+  }
+
+  Widget _content(Map<String, dynamic> data) {
+    final grandTotal = _num(data['grandTotalUsd']);
+    final customers = Map<String, dynamic>.from(
+      data['customers'] as Map? ?? {},
+    );
+    final agents = Map<String, dynamic>.from(data['agents'] as Map? ?? {});
+    final merchants = Map<String, dynamic>.from(
+      data['merchants'] as Map? ?? {},
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Platform balance (escrow)',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            TouchScale(
+              onTap: _load,
+              child: const Icon(
+                Icons.refresh_rounded,
+                color: BybitPalette.muted,
+                size: 18,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Total custodial funds held across every wallet on the platform.',
+          style: TextStyle(
+            color: BybitPalette.muted2,
+            fontSize: 12,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          '\$${grandTotal.toStringAsFixed(2)}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 16),
+        _categoryRow('Customers', customers),
+        const SizedBox(height: 10),
+        _categoryRow('Agents', agents, showCommission: true),
+        const SizedBox(height: 10),
+        _categoryRow('Merchants', merchants),
+      ],
+    );
+  }
+
+  Widget _categoryRow(
+    String label,
+    Map<String, dynamic> data, {
+    bool showCommission = false,
+  }) {
+    final total = _num(data['totalUsd']);
+    final count = _num(data['count']).toInt();
+    final commission = showCommission ? _num(data['commission_usd']) : 0;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: BybitPalette.surface2,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$count ${count == 1 ? 'account' : 'accounts'}${commission > 0 ? ' · incl. \$${commission.toStringAsFixed(2)} commission' : ''}',
+                  style: const TextStyle(
+                    color: BybitPalette.muted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '\$${total.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: BybitPalette.accent,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }

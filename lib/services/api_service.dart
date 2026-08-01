@@ -1037,6 +1037,25 @@ class ApiService {
     }
   }
 
+  /// Total custodial balance held platform-wide, broken down by
+  /// customers/agents/merchants (see backend routes/admin.js GET
+  /// /platform-balance for the exact math).
+  static Future<Map<String, dynamic>?> adminPlatformBalance() async {
+    if (!hasSession) return null;
+    try {
+      final res = await http
+          .get(
+            Uri.parse('$baseUrl/admin/platform-balance'),
+            headers: _headers(authed: true),
+          )
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// All merchants (optionally filtered by status: PENDING, ACTIVE, SUSPENDED).
   static Future<List<dynamic>?> adminMerchants({String? status}) async {
     if (!hasSession) return null;

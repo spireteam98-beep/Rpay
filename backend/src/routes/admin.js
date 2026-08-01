@@ -587,6 +587,68 @@ router.get('/commissions/summary', async (_req, res, next) => {
   }
 });
 
+/**
+ * GET /admin/platform-balance — total custodial balance Wayaki is holding,
+ * broken down by customers / agents / merchants. Every balance lives on
+ * users.usd_balance/kes_balance regardless of role — agents and merchants
+ * are users too, referenced by agents.user_id / merchants.owner_id — so
+ * this categorizes by whether the user also owns an agent or merchant
+ * profile. grandTotalUsd is computed directly over all users (plus the
+ * separate agent commission pool), not by summing the three categories
+ * below, since a user who is both an agent and a merchant owner would
+ * otherwise be double-counted in a naive sum.
+ */
+router.get('/platform-balance', async (_req, res, next) => {
+  try {
+    const [customers, agents, merchants, allUsers, commissions] = await Promise.all([
+      pool.query(`
+        SELECT COALESCE(SUM(usd_balance),0)::float AS usd,
+               COALESCE(SUM(kes_balance),0)::float AS kes,
+               COUNT(*)::int AS count
+          FROM users
+         WHERE id NOT IN (SELECT user_id FROM agents)
+           AND id NOT IN (SELECT owner_id FROM merchants)
+      `),
+      pool.query(`
+        SELECT COALESCE(SUM(u.usd_balance),0)::float AS usd,
+               COALESCE(SUM(u.kes_balance),0)::float AS kes,
+               COALESCE(SUM(a.commission_balance),0)::float AS commission_usd,
+               COUNT(DISTINCT u.id)::int AS count
+          FROM users u
+          JOIN agents a ON a.user_id = u.id
+      `),
+      pool.query(`
+        SELECT COALESCE(SUM(u.usd_balance),0)::float AS usd,
+               COALESCE(SUM(u.kes_balance),0)::float AS kes,
+               COUNT(DISTINCT u.id)::int AS count
+          FROM users u
+          JOIN merchants m ON m.owner_id = u.id
+      `),
+      pool.query(`
+        SELECT COALESCE(SUM(usd_balance),0)::float AS usd,
+               COALESCE(SUM(kes_balance),0)::float AS kes
+          FROM users
+      `),
+      pool.query(`SELECT COALESCE(SUM(commission_balance),0)::float AS usd FROM agents`),
+    ]);
+    const toUsd = (row) => row.usd + row.kes / config.kesPerUsd;
+    const grandTotalUsd = toUsd(allUsers.rows[0]) + commissions.rows[0].usd;
+
+    res.json({
+      referenceRateKesPerUsd: config.kesPerUsd,
+      customers: { ...customers.rows[0], totalUsd: toUsd(customers.rows[0]) },
+      agents: {
+        ...agents.rows[0],
+        totalUsd: toUsd(agents.rows[0]) + agents.rows[0].commission_usd,
+      },
+      merchants: { ...merchants.rows[0], totalUsd: toUsd(merchants.rows[0]) },
+      grandTotalUsd,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** POST /admin/merchants — admin directly onboards an existing user as a merchant, pre-approved.
  * Optional agentCode pays that agent the merchant-onboarding commission immediately, since the
  * merchant is created already ACTIVE (no separate approval step to gate it on). */
