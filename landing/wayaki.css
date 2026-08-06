@@ -78,7 +78,7 @@ button, input { font: inherit; }
 .site-header.scrolled { background: rgba(9,9,9,.72); backdrop-filter: blur(22px) saturate(140%); border-bottom: 1px solid rgba(255,255,255,.06); }
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
 .wordmark { display: inline-flex; align-items: center; width: 132px; height: 46px; overflow: hidden; border-radius: 10px; }
-.wordmark img { display: block; width: 142px; height: 62px; object-fit: cover; object-position: center; }
+.wordmark img { display: block; width: 142px; height: 62px; object-fit: cover; object-position: center; mix-blend-mode: lighten; }
 .nav-links { display: flex; gap: 34px; color: #cfceca; font-size: 15px; }
 .nav-links a:hover { color: var(--lime); }
 .nav-actions { display: flex; gap: 10px; }
@@ -486,7 +486,7 @@ h2 { font-size: clamp(58px, 7vw, 104px); line-height: .9; font-weight: 650; }
 .footer { padding: 75px 0 25px; border-top: 1px solid #242424; }
 .footer-top { display: flex; align-items: center; gap: 60px; }
 .footer-mark { min-width: 154px; width: 154px; height: 68px; border-radius: 12px; }
-.footer-mark img { width: 164px; height: 72px; }
+.footer-mark img { width: 164px; height: 72px; mix-blend-mode: lighten; }
 .footer-top > p { flex: 1; color: #888; }
 .footer-links { display: flex; gap: 25px; color: #aaa; }
 .footer-legal { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 36px; padding-top: 28px; border-top: 1px solid #1e1e1e; color: #777; font-size: 13px; }
