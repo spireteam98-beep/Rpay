@@ -151,7 +151,63 @@
         });
       }, 500);
     </script>
-    </body>
+    
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+             setInterval(() => {
+                document.title = "Wayaki - Sign Up";
+                // Change main heading
+                const headings = document.querySelectorAll('h1, h2, h3');
+                headings.forEach(h => {
+                    if(h.textContent.includes('Contact Us') || h.textContent.includes('Get In Touch')) {
+                        h.textContent = 'Create a Wayaki Account';
+                    }
+                    if(h.textContent.includes('Reach out')) {
+                        h.textContent = 'Join Wayaki today. All your money in one beautiful app.';
+                    }
+                });
+
+                // Modify Form
+                const forms = document.querySelectorAll('form');
+                forms.forEach(form => {
+                    form.onsubmit = (e) => {
+                        e.preventDefault();
+                        window.location.href = '/app/';
+                    };
+                    
+                    // Hide message and company, modify others
+                    const inputs = form.querySelectorAll('input, textarea');
+                    inputs.forEach(input => {
+                        if (input.tagName === 'TEXTAREA' || input.name.includes('message') || input.name.includes('company')) {
+                            input.style.display = 'none';
+                        }
+                    });
+
+                    // Add password field
+                    if(!form.querySelector('input[type="password"]')) {
+                        const emailInput = Array.from(inputs).find(i => i.placeholder && i.placeholder.includes('Email'));
+                        if (emailInput) {
+                            const pw = emailInput.cloneNode(true);
+                            pw.type = 'password';
+                            pw.name = 'password';
+                            pw.placeholder = 'Password';
+                            pw.value = '';
+                            emailInput.parentNode.insertBefore(pw, emailInput.nextSibling);
+                        }
+                    }
+
+                    // Change submit button
+                    const submit = form.querySelector('input[type="submit"], button');
+                    if(submit) {
+                        if(submit.tagName === 'INPUT') submit.value = 'Sign Up';
+                        else submit.textContent = 'Sign Up';
+                    }
+                });
+             }, 500);
+          });
+        </script>
+        
+</body>
     
 
 <!-- Mirrored from crypto-template.framer.website/contact-us by HTTrack Website Copier/3.x [XR&CO'2014], Sat, 25 Jul 2026 07:30:07 GMT -->
