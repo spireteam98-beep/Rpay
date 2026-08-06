@@ -206,6 +206,17 @@ h1 span {
 .ticker-track i:nth-of-type(4n+3) { color: var(--blue); }
 .ticker-track i:nth-of-type(4n) { color: var(--pink); }
 
+.rails-strip { padding: 46px 0; border-bottom: 1px solid #1c1c1c; background: #0a0a0a; }
+.rails-inner { display: flex; flex-wrap: wrap; align-items: center; gap: 22px 34px; }
+.rails-label { margin: 0; color: #6f7178; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+.rails-logos { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.rail-badge {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px;
+  border: 1px solid #26282c; border-radius: 999px; background: rgba(255,255,255,.03);
+  color: #cfceca; font-size: 13.5px; font-weight: 700; letter-spacing: .01em;
+}
+.rail-badge-image img { width: 16px; height: 16px; border-radius: 4px; object-fit: contain; background: #fff; }
+
 .trust-bar { border-block: 1px solid #252525; }
 .trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
 .trust-grid p { margin: 0; padding: 26px 18px; border-right: 1px solid #252525; color: #bbb; }
@@ -378,9 +389,13 @@ h2 { font-size: clamp(58px, 7vw, 104px); line-height: .9; font-weight: 650; }
 .price-amount span { margin-left: 4px; font: 600 16px/1 "Manrope"; opacity: .6; }
 .price-desc { max-width: 380px; margin: 0 0 28px; font-size: 15.5px; line-height: 1.5; opacity: .82; }
 .price-features { list-style: none; margin: 0 0 34px; padding: 0; display: grid; gap: 13px; flex: 1; }
-.price-features li { position: relative; padding-left: 26px; font-size: 15px; }
-.price-features li::before { content: "✓"; position: absolute; left: 0; top: 0; font-weight: 800; color: var(--lime); }
-.price-premium .price-features li::before { color: #071311; }
+.price-features li { display: flex; align-items: center; gap: 12px; font-size: 15px; }
+.price-check {
+  display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px;
+  border-radius: 50%; background: rgba(221,247,22,.14); color: var(--lime);
+  font-size: 11px; font-weight: 800;
+}
+.price-premium .price-check { background: rgba(7,19,17,.14); color: #071311; }
 .price-card .button { align-self: flex-start; }
 
 .technology-section { position: relative; padding: 145px 0 165px; overflow: hidden; background: radial-gradient(circle at 18% 24%, rgba(22,140,255,.16), transparent 30%), radial-gradient(circle at 82% 70%, rgba(239,49,139,.11), transparent 28%), #0b0d0f; border-block: 1px solid #23262a; }
@@ -556,6 +571,9 @@ h2 { font-size: clamp(58px, 7vw, 104px); line-height: .9; font-weight: 650; }
   .float-card-one { left: 10px; top: 60px; }
   .float-card-two { right: 10px; bottom: 35px; }
   .float-pill { display: none; }
+  .rails-strip { padding: 30px 0; }
+  .rails-inner { gap: 14px 18px; }
+  .rail-badge { padding: 7px 14px; font-size: 12px; }
   .trust-grid { grid-template-columns: 1fr; }
   .brand-statement { padding: 95px 0 75px; }
   .statement-top { margin-bottom: 28px; }

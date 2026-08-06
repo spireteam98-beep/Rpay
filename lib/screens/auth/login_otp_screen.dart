@@ -1,3 +1,4 @@
+import 'package:go_router/go_router.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -90,10 +91,7 @@ class _LoginOtpScreenState extends State<LoginOtpScreen> {
       if (signedIn == true) {
         await AuthService.signInBackendUser(email: widget.email);
         if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          kashRoute(const MainNavigation()),
-          (route) => false,
-        );
+        context.go('/home');
         return;
       }
       setState(() => _verifying = false);

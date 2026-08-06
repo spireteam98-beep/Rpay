@@ -5,6 +5,11 @@
     { "source": "/terms", "destination": "/app/terms.html" },
     { "source": "/disclaimer", "destination": "/app/disclaimer.html" },
     { "source": "/support", "destination": "/app/support.html" },
+    { "source": "/data-deletion", "destination": "/app/data-deletion.html" },
+    { "source": "/cookies", "destination": "/app/cookies.html" },
+    { "source": "/kyc-policy", "destination": "/app/kyc-policy.html" },
+    { "source": "/aml-policy", "destination": "/app/aml-policy.html" },
+    { "source": "/refund-policy", "destination": "/app/refund-policy.html" },
     { "source": "/app", "destination": "/app/index.html" },
     { "source": "/app/", "destination": "/app/index.html" }
   ]

@@ -1,8 +1,13 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
-import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
+import '../../constants/app_theme.dart';
+import '../../widgets/ui/wayaki_glow_button.dart';
+import '../../widgets/ui/wayaki_glass_input.dart';
+import '../../widgets/ui/wayaki_glass_card.dart';
+import '../../widgets/ui/wayaki_background_glow.dart';
 import '../main_navigation.dart';
 import 'login_otp_screen.dart';
 
@@ -62,10 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (signedIn == true) {
         await AuthService.signInBackendUser(email: email);
         if (!mounted) return;
-        Navigator.of(context).pushAndRemoveUntil(
-          kashRoute(const MainNavigation()),
-          (route) => false,
-        );
+        context.go('/home');
         return;
       }
       _showMessage(
@@ -107,64 +109,95 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: BybitPalette.bg,
-      appBar: const BybitSubHeader('Log in'),
-      body: SafeArea(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      extendBodyBehindAppBar: true,
+      body: WayakiBackgroundGlow(
+        child: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Welcome back',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.6,
+              const SizedBox(height: 40),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Welcome back',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                    fontFamily: 'Space Grotesk',
+                    letterSpacing: -1.0,
+                    height: 1.1,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Enter your email and password to log in.',
-                style: TextStyle(color: BybitPalette.muted2, fontSize: 14),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Enter your email and password to log in.',
+                  style: TextStyle(color: AppTheme.textGrey, fontSize: 16),
+                ),
               ),
-              const SizedBox(height: 28),
-              BybitTextField(
-                label: 'Email address',
-                hint: 'you@example.com',
-                icon: Icons.alternate_email_rounded,
-                keyboardType: TextInputType.emailAddress,
-                controller: _emailController,
-              ),
-              const SizedBox(height: 18),
-              BybitTextField(
-                label: 'Password',
-                hint: 'Your password',
-                icon: Icons.lock_outline_rounded,
-                obscure: true,
-                controller: _passwordController,
+              const SizedBox(height: 40),
+              WayakiGlassCard(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Email Address', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    WayakiGlassInput(
+                      hintText: 'you@example.com',
+                      prefixIcon: Icons.alternate_email_rounded,
+                      keyboardType: TextInputType.emailAddress,
+                      controller: _emailController,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('Password', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    WayakiGlassInput(
+                      hintText: 'Your password',
+                      prefixIcon: Icons.lock_outline_rounded,
+                      obscureText: true,
+                      controller: _passwordController,
+                    ),
+                    const SizedBox(height: 32),
+                    WayakiGlowButton(
+                      label: _sending ? 'Please wait…' : 'Log in',
+                      isLoading: _sending,
+                      onPressed: _sending ? null : _handlePasswordLogin,
+                      isPrimary: true,
+                      icon: Icons.arrow_forward_rounded,
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 24),
-              BybitPrimaryButton(
-                label: _sending ? 'Please wait…' : 'Log in',
-                enabled: !_sending,
-                onTap: _handlePasswordLogin,
-              ),
-              const SizedBox(height: 14),
               Center(
                 child: TextButton(
                   onPressed: _sending ? null : _handleSendCode,
                   child: const Text(
                     'Log in with a one-time code instead',
-                    style: TextStyle(color: BybitPalette.accent),
+                    style: TextStyle(color: AppTheme.accentColor, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
               const SizedBox(height: 18),
             ],
           ),
+        ),
         ),
       ),
     );

@@ -1,11 +1,16 @@
+import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../state/kash_app_state.dart';
-import '../../widgets/bybit_wallet_ui.dart';
 import '../../widgets/kash_widgets.dart';
+import '../../constants/app_theme.dart';
+import '../../widgets/ui/wayaki_glow_button.dart';
+import '../../widgets/ui/wayaki_glass_input.dart';
+import '../../widgets/ui/wayaki_glass_card.dart';
+import '../../widgets/ui/wayaki_background_glow.dart';
 import '../../widgets/touch_scale.dart';
 import 'email_verify_screen.dart';
 import 'login_screen.dart';
@@ -160,9 +165,18 @@ class _SignupScreenState extends State<SignupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: BybitPalette.bg,
-      appBar: BybitSubHeader('Create account', onBack: _stepBack),
-      body: SafeArea(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: _stepBack,
+        ),
+      ),
+      extendBodyBehindAppBar: true,
+      body: WayakiBackgroundGlow(
+        child: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
@@ -196,6 +210,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
         ),
+        ),
       ),
     );
   }
@@ -213,7 +228,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 width: step == _step ? 22 : 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: active ? BybitPalette.accent : BybitPalette.surface2,
+                  color: active ? AppTheme.primaryColor : AppTheme.glassStroke,
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -234,16 +249,17 @@ class _SignupScreenState extends State<SignupScreen> {
             question,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 28,
+              fontSize: 36,
               fontWeight: FontWeight.w900,
-              letterSpacing: -0.6,
-              height: 1.15,
+              fontFamily: 'Space Grotesk',
+              letterSpacing: -1.0,
+              height: 1.1,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             subtitle,
-            style: const TextStyle(color: BybitPalette.muted2, fontSize: 14),
+            style: TextStyle(color: AppTheme.textGrey, fontSize: 16),
           ),
         ],
       ),
@@ -259,14 +275,27 @@ class _SignupScreenState extends State<SignupScreen> {
           "What's your name?",
           'This is how you\'ll appear to other Wayaki users.',
         ),
-        BybitTextField(
-          label: 'Full name',
-          hint: 'Mohamed Ali',
-          icon: Icons.person_outline_rounded,
-          controller: _nameController,
+        WayakiGlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Full name', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              WayakiGlassInput(
+                hintText: 'Mohamed Ali',
+                prefixIcon: Icons.person_outline_rounded,
+                controller: _nameController,
+              ),
+              const SizedBox(height: 28),
+              WayakiGlowButton(
+                label: 'Continue',
+                onPressed: _continueFromName,
+                icon: Icons.arrow_forward_rounded,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 28),
-        BybitPrimaryButton(label: 'Continue', onTap: _continueFromName),
         const SizedBox(height: 14),
         // Opened inside Telegram, this is the app's very first screen — no
         // welcome screen behind it to fall back on — so a returning user
@@ -274,16 +303,16 @@ class _SignupScreenState extends State<SignupScreen> {
         Center(
           child: TouchScale(
             onTap:
-                () => Navigator.of(context).push(kashRoute(const LoginScreen())),
+                () => context.push('/login'),
             child: RichText(
-              text: const TextSpan(
-                style: TextStyle(fontSize: 14, color: BybitPalette.muted2),
+              text: TextSpan(
+                style: TextStyle(fontSize: 14, color: AppTheme.textGrey),
                 children: [
-                  TextSpan(text: 'Already have an account? '),
+                  const TextSpan(text: 'Already have an account? '),
                   TextSpan(
                     text: 'Log in',
                     style: TextStyle(
-                      color: BybitPalette.accent,
+                      color: AppTheme.primaryColor,
                       fontWeight: FontWeight.w800,
                       decoration: TextDecoration.underline,
                     ),
@@ -306,15 +335,28 @@ class _SignupScreenState extends State<SignupScreen> {
           "What's your email?",
           'We\'ll send a short code to confirm it.',
         ),
-        BybitTextField(
-          label: 'Email address',
-          hint: 'you@example.com',
-          icon: Icons.alternate_email_rounded,
-          keyboardType: TextInputType.emailAddress,
-          controller: _emailController,
+        WayakiGlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Email address', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              WayakiGlassInput(
+                hintText: 'you@example.com',
+                prefixIcon: Icons.alternate_email_rounded,
+                keyboardType: TextInputType.emailAddress,
+                controller: _emailController,
+              ),
+              const SizedBox(height: 28),
+              WayakiGlowButton(
+                label: 'Continue',
+                onPressed: _continueFromEmail,
+                icon: Icons.arrow_forward_rounded,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 28),
-        BybitPrimaryButton(label: 'Continue', onTap: _continueFromEmail),
       ],
     );
   }
@@ -328,15 +370,28 @@ class _SignupScreenState extends State<SignupScreen> {
           "What's your phone number?",
           'Used for M-Pesa transfers and account recovery.',
         ),
-        BybitTextField(
-          label: 'Phone number',
-          hint: '+252 61 000 0000',
-          icon: Icons.phone_iphone_rounded,
-          keyboardType: TextInputType.phone,
-          controller: _phoneController,
+        WayakiGlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Phone number', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              WayakiGlassInput(
+                hintText: '+252 61 000 0000',
+                prefixIcon: Icons.phone_iphone_rounded,
+                keyboardType: TextInputType.phone,
+                controller: _phoneController,
+              ),
+              const SizedBox(height: 28),
+              WayakiGlowButton(
+                label: 'Continue',
+                onPressed: _continueFromPhone,
+                icon: Icons.arrow_forward_rounded,
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 28),
-        BybitPrimaryButton(label: 'Continue', onTap: _continueFromPhone),
       ],
     );
   }
@@ -350,61 +405,71 @@ class _SignupScreenState extends State<SignupScreen> {
           'Secure your account',
           'At least 8 characters — this is what you\'ll log in with.',
         ),
-        BybitTextField(
-          label: 'Password',
-          hint: 'At least 8 characters',
-          icon: Icons.lock_outline_rounded,
-          obscure: true,
-          controller: _passwordController,
-        ),
-        const SizedBox(height: 18),
-        BybitTextField(
-          label: 'Confirm password',
-          hint: 'Re-enter your password',
-          icon: Icons.lock_outline_rounded,
-          obscure: true,
-          controller: _confirmPasswordController,
-        ),
-        const SizedBox(height: 24),
-        CheckboxListTile(
-          value: _acceptedLegal,
-          onChanged:
-              (value) => setState(() => _acceptedLegal = value ?? false),
-          contentPadding: EdgeInsets.zero,
-          controlAffinity: ListTileControlAffinity.leading,
-          activeColor: BybitPalette.accent,
-          checkColor: Colors.black,
-          title: const Text(
-            'I agree to the Terms of Service and Privacy Policy.',
-            style: TextStyle(color: BybitPalette.muted2, fontSize: 12),
+        WayakiGlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Password', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              WayakiGlassInput(
+                hintText: 'At least 8 characters',
+                prefixIcon: Icons.lock_outline_rounded,
+                obscureText: true,
+                controller: _passwordController,
+              ),
+              const SizedBox(height: 18),
+              const Text('Confirm password', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              WayakiGlassInput(
+                hintText: 'Re-enter your password',
+                prefixIcon: Icons.lock_outline_rounded,
+                obscureText: true,
+                controller: _confirmPasswordController,
+              ),
+              const SizedBox(height: 24),
+              CheckboxListTile(
+                value: _acceptedLegal,
+                onChanged:
+                    (value) => setState(() => _acceptedLegal = value ?? false),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: AppTheme.primaryColor,
+                checkColor: Colors.black,
+                title: Text(
+                  'I agree to the Terms of Service and Privacy Policy.',
+                  style: TextStyle(color: AppTheme.textGrey, fontSize: 12),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TextButton(
+                    onPressed:
+                        () => launchUrl(
+                          Uri.parse('https://wayaki.com/terms'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                    child: Text('Read Terms', style: TextStyle(color: AppTheme.primaryColor)),
+                  ),
+                  TextButton(
+                    onPressed:
+                        () => launchUrl(
+                          Uri.parse('https://wayaki.com/privacy'),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                    child: Text('Read Privacy Policy', style: TextStyle(color: AppTheme.primaryColor)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              WayakiGlowButton(
+                label: _submitting ? 'Creating account…' : 'Create account',
+                isLoading: _submitting,
+                onPressed: (!_acceptedLegal || _submitting) ? null : _handleSubmit,
+              ),
+            ],
           ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextButton(
-              onPressed:
-                  () => launchUrl(
-                    Uri.parse('https://wayaki.com/terms'),
-                    mode: LaunchMode.externalApplication,
-                  ),
-              child: const Text('Read Terms'),
-            ),
-            TextButton(
-              onPressed:
-                  () => launchUrl(
-                    Uri.parse('https://wayaki.com/privacy'),
-                    mode: LaunchMode.externalApplication,
-                  ),
-              child: const Text('Read Privacy Policy'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        BybitPrimaryButton(
-          label: _submitting ? 'Creating account…' : 'Create account',
-          enabled: _acceptedLegal && !_submitting,
-          onTap: _handleSubmit,
         ),
       ],
     );

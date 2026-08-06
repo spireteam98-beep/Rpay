@@ -11,15 +11,13 @@ import 'screens/pay_merchant_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_service.dart';
 import 'services/telegram_service.dart';
+import 'services/pwa_service.dart';
 import 'state/kash_app_state.dart';
+import 'widgets/pwa_install_banner.dart';
 
-/// Set once a merchant payment link's `?pay=<till>` has been handed off to
-/// the navigator, so a rebuild of CryptoExchangeApp (e.g. from the
-/// ChangeNotifierProvider above it) doesn't push the pay screen twice.
-bool _didHandlePayLink = false;
-final _rootNavigatorKey = GlobalKey<NavigatorState>();
+import 'router.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Kick off a health ping immediately — harmless no-op now that the
   // backend (Cloud Run, min-instances=1) never sleeps, but cheap insurance
@@ -40,6 +38,10 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
+  
+  await AuthService.init();
+  await PwaService.init();
+
   runApp(const CryptoExchangeApp());
 }
 
@@ -59,8 +61,6 @@ Future<void> _bootstrap() async {
   TelegramService.disableSwipeToClose();
   TelegramService.confirmBeforeClosing();
 
-  await AuthService.init();
-
   if (!AuthService.isSignedIn && TelegramService.isAvailable) {
     try {
       final signedIn = await ApiService.telegramLogin(
@@ -78,112 +78,37 @@ Future<void> _bootstrap() async {
   TelegramService.notifyReady();
 }
 
-/// Mirrors the Flutter navigation stack onto Telegram's native chrome back
-/// button: shown whenever there's a screen to pop back to, hidden at the
-/// root so Telegram's own close/swipe gesture takes over. Without this,
-/// the only way back is the in-app arrow — Telegram users expect its own
-/// back button to work too.
-class _TelegramBackButtonObserver extends NavigatorObserver {
-  void _sync() {
-    if (navigator?.canPop() ?? false) {
-      TelegramService.showBackButton(() => navigator?.maybePop());
-    } else {
-      TelegramService.hideBackButton();
-    }
-  }
-
-  @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _sync();
-
-  @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _sync();
-
-  @override
-  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
-      _sync();
-
-  @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
-      _sync();
-}
-
 class CryptoExchangeApp extends StatelessWidget {
   const CryptoExchangeApp({super.key});
 
-  Widget _signedOutEntryScreen() {
-    final requestedScreen = Uri.base.queryParameters['screen'];
-    if (requestedScreen == 'login') {
-      return const LoginScreen();
-    }
-    if (requestedScreen == 'signup') {
-      return const SignupScreen();
-    }
-    // Inside Telegram there's no need for the marketing welcome screen —
-    // the user already arrived via the bot, so go straight to signup. This
-    // is also the fallback for anyone silent Telegram sign-in didn't cover
-    // (e.g. an older Telegram client). Regular web visitors still see the
-    // welcome screen first.
-    if (TelegramService.isAvailable) {
-      return const SignupScreen();
-    }
-    return const WelcomeScreen();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _bootstrap(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return MaterialApp(
-            title: 'Wayaki',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.darkTheme,
-            home: const Scaffold(
-              backgroundColor: AppTheme.darkBackground,
-              body: Center(
-                child: CircularProgressIndicator(color: AppTheme.primaryColor),
-              ),
+    // Fire off the background bootstrap (Telegram sync) without blocking the UI
+    _bootstrap();
+
+    return ChangeNotifierProvider(
+      create:
+          (_) => KashAppState(
+            profileName: AuthService.storedFullName,
+            phoneNumber: AuthService.storedPhone,
+          ),
+      child: MaterialApp.router(
+        routerConfig: appRouter,
+        title: 'Wayaki',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.darkTheme,
+        builder: (context, child) {
+          return Directionality(
+            textDirection: TextDirection.ltr,
+            child: Stack(
+              children: [
+                if (child != null) child,
+                const PwaInstallBanner(),
+              ],
             ),
           );
-        }
-
-        // A merchant payment link (wayaki.com/app/?pay=<till>) opened by an
-        // already-signed-in user should land straight on the pay screen,
-        // not the wallet home. Signed-out visitors just see the normal
-        // welcome/login flow for now — the link isn't preserved across
-        // that round trip yet.
-        final payTill = Uri.base.queryParameters['pay'];
-        if (AuthService.isSignedIn && payTill != null && payTill.isNotEmpty && !_didHandlePayLink) {
-          _didHandlePayLink = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _rootNavigatorKey.currentState?.push(
-              MaterialPageRoute(
-                builder: (_) => PayMerchantScreen(tillNumber: payTill),
-              ),
-            );
-          });
-        }
-
-        return ChangeNotifierProvider(
-          create:
-              (_) => KashAppState(
-                profileName: AuthService.storedFullName,
-                phoneNumber: AuthService.storedPhone,
-              ),
-          child: MaterialApp(
-            navigatorKey: _rootNavigatorKey,
-            title: 'Wayaki',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.darkTheme,
-            navigatorObservers: [_TelegramBackButtonObserver()],
-            home:
-                AuthService.isSignedIn
-                    ? const MainNavigation()
-                    : _signedOutEntryScreen(),
-          ),
-        );
-      },
+        },
+      ),
     );
   }
 }
