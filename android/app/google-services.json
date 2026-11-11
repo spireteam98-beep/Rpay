@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "1051480531190-gse3hn436us6u82q3ns4qsqne13jn4tg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wayaki.app",
+            "certificate_hash": "de77bf3c556ed070b8b3ec226492ee9ffcfa7333"
+          }
+        },
+        {
           "client_id": "1051480531190-9d00d3vcn3dfkec0net7kar8n4q1l4v7.apps.googleusercontent.com",
           "client_type": 3
         }
