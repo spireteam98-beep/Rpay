@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../models/kash_account.dart';
 import '../services/api_service.dart';
+import '../state/kash_app_state.dart';
 import '../widgets/bybit_wallet_ui.dart';
 import '../widgets/polish.dart';
 import '../widgets/touch_scale.dart';
@@ -80,11 +83,61 @@ class _BillPayScreenState extends State<BillPayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasKes = context
+        .watch<KashAppState>()
+        .isCurrencyAdded(KashAccountType.walletKes);
     return Scaffold(
       backgroundColor: BybitPalette.bg,
       appBar: const BybitSubHeader('Pay bills'),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: hasKes ? _form(context) : _addKesPrompt(context),
+      ),
+    );
+  }
+
+  Widget _addKesPrompt(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.phone_iphone_rounded,
+              color: BybitPalette.muted,
+              size: 40,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Bill pay needs a Fareenn KES wallet',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Add your KES wallet once to pay utility and TV billers through it.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: BybitPalette.muted, fontSize: 13.5),
+            ),
+            const SizedBox(height: 24),
+            BybitPrimaryButton(
+              label: 'Add KES wallet',
+              onTap: () => context.read<KashAppState>().addCurrency(
+                KashAccountType.walletKes,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _form(BuildContext context) {
+    return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
           child: Column(
@@ -279,8 +332,6 @@ class _BillPayScreenState extends State<BillPayScreen> {
               ),
             ],
           ),
-        ),
-      ),
     );
   }
 }

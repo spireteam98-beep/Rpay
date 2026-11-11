@@ -28,6 +28,19 @@ app.get('/health', (_req, res) =>
   res.json({ ok: true, network: config.network, service: 'wayaki-api' }),
 );
 
+// GET /app/version?platform=android&build=12 — the app's force-update
+// check (see lib/services/update_service.dart). No auth: it has to work
+// before the user has signed in, on the very first screen.
+app.get('/app/version', (req, res) => {
+  const build = parseInt(req.query.build, 10) || 0;
+  res.json({
+    minBuildNumber: config.minAndroidBuildNumber,
+    latestVersion: config.latestAndroidVersion,
+    updateUrl: config.androidUpdateUrl,
+    forceUpdate: build > 0 && build < config.minAndroidBuildNumber,
+  });
+});
+
 app.use('/auth', require('./routes/auth'));
 app.use('/wallet', require('./routes/wallet'));
 app.use('/ledger', require('./routes/ledger'));

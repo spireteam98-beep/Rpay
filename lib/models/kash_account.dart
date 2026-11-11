@@ -10,6 +10,12 @@ enum KashAccountType { walletUsd, walletKes, crypto, bank }
 
 const _hiddenAccountTypes = {KashAccountType.crypto, KashAccountType.bank};
 
+/// Currency wallets a user gets by default, with no action needed. Every
+/// other currency type (KES today, more later) starts out unavailable and
+/// only shows up once the user explicitly adds it — see
+/// [KashAppState.addableCurrencies] / [KashAppState.addCurrency].
+const _defaultCurrencyTypes = {KashAccountType.walletUsd};
+
 class KashAccount {
   final KashAccountType type;
   final String title;
@@ -50,6 +56,10 @@ class KashAccount {
 
   /// True for the accounts that actually show up on the wallet screen.
   bool get isVisible => !_hiddenAccountTypes.contains(type);
+
+  /// True for currency wallets every user starts with (USD). False for ones
+  /// that need [KashAppState.addCurrency] first (KES today, more later).
+  bool get isDefaultCurrency => _defaultCurrencyTypes.contains(type);
 
   String get balance =>
       NumberFormat.currency(symbol: nativeSymbol).format(nativeAmount);
@@ -133,7 +143,7 @@ IconData kashIconFor(String? key) =>
 const List<KashAccount> kashAccounts = [
   KashAccount(
     type: KashAccountType.walletUsd,
-    title: 'Wayaki · USD',
+    title: 'Fareenn · USD',
     subtitle: 'Card top-ups, transfers and payments',
     balanceUsd: 0,
     nativeAmount: 0,
@@ -141,13 +151,13 @@ const List<KashAccount> kashAccounts = [
     currency: 'USD',
     status: 'Active',
     icon: Icons.attach_money_rounded,
-    accent: Color(0xFFDDF716),
-    rails: ['Card top-up', 'Wayaki transfer', 'Bill pay'],
+    accent: Color(0xFFE60000),
+    rails: ['Card top-up', 'Fareenn transfer', 'Bill pay'],
     transactions: [],
   ),
   KashAccount(
     type: KashAccountType.walletKes,
-    title: 'Wayaki · KES',
+    title: 'Fareenn · KES',
     subtitle: 'M-Pesa cash in and cash out',
     balanceUsd: 0,
     nativeAmount: 0,
@@ -156,21 +166,21 @@ const List<KashAccount> kashAccounts = [
     status: 'Active',
     icon: Icons.phone_iphone_rounded,
     accent: Color(0xFF2ED17C),
-    rails: ['M-Pesa', 'Wayaki transfer'],
+    rails: ['M-Pesa', 'Fareenn transfer'],
     transactions: [],
   ),
   // Hidden for now — Binance custody sub-account, coming in a later phase.
   KashAccount(
     type: KashAccountType.crypto,
     title: 'Crypto custody',
-    subtitle: 'BTC, ETH and USDT held by Wayaki',
+    subtitle: 'BTC, ETH and USDT held by Fareenn',
     balanceUsd: 0,
     nativeAmount: 0,
     nativeSymbol: '\$',
     currency: 'USDT value',
     status: 'MPC custody sandbox',
     icon: Icons.currency_bitcoin_rounded,
-    accent: Color(0xFFDDF716),
+    accent: Color(0xFFE60000),
     rails: ['BTC', 'ETH', 'USDT', 'Address screening'],
     transactions: [],
   ),

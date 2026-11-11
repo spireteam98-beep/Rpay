@@ -63,6 +63,15 @@ dependencies:
   image_picker: ^1.1.2
   share_plus: ^13.3.0
 
+  # Google sign-in (Firebase Authentication) + Face ID / fingerprint
+  firebase_core: ^4.1.0
+  firebase_auth: ^6.0.2
+  local_auth: ^2.3.0
+  # Native NFC for the Android POS / card linking (Fareenn tap cards).
+  nfc_manager: ^3.5.0
+  # App version/build number, for the force-update check against the backend.
+  package_info_plus: ^10.2.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

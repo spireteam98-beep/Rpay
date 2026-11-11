@@ -74,6 +74,9 @@ class KashAppState extends ChangeNotifier {
   String _phoneNumber = '+252 61 000 0000';
   String _email = '';
   String? _avatarUrl;
+  String? _walletNumber;
+  String? _kycStatus;
+  String? _kycRejectReason;
   String? _username;
   String _walletIdType = 'phone';
   bool _phoneVerified = false;
@@ -93,6 +96,9 @@ class KashAppState extends ChangeNotifier {
   final List<DateTime> _recentTransferTimes = [];
   double _spentToday = 0;
   String _spentDate = '';
+  // Non-default currency wallets (KES today, more later) the user has
+  // explicitly added — see [visibleAccounts] / [addCurrency].
+  final Set<KashAccountType> _addedCurrencyTypes = {};
 
   KashAppState({String? profileName, String? phoneNumber}) {
     if (profileName != null && profileName.isNotEmpty) {
@@ -149,6 +155,9 @@ class KashAppState extends ChangeNotifier {
       _phoneNumber = me['phone'] as String? ?? _phoneNumber;
       _email = me['email'] as String? ?? _email;
       _avatarUrl = me['avatar_url'] as String?;
+      _walletNumber = me['wallet_number'] as String?;
+      _kycStatus = me['kyc_status'] as String?;
+      _kycRejectReason = me['kyc_reject_reason'] as String?;
       _username = me['username'] as String?;
       _walletIdType = me['wallet_id_type'] as String? ?? _walletIdType;
       _phoneVerified = me['phone_verified'] == true;
@@ -234,11 +243,41 @@ class KashAppState extends ChangeNotifier {
   // ── Getters ─────────────────────────────────────────────────────
   List<KashAccount> get accounts => List.unmodifiable(_accounts);
 
-  /// The accounts actually shown in the app — Wayaki USD and Wayaki KES.
-  /// Crypto custody and the virtual bank account stay in [_accounts] (kept
-  /// in sync in the background) but are hidden from the UI until later.
-  List<KashAccount> get visibleAccounts =>
-      List.unmodifiable(_accounts.where((account) => account.isVisible));
+  /// The accounts actually shown in the app — Wayaki USD always, plus any
+  /// other currency (KES today, more later) the user has added via
+  /// [addCurrency]. Crypto custody and the virtual bank account stay in
+  /// [_accounts] (kept in sync in the background) but are hidden from the
+  /// UI until later.
+  List<KashAccount> get visibleAccounts => List.unmodifiable(
+    _accounts.where(
+      (account) =>
+          account.isVisible &&
+          (account.isDefaultCurrency || _addedCurrencyTypes.contains(account.type)),
+    ),
+  );
+
+  /// Currencies the user could add but hasn't yet (KES today — any other
+  /// non-default currency wallet added to [kashAccounts] later shows up
+  /// here automatically, no extra code needed).
+  List<KashAccount> get addableCurrencies => List.unmodifiable(
+    _accounts.where(
+      (account) =>
+          account.isVisible &&
+          !account.isDefaultCurrency &&
+          !_addedCurrencyTypes.contains(account.type),
+    ),
+  );
+
+  bool isCurrencyAdded(KashAccountType type) =>
+      accountByType(type).isDefaultCurrency || _addedCurrencyTypes.contains(type);
+
+  /// Unlocks a non-default currency wallet (e.g. KES) for this user —
+  /// it starts showing up in [visibleAccounts] and anywhere that reads it.
+  void addCurrency(KashAccountType type) {
+    if (!_addedCurrencyTypes.add(type)) return;
+    _persist();
+    notifyListeners();
+  }
   List<LedgerTransaction> get ledgerTransactions =>
       List.unmodifiable(_ledgerTransactions);
   List<LedgerEntry> get ledgerEntries => List.unmodifiable(
@@ -253,6 +292,13 @@ class KashAppState extends ChangeNotifier {
   String get phoneNumber => _phoneNumber;
   String get email => _email;
   String? get avatarUrl => _avatarUrl;
+
+  /// Short Fareenn account number, issued once KYC is approved.
+  String? get walletNumber => _walletNumber;
+
+  /// PENDING_REVIEW, APPROVED or REJECTED (null before KYC was submitted).
+  String? get kycStatus => _kycStatus;
+  String? get kycRejectReason => _kycRejectReason;
   String? get username => _username;
   String get walletIdType => _walletIdType;
 
@@ -370,6 +416,7 @@ class KashAppState extends ChangeNotifier {
 
   void setBiometricEnabled(bool value) {
     _biometricEnabled = value;
+    AuthService.setBiometricLock(value);
     _persist();
     notifyListeners();
   }
@@ -418,7 +465,7 @@ class KashAppState extends ChangeNotifier {
         final transfer = response['transfer'] as Map<String, dynamic>?;
         await syncFromBackend();
         return TransferResult.success(
-          '${_money.format(amount)} sent through Wayaki.',
+          '${_money.format(amount)} sent through Fareenn.',
           transactionId: transfer?['id']?.toString(),
         );
       } on ApiException catch (err) {
@@ -782,6 +829,8 @@ class KashAppState extends ChangeNotifier {
       'ledgerSequence': _ledgerSequence,
       'spentToday': _spentToday,
       'spentDate': _spentDate,
+      'addedCurrencyTypes':
+          _addedCurrencyTypes.map((type) => type.index).toList(),
       'accounts':
           _accounts
               .map(
@@ -830,6 +879,13 @@ class KashAppState extends ChangeNotifier {
       _ledgerSequence = state['ledgerSequence'] as int? ?? 1004;
       _spentToday = (state['spentToday'] as num?)?.toDouble() ?? 0;
       _spentDate = state['spentDate'] as String? ?? '';
+      _addedCurrencyTypes
+        ..clear()
+        ..addAll(
+          ((state['addedCurrencyTypes'] as List?) ?? []).map(
+            (i) => KashAccountType.values[i as int],
+          ),
+        );
 
       final storedAccounts = (state['accounts'] as List?) ?? [];
       _accounts =
@@ -893,6 +949,7 @@ class KashAppState extends ChangeNotifier {
     _spentToday = 0;
     _spentDate = '';
     _ledgerSequence = 1004;
+    _addedCurrencyTypes.clear();
     _persist();
     notifyListeners();
     syncFromBackend();

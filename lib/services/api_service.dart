@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_service.dart';
@@ -9,20 +10,20 @@ import 'auth_service.dart';
 /// This app requires a live backend session and does not use local sandbox-only mode.
 class ApiService {
   /// Backend URL, overridable at build time with `--dart-define=API_BASE_URL=`.
-  /// Defaults to Cloud Run (wayaki-api, project zinc-wares-464304-t4,
-  /// us-central1) — moved off Render's free tier because its 15-minute
-  /// idle spin-down (30-50s cold start) was showing up as frequent "backend
-  /// not reachable" errors for real users. Cloud Run runs with
-  /// --min-instances=1, so it never scales to zero. Render
-  /// (kashflip-api.onrender.com) is left running untouched as a fallback —
-  /// same shared Neon database, so either backend works if this ever needs
-  /// rolling back. Local development against a backend running on this
-  /// machine should pass `--dart-define=API_BASE_URL=http://localhost:8080`
-  /// explicitly (see .claude/launch.json's flutter-web/verify-web entries).
-  static const String baseUrl = String.fromEnvironment(
+  /// Defaults to the Railway backend (fareenn-api, production).
+  static const String _baseUrlOverride = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://wayaki-api-361052105935.us-central1.run.app',
   );
+
+  /// Debug builds (`flutter run`) talk to the local backend
+  /// (`npm start` in backend/, port 8080) so new endpoints work before
+  /// they're deployed. Release builds use the deployed API. Either can be
+  /// overridden with `--dart-define=API_BASE_URL=...`.
+  static String get baseUrl {
+    if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
+    if (kDebugMode) return 'http://localhost:8080';
+    return 'https://fareenn-api-production.up.railway.app';
+  }
 
   /// Stripe publishable key (safe to ship client-side by design).
   /// Overridable with `--dart-define=STRIPE_PUBLISHABLE_KEY=`.
@@ -56,6 +57,21 @@ class ApiService {
       return res.statusCode == 200;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// GET /app/version?build=N — the force-update check (see
+  /// UpdateService). Returns null if the backend can't be reached, so a
+  /// flaky connection never blocks the app from opening.
+  static Future<Map<String, dynamic>?> appVersion(int buildNumber) async {
+    try {
+      final res = await http
+          .get(Uri.parse('$baseUrl/app/version?build=$buildNumber'))
+          .timeout(_timeout);
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -140,6 +156,110 @@ class ApiService {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Exchanges a Firebase ID token (after Google confirmed the account) for
+  /// a backend session. Works for both new and returning users; the result
+  /// says which onboarding steps are still missing. Throws [ApiException]
+  /// with a user-facing message on any failure.
+  static Future<GoogleSignInResult> firebaseLogin({
+    required String idToken,
+  }) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            Uri.parse('$baseUrl/auth/firebase'),
+            headers: _headers(),
+            body: jsonEncode({'idToken': idToken}),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      throw ApiException(
+        "Can't reach the Fareenn server at $baseUrl. "
+        'Is the backend running?',
+      );
+    }
+    final body = _decodeObject(res.body);
+    if ((res.statusCode == 200 || res.statusCode == 201) &&
+        body['token'] is String) {
+      await _prefs.setString(_tokenKey, body['token'] as String);
+      return GoogleSignInResult.fromJson(body);
+    }
+    if (res.statusCode == 404) {
+      throw ApiException(
+        'The server at $baseUrl does not support Google sign-in yet '
+        '(POST /auth/firebase not found). Start the local backend or '
+        'deploy the latest backend.',
+      );
+    }
+    throw ApiException(
+      body['error'] as String? ??
+          'Google sign-in failed (server returned ${res.statusCode}).',
+    );
+  }
+
+  /// Parses a JSON object body; returns {} for HTML/empty error pages.
+  static Map<String, dynamic> _decodeObject(String body) {
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (_) {}
+    return <String, dynamic>{};
+  }
+
+  /// Profile step after Google sign-in: first/last name and an E.164 phone.
+  static Future<void> completeProfile({
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String gender,
+    required String address,
+    required String idType,
+    required String idNumber,
+    required String regionCode,
+    required List<int> idFrontBytes,
+    required String idFrontContentType,
+    required List<int> idBackBytes,
+    required String idBackContentType,
+    required List<int> selfieBytes,
+    required String selfieContentType,
+  }) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            Uri.parse('$baseUrl/auth/profile/complete'),
+            headers: _headers(authed: true),
+            body: jsonEncode({
+              'firstName': firstName,
+              'lastName': lastName,
+              'phone': phone,
+              'gender': gender,
+              'address': address,
+              'idType': idType,
+              'idNumber': idNumber,
+              'regionCode': regionCode,
+              'idFrontBase64': base64Encode(idFrontBytes),
+              'idFrontContentType': idFrontContentType,
+              'idBackBase64': base64Encode(idBackBytes),
+              'idBackContentType': idBackContentType,
+              'selfieBase64': base64Encode(selfieBytes),
+              'selfieContentType': selfieContentType,
+            }),
+          )
+          .timeout(const Duration(seconds: 60));
+    } catch (_) {
+      throw ApiException(
+        "Can't reach Fareenn right now. Check your connection and try again.",
+      );
+    }
+    if (res.statusCode == 200) return;
+    final body = _decodeObject(res.body);
+    throw ApiException(
+      body['error'] as String? ??
+          'Could not save your profile (server returned ${res.statusCode}).',
+    );
   }
 
   /// Signs in (or silently registers) via a Telegram Mini App session.
@@ -732,6 +852,189 @@ class ApiService {
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode == 201) return body;
     throw ApiException(body['error'] as String? ?? 'Payment failed');
+  }
+
+  // ── Fareenn tap cards (NFC) ───────────────────────────────────────
+
+  static Future<Map<String, dynamic>> _nfcPost(String path, Map<String, dynamic> body, {int ok = 200}) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(Uri.parse('$baseUrl/cards/nfc/$path'), headers: _headers(authed: true), body: jsonEncode(body))
+          .timeout(_timeout);
+    } catch (_) {
+      throw ApiException("Can't reach the Fareenn server. Check your connection and try again.");
+    }
+    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == ok || res.statusCode == 200) return decoded;
+    throw ApiException(
+      decoded['error'] as String? ?? 'Request failed',
+      code: decoded['code'] as String?,
+      data: decoded,
+    );
+  }
+
+  /// A fresh token + card URL to write onto a blank card.
+  static Future<Map<String, dynamic>> nfcPrepare() => _nfcPost('prepare', const {});
+
+  static Future<Map<String, dynamic>> nfcLink({required String uid, required String token, required String pin}) async =>
+      (await _nfcPost('link', {'uid': uid, 'token': token, 'pin': pin}, ok: 201))['card'] as Map<String, dynamic>;
+
+  static Future<List<Map<String, dynamic>>> nfcMyCards() async {
+    http.Response res;
+    try {
+      res = await http.get(Uri.parse('$baseUrl/cards/nfc/mine'), headers: _headers(authed: true)).timeout(_timeout);
+    } catch (_) {
+      throw ApiException("Can't reach the Fareenn server. Check your connection and try again.");
+    }
+    final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 200) throw ApiException(decoded['error'] as String? ?? 'Could not load cards');
+    return (decoded['cards'] as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> nfcFreeze(String cardId, bool frozen) => _nfcPost('$cardId/freeze', {'frozen': frozen});
+
+  static Future<void> nfcBlock(String cardId) => _nfcPost('$cardId/block', const {});
+
+  /// Full card number, expiry and CVC, after the cardholder's PIN.
+  static Future<Map<String, dynamic>> nfcReveal(String cardId, String pin) => _nfcPost('$cardId/reveal', {'pin': pin});
+
+  /// Merchant side: who owns the tapped card (first name + initial).
+  /// `token` is null for a card recognised by its serial number only.
+  static Future<Map<String, dynamic>> nfcLookup({required String merchantId, required String uid, String? token}) =>
+      _nfcPost('lookup', {'merchantId': merchantId, 'uid': uid, if (token != null) 'token': token});
+
+  /// Merchant side: charges the tapped card. A serial-only card (no Fareenn
+  /// link on it) first fails with code PIN_REQUIRED; retry with the PIN.
+  static Future<Map<String, dynamic>> nfcCharge({
+    required String merchantId,
+    required String uid,
+    String? token,
+    required double amount,
+    required String currency,
+    String? pin,
+  }) async =>
+      (await _nfcPost('charge', {
+        'merchantId': merchantId,
+        'uid': uid,
+        if (token != null) 'token': token,
+        'amount': amount,
+        'currency': currency,
+        if (pin != null) 'pin': pin,
+      }, ok: 201))['receipt'] as Map<String, dynamic>;
+
+  /// Full e-receipt for one card payment (cardholder or merchant only).
+  static Future<Map<String, dynamic>> nfcReceipt(String id) async =>
+      (await _authedGetJson('cards/nfc/receipts/$id'))['receipt'] as Map<String, dynamic>;
+
+  // ── In-app notification inbox ─────────────────────────────────────
+
+  /// { unread: {notifications, messages}, notifications: [...] }
+  static Future<Map<String, dynamic>> notifications() => _authedGetJson('social/notifications');
+
+  /// Badge counts: { notifications, messages }.
+  static Future<Map<String, dynamic>> unreadCounts() => _authedGetJson('social/unread');
+
+  /// Marks the given notification ids — or all, when [ids] is null — as read.
+  static Future<void> markNotificationsRead([List<String>? ids]) async {
+    try {
+      await http
+          .post(
+            Uri.parse('$baseUrl/social/notifications/read'),
+            headers: _headers(authed: true),
+            body: jsonEncode({if (ids != null) 'ids': ids}),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      // Read state is cosmetic; never surface an error for it.
+    }
+  }
+
+  // ── Business & Agent accounts (separate from the personal wallet) ─
+
+  static Future<Map<String, dynamic>> _authedPostJson(String path, Map<String, dynamic> body) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(Uri.parse('$baseUrl/$path'), headers: _headers(authed: true), body: jsonEncode(body))
+          .timeout(_timeout);
+    } catch (_) {
+      throw ApiException("Can't reach the Fareenn server. Check your connection and try again.");
+    }
+    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200 || res.statusCode == 201) return decoded;
+    throw ApiException(decoded['error'] as String? ?? 'Request failed', code: decoded['code'] as String?, data: decoded);
+  }
+
+  /// Business account → owner's wallet.
+  static Future<Map<String, dynamic>> merchantToWallet(String merchantId, {required double amount, required String currency}) =>
+      _authedPostJson('merchants/$merchantId/to-wallet', {'amount': amount, 'currency': currency});
+
+  /// { agentId, businessName, float: {USD, KES}, commissionUsd, moves }
+  static Future<Map<String, dynamic>> agentAccount() => _authedGetJson('agents/account');
+
+  /// Wallet → Agent float.
+  static Future<Map<String, dynamic>> agentTopUp({required double amount, required String currency}) =>
+      _authedPostJson('agents/account/top-up', {'amount': amount, 'currency': currency});
+
+  /// Agent float (or commission, USD) → wallet.
+  static Future<Map<String, dynamic>> agentToWallet({required double amount, required String currency, bool fromCommission = false}) =>
+      _authedPostJson('agents/account/to-wallet',
+          {'amount': amount, 'currency': currency, if (fromCommission) 'from': 'commission'});
+
+  /// Super-admin: Fareenn funds an agent's float.
+  static Future<Map<String, dynamic>> adminFundAgentFloat(String agentId, {required double amount, required String currency, String? note}) =>
+      _authedPostJson('admin/agents/$agentId/fund-float', {'amount': amount, 'currency': currency, if (note != null) 'note': note});
+
+  // ── Direct messages ───────────────────────────────────────────────
+
+  /// Latest message per person: [{ user, lastBody, lastAt, lastFromMe, unread }].
+  static Future<List<Map<String, dynamic>>> conversations() async {
+    http.Response res;
+    try {
+      res = await http.get(Uri.parse('$baseUrl/social/conversations'), headers: _headers(authed: true)).timeout(_timeout);
+    } catch (_) {
+      throw ApiException("Can't reach the Fareenn server. Check your connection and try again.");
+    }
+    final decoded = jsonDecode(res.body);
+    if (res.statusCode != 200) throw ApiException((decoded as Map)['error'] as String? ?? 'Could not load messages');
+    return (decoded as List).cast<Map<String, dynamic>>();
+  }
+
+  /// Thread with one person (user id or any identifier); marks it read.
+  static Future<Map<String, dynamic>> messageThread(String who) =>
+      _authedGetJson('social/messages/${Uri.encodeComponent(who)}');
+
+  /// Sends a message to a user id, email, phone, @username or Fareenn ID.
+  static Future<Map<String, dynamic>> sendMessage(String to, String body) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(Uri.parse('$baseUrl/social/messages'),
+              headers: _headers(authed: true), body: jsonEncode({'to': to, 'body': body}))
+          .timeout(_timeout);
+    } catch (_) {
+      throw ApiException("Can't reach the Fareenn server. Check your connection and try again.");
+    }
+    final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode != 201) throw ApiException(decoded['error'] as String? ?? 'Message not sent');
+    return decoded['message'] as Map<String, dynamic>;
+  }
+
+  /// Signed-in request headers, for services that open their own requests
+  /// (e.g. the real-time notification stream).
+  static Map<String, String> get authHeaders => _headers(authed: true);
+
+  static Future<Map<String, dynamic>> _authedGetJson(String path) async {
+    http.Response res;
+    try {
+      res = await http.get(Uri.parse('$baseUrl/$path'), headers: _headers(authed: true)).timeout(_timeout);
+    } catch (_) {
+      throw ApiException("Can't reach the Fareenn server. Check your connection and try again.");
+    }
+    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body) as Map<String, dynamic>;
+    if (res.statusCode == 200) return decoded;
+    throw ApiException(decoded['error'] as String? ?? 'Request failed', code: decoded['code'] as String?, data: decoded);
   }
 
   // ── Agent ────────────────────────────────────────────────────────
@@ -1698,6 +2001,100 @@ class ApiService {
   /// Uploads a profile photo. [bytes] is the raw (not base64-encoded)
   /// image data; [contentType] must be image/jpeg, image/png, or
   /// image/webp. Returns the new public avatar URL.
+  // ── KYC review (agents / Trustee agents, and HQ for admin) ──────────
+
+  static String _kycBase(bool admin) =>
+      admin ? '$baseUrl/admin/kyc' : '$baseUrl/agents/kyc';
+
+  static Future<Map<String, dynamic>> _kycCall(
+    String method,
+    String url, {
+    Map<String, dynamic>? body,
+  }) async {
+    http.Response res;
+    try {
+      final uri = Uri.parse(url);
+      res = await (method == 'GET'
+              ? http.get(uri, headers: _headers(authed: true))
+              : http.post(
+                uri,
+                headers: _headers(authed: true),
+                body: jsonEncode(body ?? {}),
+              ))
+          .timeout(const Duration(seconds: 45));
+    } catch (_) {
+      throw ApiException(
+        "Can't reach Fareenn right now. Check your connection and try again.",
+      );
+    }
+    final decoded = _decodeObject(res.body);
+    if (res.statusCode == 200) return decoded;
+    throw ApiException(
+      decoded['error'] as String? ?? 'Request failed (${res.statusCode}).',
+      code: decoded['code'] as String?,
+      data: decoded,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> kycPending({
+    bool admin = false,
+  }) async {
+    final body = await _kycCall('GET', '${_kycBase(admin)}/pending');
+    final list = body['customers'] as List<dynamic>? ?? const [];
+    return list.whereType<Map<String, dynamic>>().toList();
+  }
+
+  static Future<Map<String, dynamic>> kycDocuments(
+    String userId, {
+    bool admin = false,
+  }) => _kycCall('GET', '${_kycBase(admin)}/$userId/documents');
+
+  /// Approves the customer and returns { walletNumber, card? }. When
+  /// [cardUid] is given (a card the reviewer just scanned), that card is
+  /// linked to the customer in the same step; a card problem fails the
+  /// whole approval so nothing is half-done.
+  static Future<Map<String, dynamic>> kycApprove(String userId, {bool admin = false, String? cardUid}) =>
+      _kycCall('POST', '${_kycBase(admin)}/$userId/approve', body: {if (cardUid != null) 'cardUid': cardUid});
+
+  /// "Request changes": [issues] are the problems the reviewer ticked,
+  /// [reason] an optional note. The customer gets them as a chat message.
+  static Future<void> kycReject(
+    String userId,
+    String reason, {
+    bool admin = false,
+    List<String> issues = const [],
+  }) => _kycCall(
+    'POST',
+    '${_kycBase(admin)}/$userId/reject',
+    body: {'reason': reason, 'issues': issues},
+  );
+
+  /// Links the signed-in customer to the Agent / Trustee Agent who
+  /// onboarded them. Returns the agent's business name.
+  static Future<String> linkAgent(String agentCode) async {
+    http.Response res;
+    try {
+      res = await http
+          .post(
+            Uri.parse('$baseUrl/auth/agent-code'),
+            headers: _headers(authed: true),
+            body: jsonEncode({'agentCode': agentCode}),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      throw ApiException(
+        "Can't reach Fareenn right now. Check your connection and try again.",
+      );
+    }
+    final body = _decodeObject(res.body);
+    if (res.statusCode == 200) {
+      return body['agentName'] as String? ?? 'your agent';
+    }
+    throw ApiException(
+      body['error'] as String? ?? 'Could not link the agent code.',
+    );
+  }
+
   static Future<String> uploadAvatar({
     required List<int> bytes,
     required String contentType,
@@ -1844,7 +2241,53 @@ class ApiService {
 
 class ApiException implements Exception {
   final String message;
-  ApiException(this.message);
+
+  /// Machine-readable reason from the backend (e.g. 'PIN_REQUIRED'), if any.
+  final String? code;
+
+  /// The full error body, for screens that need extra fields.
+  final Map<String, dynamic>? data;
+  ApiException(this.message, {this.code, this.data});
   @override
   String toString() => message;
+}
+
+/// Backend answer to POST /auth/firebase.
+class GoogleSignInResult {
+  final bool isNewUser;
+  final bool profileComplete;
+  final bool hasPin;
+  final String firstName;
+  final String lastName;
+  final String fullName;
+  final String email;
+  final String phone;
+
+  const GoogleSignInResult({
+    required this.isNewUser,
+    required this.profileComplete,
+    required this.hasPin,
+    required this.firstName,
+    required this.lastName,
+    required this.fullName,
+    required this.email,
+    required this.phone,
+  });
+
+  factory GoogleSignInResult.fromJson(Map<String, dynamic> json) {
+    final profile = Map<String, dynamic>.from(
+      (json['profile'] as Map?) ?? const {},
+    );
+    String str(String key) => (profile[key] as String?)?.trim() ?? '';
+    return GoogleSignInResult(
+      isNewUser: json['isNewUser'] == true,
+      profileComplete: json['profileComplete'] == true,
+      hasPin: json['hasPin'] == true,
+      firstName: str('firstName'),
+      lastName: str('lastName'),
+      fullName: str('fullName'),
+      email: str('email'),
+      phone: str('phone'),
+    );
+  }
 }

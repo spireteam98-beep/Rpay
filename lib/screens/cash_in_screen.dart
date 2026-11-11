@@ -82,6 +82,47 @@ class _CashInScreenState extends State<CashInScreen> {
   }
 
   void _goToAmount(String gateway) {
+    if (_currencyFor(gateway) == 'KES' &&
+        !context.read<KashAppState>().isCurrencyAdded(KashAccountType.walletKes)) {
+      _promptAddKes(gateway);
+      return;
+    }
+    setState(() {
+      _gateway = gateway;
+      _step = _CashInStep.amount;
+    });
+  }
+
+  /// M-Pesa cash-in needs a Fareenn KES wallet — offer to add it on the
+  /// spot rather than silently failing or burying the option elsewhere.
+  Future<void> _promptAddKes(String gateway) async {
+    final add = await showDialog<bool>(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            backgroundColor: BybitPalette.surface,
+            title: const Text(
+              'Add your KES wallet?',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: const Text(
+              'M-Pesa cash-in pays into a Fareenn KES wallet. Add one now to continue.',
+              style: TextStyle(color: BybitPalette.muted),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Add KES'),
+              ),
+            ],
+          ),
+    );
+    if (add != true || !mounted) return;
+    context.read<KashAppState>().addCurrency(KashAccountType.walletKes);
     setState(() {
       _gateway = gateway;
       _step = _CashInStep.amount;
@@ -654,7 +695,7 @@ class _ProcessStep extends StatelessWidget {
                     backgroundColor: BybitPalette.accent,
                     child: Icon(
                       Icons.check_rounded,
-                      color: Colors.black,
+                      color: Colors.white,
                       size: 38,
                     ),
                   ),

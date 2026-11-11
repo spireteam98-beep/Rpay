@@ -147,6 +147,19 @@ const config = {
   // already has Editor on this project, so no separate key file is needed
   // in production; local dev needs `gcloud auth application-default login`.
   avatarBucket: (process.env.AVATAR_BUCKET || 'wayaki-avatars').trim(),
+
+  // Force-update gate (GET /app/version) — the app refuses to proceed past
+  // its splash screen when its own build number is below
+  // MIN_ANDROID_BUILD_NUMBER. Bump that env var on Railway (no redeploy of
+  // the app itself needed) whenever a release ships that older clients
+  // must not keep using (e.g. a breaking API change or a critical fix).
+  // Left at 1 (every build qualifies) until a real minimum is set.
+  minAndroidBuildNumber: parseInt(process.env.MIN_ANDROID_BUILD_NUMBER || '1', 10),
+  latestAndroidVersion: (process.env.LATEST_ANDROID_VERSION || '').trim(),
+  androidUpdateUrl: (
+    process.env.ANDROID_UPDATE_URL ||
+    'https://play.google.com/store/apps/details?id=com.wayaki.app'
+  ).trim(),
 };
 
 if (config.network !== 'testnet' && config.network !== 'mainnet') {

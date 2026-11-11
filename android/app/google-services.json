@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1051480531190",
+    "project_id": "fareenn-f29f3",
+    "storage_bucket": "fareenn-f29f3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1051480531190:android:6ccef1994dbf421561ccd7",
+        "android_client_info": {
+          "package_name": "com.wayaki.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1051480531190-8b7t021d6b2u0kk96q6htuvc824qnjf9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.wayaki.app",
+            "certificate_hash": "41720e85c07830b98a6d968dca85404cf540e27f"
+          }
+        },
+        {
+          "client_id": "1051480531190-9d00d3vcn3dfkec0net7kar8n4q1l4v7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBRHZ74yeRCGji4zgdvPubBTMPiPxqEO-Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1051480531190-9d00d3vcn3dfkec0net7kar8n4q1l4v7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
