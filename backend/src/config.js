@@ -110,6 +110,10 @@ const config = {
   adminEmail: (process.env.ADMIN_EMAIL || 'wirenext8@gmail.com').trim().toLowerCase(),
   // Test accounts that get an ACTIVE business automatically (POS testing).
   // Set TEST_MERCHANT_EMAILS="" in production to switch this off.
+  // Fareenn card taps below this USD amount need no PIN when the card is
+  // recognised by serial only (like contactless bank cards). The card's own
+  // per-payment and daily limits still apply on top.
+  cardNoPinLimitUsd: Number(process.env.CARD_NO_PIN_LIMIT_USD || '100'),
   testMerchantEmails: (process.env.TEST_MERCHANT_EMAILS ?? 'wirenext8@gmail.com')
     .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
 

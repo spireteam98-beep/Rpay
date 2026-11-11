@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 const ledger = require('../services/ledger');
 const config = require('../config');
 const compliance = require('../services/compliance');
+const notify = require('../services/notify');
 
 /**
  * Fareenn closed-loop NFC cards (MIFARE Classic 1K test cards; NTAG also works).
@@ -148,6 +149,29 @@ async function cardForTap(client, uid, token, lock) {
   ).rows[0];
   if (!row) return null;
   return { card: row, verified: Boolean(token) && sameToken(row.token, token) };
+}
+
+const receiptRef = (id) => String(id).split('-')[0].toUpperCase();
+const money = (amount, currency) => `${currency} ${Number(amount).toFixed(2)}`;
+
+/**
+ * E-receipt: lands in the customer's and the merchant's in-app inbox (and
+ * Telegram/email if they enabled those). Best-effort, after the commit, so
+ * it can never affect the payment itself.
+ */
+function sendReceipts(r, { customerId, merchantOwnerId, cashierId }) {
+  const when = new Date(r.at).toLocaleString('en-GB', { timeZone: 'Africa/Mogadishu' });
+  const data = { type: 'card_receipt', receiptId: r.id };
+  notify.notifyUser(customerId, {
+    kind: 'receipt',
+    title: `Receipt: ${money(r.amount, r.currency)} at ${r.merchant}`,
+    body: `You paid ${money(r.amount, r.currency)} to ${r.merchant} (till ${r.tillNumber}) with card •••• ${r.last4} on ${when}. Ref ${r.ref}.`,
+    data,
+  });
+  const merchantBody = `${r.holder} paid ${money(r.amount, r.currency)} with card •••• ${r.last4} on ${when}. Ref ${r.ref}.`;
+  for (const id of new Set([merchantOwnerId, cashierId])) {
+    notify.notifyUser(id, { kind: 'receipt', title: `Sale receipt: ${money(r.amount, r.currency)}`, body: merchantBody, data });
+  }
 }
 
 const NOT_REGISTERED = 'This card is not registered with Fareenn.';
@@ -362,9 +386,11 @@ router.post('/nfc/charge', async (req, res, next) => {
     ).rows[0];
     const holderFirst = holder?.first_name || String(holder?.full_name || '').split(' ')[0] || 'Customer';
     const holderName = holder?.last_name ? `${holderFirst} ${holder.last_name.slice(0, 1)}.` : holderFirst;
-    // Serial-only tap: the cardholder's PIN is what proves this is really
-    // their card (a UID alone can be cloned), so ask for it before charging.
-    if (!tap.verified && !pin) {
+    // Serial-only tap at or above the no-PIN limit: the cardholder's PIN is
+    // what proves this is really their card (a UID alone can be cloned).
+    // Smaller taps go through without a PIN, capped by the card's limits.
+    const noPinOk = compliance.toUsd(amount, currency) < config.cardNoPinLimitUsd;
+    if (!tap.verified && !pin && !noPinOk) {
       await client.query('ROLLBACK');
       if (!holder?.pin_hash) {
         return res.status(403).json({ error: 'The cardholder has not set a Fareenn PIN yet.' });
@@ -467,24 +493,78 @@ router.post('/nfc/charge', async (req, res, next) => {
       ],
     );
     await client.query('COMMIT');
-    res.status(201).json({
-      receipt: {
-        id: tx.id,
-        paymentId: payment.id,
-        merchant: merchant.name,
-        amount,
-        currency,
-        last4: cardLast4(card),
-        holder: holderName,
-        at: tx.created_at,
-      },
-    });
+    const receipt = {
+      id: tx.id,
+      ref: receiptRef(tx.id),
+      paymentId: payment.id,
+      merchant: merchant.name,
+      tillNumber: merchant.till_number,
+      amount,
+      currency,
+      last4: cardLast4(card),
+      holder: holderName,
+      pinVerified: Boolean(pin),
+      at: tx.created_at,
+    };
+    sendReceipts(receipt, { customerId: holder.id, merchantOwnerId: merchant.owner_id, cashierId: req.userId });
+    res.status(201).json({ receipt });
   } catch (err) {
     try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
     if (err.status) return res.status(err.status).json({ error: err.message });
     next(err);
   } finally {
     client.release();
+  }
+});
+
+/**
+ * GET /cards/nfc/receipts/:id — the full e-receipt for one card payment.
+ * Visible to the cardholder and to the merchant's owner/tellers only.
+ */
+router.get('/nfc/receipts/:id', async (req, res, next) => {
+  try {
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return res.status(404).json({ error: 'Receipt not found' });
+    const row = (
+      await pool.query(
+        `SELECT t.id, t.amount, t.currency, t.amount_usd, t.status, t.reason, t.created_at, t.payment_id,
+                c.user_id AS holder_id, c.card_number, c.uid,
+                m.id AS merchant_id, m.name AS merchant, m.till_number, m.owner_id,
+                u.first_name, u.last_name, u.full_name
+           FROM nfc_card_transactions t
+           JOIN nfc_cards c ON c.id = t.card_id
+           JOIN merchants m ON m.id = t.merchant_id
+           JOIN users u ON u.id = c.user_id
+          WHERE t.id = $1`,
+        [req.params.id],
+      )
+    ).rows[0];
+    if (!row) return res.status(404).json({ error: 'Receipt not found' });
+    const isHolder = row.holder_id === req.userId;
+    if (!isHolder && !(await merchantAccess(pool, req.userId, row.merchant_id))) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+    const first = row.first_name || String(row.full_name || '').split(' ')[0] || 'Customer';
+    res.json({
+      receipt: {
+        id: row.id,
+        ref: receiptRef(row.id),
+        paymentId: row.payment_id,
+        status: row.status,
+        reason: row.reason,
+        merchant: row.merchant,
+        tillNumber: row.till_number,
+        amount: Number(row.amount),
+        currency: row.currency,
+        amountUsd: row.amount_usd == null ? null : Number(row.amount_usd),
+        last4: (row.card_number || row.uid).slice(-4),
+        holder: isHolder ? row.full_name : (row.last_name ? `${first} ${row.last_name.slice(0, 1)}.` : first),
+        method: 'Fareenn card (tap)',
+        at: row.created_at,
+        viewer: isHolder ? 'customer' : 'merchant',
+      },
+    });
+  } catch (err) {
+    next(err);
   }
 });
 
