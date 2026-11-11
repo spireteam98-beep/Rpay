@@ -435,7 +435,7 @@ async function migrate() {
   await pool.query(`
     ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_tier_check;
     ALTER TABLE agents ADD CONSTRAINT agents_tier_check
-      CHECK (tier IN ('COUNTRY_AGENT','SUPER_AGENT','AGENT','SUB_AGENT'));
+      CHECK (tier IN ('COUNTRY_AGENT','SUPER_AGENT','AGENT','SUB_AGENT','TRUSTEE_AGENT'));
 
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS country_code TEXT;
     ALTER TABLE agents ADD COLUMN IF NOT EXISTS region TEXT;
@@ -464,6 +464,20 @@ async function migrate() {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id
       ON users (telegram_id)
       WHERE telegram_id IS NOT NULL;
+  `);
+
+  // Google sign-in via Firebase Authentication (routes/auth.js POST
+  // /auth/firebase). Like Telegram, a fresh Google signup has no phone yet,
+  // so phone holds a synthetic 'g:<firebase uid>' placeholder until the
+  // profile step (POST /auth/profile/complete) replaces it.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS firebase_uid TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_completed_at TIMESTAMPTZ;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid
+      ON users (firebase_uid)
+      WHERE firebase_uid IS NOT NULL;
   `);
 
   // Admin monitoring: login/logout events (auth here is stateless JWT, so
@@ -687,6 +701,177 @@ async function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_agent_usd_topup_order_messages_order
       ON agent_usd_topup_order_messages(order_id, created_at);
+  `);
+
+  // Onboarding KYC: personal details captured right after Google sign-in,
+  // plus the ID document kept privately in the database (never in a public
+  // bucket) for compliance review. Also records when an agent was linked.
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_status TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_submitted_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS agent_linked_at TIMESTAMPTZ;
+
+    CREATE TABLE IF NOT EXISTS kyc_documents (
+      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id       UUID NOT NULL REFERENCES users(id),
+      doc_type      TEXT NOT NULL,
+      doc_number    TEXT NOT NULL,
+      image         BYTEA NOT NULL,
+      content_type  TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'PENDING_REVIEW'
+                     CHECK (status IN ('PENDING_REVIEW','APPROVED','REJECTED')),
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_kyc_documents_user ON kyc_documents(user_id, created_at DESC);
+
+    -- Both sides of the document plus a photo of the customer.
+    ALTER TABLE kyc_documents ADD COLUMN IF NOT EXISTS back_image BYTEA;
+    ALTER TABLE kyc_documents ADD COLUMN IF NOT EXISTS back_content_type TEXT;
+    ALTER TABLE kyc_documents ADD COLUMN IF NOT EXISTS selfie_image BYTEA;
+    ALTER TABLE kyc_documents ADD COLUMN IF NOT EXISTS selfie_content_type TEXT;
+    ALTER TABLE kyc_documents DROP CONSTRAINT IF EXISTS kyc_documents_doc_type_check;
+    ALTER TABLE kyc_documents ADD CONSTRAINT kyc_documents_doc_type_check
+      CHECK (doc_type IN ('nira_id','passport','national_id','driving_licence'));
+
+    -- Short Fareenn account number (Wallet ID), issued when the customer's
+    -- KYC is approved: approver digit (1 Agent, 2 Trustee, 0 HQ) + region
+    -- code + a serial per approver/region group, e.g. 1202.
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS region_code TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_number TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_reviewed_by UUID REFERENCES users(id);
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_reviewed_at TIMESTAMPTZ;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_reject_reason TEXT;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_wallet_number ON users(wallet_number)
+      WHERE wallet_number IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS wallet_number_counters (
+      prefix      TEXT PRIMARY KEY,
+      last_serial INT  NOT NULL DEFAULT 0
+    );
+
+    -- Fareenn closed-loop NFC tap cards. The card holds only its UID and a
+    -- random token; money always stays in the wallet.
+    CREATE TABLE IF NOT EXISTS nfc_cards (
+      id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      uid              TEXT NOT NULL UNIQUE,
+      token            TEXT NOT NULL UNIQUE,
+      user_id          UUID REFERENCES users(id),
+      label            TEXT,
+      status           TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','FROZEN','BLOCKED')),
+      per_tx_limit_usd NUMERIC(18,2) NOT NULL DEFAULT 100,
+      daily_limit_usd  NUMERIC(18,2) NOT NULL DEFAULT 300,
+      pin_failures     INT NOT NULL DEFAULT 0,
+      issued_by        UUID REFERENCES users(id),
+      created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_used_at     TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_nfc_cards_user ON nfc_cards(user_id);
+    ALTER TABLE nfc_cards ADD COLUMN IF NOT EXISTS card_number TEXT;
+    ALTER TABLE nfc_cards ADD COLUMN IF NOT EXISTS expiry TEXT;
+    ALTER TABLE nfc_cards ADD COLUMN IF NOT EXISTS cvc_enc TEXT;
+    ALTER TABLE nfc_cards ADD COLUMN IF NOT EXISTS chip_type TEXT;
+    -- Tap and pay has no PIN, so new cards get contactless-style limits.
+    ALTER TABLE nfc_cards ALTER COLUMN per_tx_limit_usd SET DEFAULT 50;
+    ALTER TABLE nfc_cards ALTER COLUMN daily_limit_usd SET DEFAULT 150;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_nfc_cards_number ON nfc_cards(card_number) WHERE card_number IS NOT NULL;
+    CREATE TABLE IF NOT EXISTS nfc_card_transactions (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      card_id      UUID NOT NULL REFERENCES nfc_cards(id),
+      merchant_id  UUID REFERENCES merchants(id),
+      payment_id   UUID REFERENCES merchant_payments(id),
+      amount       NUMERIC(18,2) NOT NULL,
+      currency     TEXT NOT NULL,
+      amount_usd   NUMERIC(18,2),
+      status       TEXT NOT NULL,
+      reason       TEXT,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_nfc_card_tx_card ON nfc_card_transactions(card_id, created_at DESC);
+  `);
+
+  // Failed sign-ins: recorded alongside login/logout so admin can see
+  // brute-force attempts and users locked out. user_id stays NULL when the
+  // identifier didn't match any account; `identifier` keeps what was typed.
+  await pool.query(`
+    ALTER TABLE login_events DROP CONSTRAINT IF EXISTS login_events_event_type_check;
+    ALTER TABLE login_events ADD CONSTRAINT login_events_event_type_check
+      CHECK (event_type IN ('login','logout','login_failed'));
+    ALTER TABLE login_events ADD COLUMN IF NOT EXISTS identifier TEXT;
+    ALTER TABLE login_events ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+    CREATE INDEX IF NOT EXISTS idx_login_events_failed
+      ON login_events(created_at DESC) WHERE event_type = 'login_failed';
+  `);
+
+  // In-app notification inbox — every notifyUser() call lands here, so a
+  // user reachable only through the app (no Telegram, no verified email)
+  // still receives every notification.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id    UUID NOT NULL REFERENCES users(id),
+      kind       TEXT NOT NULL DEFAULT 'general',
+      title      TEXT NOT NULL,
+      body       TEXT NOT NULL DEFAULT '',
+      data       JSONB,
+      read_at    TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL;
+  `);
+
+  // Social: follow other Fareenn users and message them directly.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id UUID NOT NULL REFERENCES users(id),
+      followee_id UUID NOT NULL REFERENCES users(id),
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (follower_id, followee_id),
+      CHECK (follower_id <> followee_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_follows_followee ON follows(followee_id);
+
+    CREATE TABLE IF NOT EXISTS direct_messages (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      sender_id    UUID NOT NULL REFERENCES users(id),
+      recipient_id UUID NOT NULL REFERENCES users(id),
+      body         TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 2000),
+      read_at      TIMESTAMPTZ,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CHECK (sender_id <> recipient_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_dm_pair ON direct_messages(
+      LEAST(sender_id, recipient_id), GREATEST(sender_id, recipient_id), created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_dm_recipient_unread ON direct_messages(recipient_id) WHERE read_at IS NULL;
+  `);
+
+  // Messages to Fareenn and issue reports: one ticket per conversation,
+  // answered by admin / support staff.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id     UUID NOT NULL REFERENCES users(id),
+      kind        TEXT NOT NULL DEFAULT 'message' CHECK (kind IN ('message','issue')),
+      category    TEXT,
+      subject     TEXT NOT NULL,
+      status      TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN','ANSWERED','CLOSED')),
+      assigned_to UUID REFERENCES users(id),
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id, updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS support_ticket_messages (
+      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      ticket_id  UUID NOT NULL REFERENCES support_tickets(id),
+      sender_id  UUID NOT NULL REFERENCES users(id),
+      from_staff BOOLEAN NOT NULL DEFAULT FALSE,
+      body       TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 4000),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_support_msgs_ticket ON support_ticket_messages(ticket_id, created_at);
   `);
 
   // Sole super-admin: keep this the only account with role='admin'. Runs

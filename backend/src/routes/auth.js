@@ -8,6 +8,7 @@ const config = require('../config');
 const email = require('../services/email');
 const storage = require('../services/storage');
 const { creditAgentCommission } = require('../services/commission');
+const firebaseAuth = require('../services/firebaseAuth');
 
 const router = express.Router();
 
@@ -49,6 +50,26 @@ async function logLoginEvent(userId, eventType, method, req) {
     );
   } catch (_) {
     // Never block a real login/logout over a logging failure.
+  }
+}
+
+/** Records a failed sign-in for the admin "failed log in" report. Best-effort. */
+async function logFailedLogin(userId, identifier, method, reason, req) {
+  try {
+    await pool.query(
+      `INSERT INTO login_events (user_id, event_type, method, ip_address, user_agent, identifier, failure_reason)
+       VALUES ($1,'login_failed',$2,$3,$4,$5,$6)`,
+      [
+        userId || null,
+        method,
+        req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || null,
+        req.headers['user-agent'] || null,
+        identifier ? String(identifier).slice(0, 200) : null,
+        reason,
+      ],
+    );
+  } catch (_) {
+    // Never block the response over a logging failure.
   }
 }
 
@@ -299,6 +320,318 @@ router.post('/telegram', async (req, res, next) => {
   }
 });
 
+function isPlaceholderPhone(phone) {
+  return !phone || phone.startsWith('g:') || phone.startsWith('tg:');
+}
+
+/** The onboarding state the app needs after any Google sign-in. */
+function onboardingState(row) {
+  return {
+    profileComplete: !isPlaceholderPhone(row.phone),
+    hasPin: Boolean(row.pin_hash),
+    profile: {
+      firstName: row.first_name || '',
+      lastName: row.last_name || '',
+      fullName: row.full_name || '',
+      email: row.email || '',
+      phone: isPlaceholderPhone(row.phone) ? '' : row.phone,
+    },
+  };
+}
+
+/**
+ * POST /auth/firebase { idToken } — Google sign-in through Firebase
+ * Authentication. Serves as both signup and login:
+ *   1. a user already linked to this Firebase UID signs straight in;
+ *   2. otherwise an existing account with the same (Google-verified) email
+ *      is linked to the UID, so pre-Google users keep their wallet;
+ *   3. otherwise a new account is created with a placeholder phone and the
+ *      same wallet + virtual-account provisioning as /auth/signup.
+ * The response tells the app which onboarding steps are still missing
+ * (profile → PIN), so returning users with both done go straight home.
+ */
+router.post('/firebase', async (req, res, next) => {
+  try {
+    if (!firebaseAuth.isConfigured()) {
+      return res.status(503).json({ error: 'Google sign-in is not configured' });
+    }
+
+    let claims;
+    try {
+      claims = await firebaseAuth.verifyIdToken(String(req.body?.idToken || ''));
+    } catch (err) {
+      if (err instanceof firebaseAuth.FirebaseAuthError) {
+        await logFailedLogin(null, null, 'google', `invalid_token: ${err.message}`.slice(0, 200), req);
+        return res.status(401).json({ error: err.message });
+      }
+      throw err;
+    }
+
+    const firebaseUid = claims.sub;
+    const cleanEmail = normalizeEmail(claims.email);
+    if (!cleanEmail || claims.email_verified !== true) {
+      return res.status(400).json({ error: 'Your Google account needs a verified email address' });
+    }
+
+    const userColumns = `id, full_name, first_name, last_name, email, phone, pin_hash,
+                         firebase_uid, deletion_requested_at, status`;
+
+    let user = (
+      await pool.query(`SELECT ${userColumns} FROM users WHERE firebase_uid = $1`, [firebaseUid])
+    ).rows[0];
+
+    let isNewUser = false;
+
+    if (!user) {
+      const byEmail = (
+        await pool.query(
+          `SELECT ${userColumns} FROM users WHERE LOWER(email) = LOWER($1)
+            ORDER BY created_at ASC LIMIT 1`,
+          [cleanEmail],
+        )
+      ).rows[0];
+      if (byEmail && byEmail.firebase_uid && byEmail.firebase_uid !== firebaseUid) {
+        return res
+          .status(409)
+          .json({ error: 'This email is already linked to a different Google account' });
+      }
+      if (byEmail) {
+        await pool.query(
+          'UPDATE users SET firebase_uid = $1, email_verified = TRUE WHERE id = $2',
+          [firebaseUid, byEmail.id],
+        );
+        user = { ...byEmail, firebase_uid: firebaseUid };
+      }
+    }
+
+    if (user) {
+      if (user.deletion_requested_at) {
+        await logFailedLogin(user.id, cleanEmail, 'google', 'account_deleted', req);
+        return res.status(403).json({ error: 'This account has been deleted' });
+      }
+      if (user.status === 'SUSPENDED') {
+        await logFailedLogin(user.id, cleanEmail, 'google', 'account_suspended', req);
+        return res.status(403).json({ error: 'This account has been suspended. Contact support.' });
+      }
+    } else {
+      isNewUser = true;
+      const displayName = String(claims.name || '').trim();
+      const fullName = displayName || cleanEmail.split('@')[0];
+      const [firstName, ...rest] = displayName.split(/\s+/).filter(Boolean);
+      const lastName = rest.join(' ');
+      const placeholderPhone = `g:${firebaseUid}`;
+
+      const inserted = await pool.query(
+        `INSERT INTO users (full_name, first_name, last_name, email, phone, firebase_uid,
+                            email_verified, avatar_url)
+         VALUES ($1,$2,$3,$4,$5,$6,TRUE,$7)
+         RETURNING id, wallet_index`,
+        [
+          fullName,
+          firstName || null,
+          lastName || null,
+          cleanEmail,
+          placeholderPhone,
+          firebaseUid,
+          claims.picture || null,
+        ],
+      );
+      const created = inserted.rows[0];
+
+      const ethAddress = custody.addressFor(created.wallet_index);
+      await pool.query('UPDATE users SET eth_address = $1 WHERE id = $2', [ethAddress, created.id]);
+      await pool.query(
+        `INSERT INTO virtual_accounts (user_id, account_name, account_number, currency)
+         VALUES ($1,$2,$3,'USD')
+         ON CONFLICT (account_number) DO NOTHING`,
+        [created.id, fullName, accountNumber(created.id)],
+      );
+
+      user = {
+        id: created.id,
+        full_name: fullName,
+        first_name: firstName || null,
+        last_name: lastName || null,
+        email: cleanEmail,
+        phone: placeholderPhone,
+        pin_hash: null,
+      };
+    }
+
+    await logLoginEvent(user.id, 'login', 'google', req);
+    res.status(isNewUser ? 201 : 200).json({
+      token: signToken(user.id),
+      isNewUser,
+      ...onboardingState(user),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /auth/profile/complete { firstName, lastName, phone } — the profile
+ * step right after Google sign-in. Replaces the placeholder phone with the
+ * real one (E.164, e.g. +254712345678) and records the name split.
+ */
+router.post('/profile/complete', requireAuth, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const firstName = String(req.body?.firstName || '').trim();
+    const lastName = String(req.body?.lastName || '').trim();
+    const phone = String(req.body?.phone || '').replace(/[\s\-()]/g, '');
+    const gender = String(req.body?.gender || '').trim().toLowerCase();
+    const address = String(req.body?.address || '').trim();
+    const idType = String(req.body?.idType || '').trim();
+    const idNumber = String(req.body?.idNumber || '').trim();
+    const regionCode = String(req.body?.regionCode || '').trim();
+    const images = {
+      front: { b64: req.body?.idFrontBase64, type: req.body?.idFrontContentType, label: 'the front of your ID' },
+      back: { b64: req.body?.idBackBase64, type: req.body?.idBackContentType, label: 'the back of your ID' },
+      selfie: { b64: req.body?.selfieBase64, type: req.body?.selfieContentType, label: 'your photo' },
+    };
+
+    if (!firstName || !lastName) {
+      return res.status(400).json({ error: 'First and last name are required' });
+    }
+    if (firstName.length > 50 || lastName.length > 50) {
+      return res.status(400).json({ error: 'Names must be 50 characters or fewer' });
+    }
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+      return res
+        .status(400)
+        .json({ error: 'Enter a valid phone number with country code, e.g. +254712345678' });
+    }
+    if (!['male', 'female'].includes(gender)) {
+      return res.status(400).json({ error: 'Choose your gender' });
+    }
+    if (address.length < 5 || address.length > 200) {
+      return res.status(400).json({ error: 'Enter your home address' });
+    }
+    if (!['2', '3', '4', '5', '6', '7', '8', '9'].includes(regionCode)) {
+      return res.status(400).json({ error: 'Choose your region' });
+    }
+    if (!['nira_id', 'passport'].includes(idType)) {
+      return res.status(400).json({ error: 'Choose NIRA ID or Passport' });
+    }
+    // The document number is optional: reviewers read it from the photos.
+    if (idNumber.length > 40) {
+      return res.status(400).json({ error: 'The document number is too long' });
+    }
+    const decoded = {};
+    for (const [key, img] of Object.entries(images)) {
+      const type = String(img.type || '').trim();
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) {
+        return res.status(400).json({ error: `Add a clear photo of ${img.label}` });
+      }
+      const buf = Buffer.from(String(img.b64 || ''), 'base64');
+      if (buf.length < 1024) {
+        return res.status(400).json({ error: `Add a clear photo of ${img.label}` });
+      }
+      if (buf.length > 1.8 * 1024 * 1024) {
+        return res.status(400).json({ error: `The photo of ${img.label} is too large` });
+      }
+      decoded[key] = { buf, type };
+    }
+
+    const taken = await client.query('SELECT id FROM users WHERE phone = $1 AND id != $2', [
+      phone,
+      req.userId,
+    ]);
+    if (taken.rows.length > 0) {
+      return res.status(409).json({ error: 'An account with this phone number already exists' });
+    }
+
+    const fullName = `${firstName} ${lastName}`;
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE users
+          SET first_name = $1, last_name = $2, full_name = $3, phone = $4,
+              gender = $5, address = $6, region_code = $7,
+              kyc_status = 'PENDING_REVIEW', kyc_submitted_at = now(),
+              kyc_reject_reason = NULL, profile_completed_at = now()
+        WHERE id = $8`,
+      [firstName, lastName, fullName, phone, gender, address, regionCode, req.userId],
+    );
+    await client.query(
+      `INSERT INTO kyc_documents
+         (user_id, doc_type, doc_number, image, content_type,
+          back_image, back_content_type, selfie_image, selfie_content_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [
+        req.userId, idType, idNumber,
+        decoded.front.buf, decoded.front.type,
+        decoded.back.buf, decoded.back.type,
+        decoded.selfie.buf, decoded.selfie.type,
+      ],
+    );
+    await client.query('COMMIT');
+    res.json({ fullName, firstName, lastName, phone, kycStatus: 'PENDING_REVIEW' });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+/**
+ * POST /auth/agent-code { agentCode } — optional onboarding step: links the
+ * customer to the Agent or Trustee Agent who onboarded them, by the agent's
+ * short code. Once linked it can't be changed, and the agent earns the
+ * onboarding commission once. The link is what later entitles the agent
+ * to a share of this customer's fees on banking products and wallet use.
+ */
+router.post('/agent-code', requireAuth, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const code = String(req.body?.agentCode || '').trim();
+    if (!code) return res.status(400).json({ error: 'Enter the agent code' });
+
+    await client.query('BEGIN');
+    const me = (
+      await client.query('SELECT id, referred_by_agent_id FROM users WHERE id = $1 FOR UPDATE', [
+        req.userId,
+      ])
+    ).rows[0];
+    if (!me) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (me.referred_by_agent_id) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Your account is already linked to an agent' });
+    }
+    const agent = (
+      await client.query(
+        "SELECT * FROM agents WHERE UPPER(agent_code) = UPPER($1) AND status = 'ACTIVE'",
+        [code],
+      )
+    ).rows[0];
+    if (!agent) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "We couldn't find an active agent with that code" });
+    }
+    if (agent.user_id === req.userId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: "You can't use your own agent code" });
+    }
+    await client.query(
+      'UPDATE users SET referred_by_agent_id = $1, agent_linked_at = now() WHERE id = $2',
+      [agent.id, req.userId],
+    );
+    const ONBOARDING_COMMISSION_USD = 1;
+    await creditAgentCommission(client, agent, 'onboarding', 'USD', ONBOARDING_COMMISSION_USD, req.userId);
+    await client.query('COMMIT');
+    res.json({ agentName: agent.business_name, agentCode: agent.agent_code, tier: agent.tier });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
 /**
  * POST /auth/login { email, password } — primary sign-in method now that
  * every new account sets a password at signup. Accounts created before
@@ -314,17 +647,24 @@ router.post('/login', async (req, res, next) => {
       'SELECT id, password_hash, deletion_requested_at, status FROM users WHERE LOWER(email) = LOWER($1)',
       [cleanEmail],
     );
-    if (result.rows.length === 0 || !result.rows[0].password_hash) {
+    const found = result.rows[0];
+    if (!found || !found.password_hash) {
+      await logFailedLogin(found?.id, cleanEmail, 'password', found ? 'no_password_set' : 'unknown_account', req);
       return res.status(401).json({ error: 'Incorrect email or password' });
     }
-    if (result.rows[0].deletion_requested_at) {
+    if (found.deletion_requested_at) {
+      await logFailedLogin(found.id, cleanEmail, 'password', 'account_deleted', req);
       return res.status(403).json({ error: 'This account has been deleted' });
     }
-    if (result.rows[0].status === 'SUSPENDED') {
+    if (found.status === 'SUSPENDED') {
+      await logFailedLogin(found.id, cleanEmail, 'password', 'account_suspended', req);
       return res.status(403).json({ error: 'This account has been suspended. Contact support.' });
     }
-    const ok = await bcrypt.compare(String(password || ''), result.rows[0].password_hash);
-    if (!ok) return res.status(401).json({ error: 'Incorrect email or password' });
+    const ok = await bcrypt.compare(String(password || ''), found.password_hash);
+    if (!ok) {
+      await logFailedLogin(found.id, cleanEmail, 'password', 'wrong_password', req);
+      return res.status(401).json({ error: 'Incorrect email or password' });
+    }
     await logLoginEvent(result.rows[0].id, 'login', 'password', req);
     res.json({ token: signToken(result.rows[0].id) });
   } catch (err) {
@@ -383,14 +723,17 @@ router.post('/login/verify-otp', async (req, res, next) => {
     ).rows[0];
     if (!user) {
       await client.query('ROLLBACK');
+      await logFailedLogin(null, cleanEmail, 'otp', 'unknown_account', req);
       return res.status(404).json({ error: 'No account found with this email' });
     }
     if (user.deletion_requested_at) {
       await client.query('ROLLBACK');
+      await logFailedLogin(user.id, cleanEmail, 'otp', 'account_deleted', req);
       return res.status(403).json({ error: 'This account has been deleted' });
     }
     if (user.status === 'SUSPENDED') {
       await client.query('ROLLBACK');
+      await logFailedLogin(user.id, cleanEmail, 'otp', 'account_suspended', req);
       return res.status(403).json({ error: 'This account has been suspended. Contact support.' });
     }
 
@@ -411,14 +754,17 @@ router.post('/login/verify-otp', async (req, res, next) => {
     ).rows[0];
     if (!otp) {
       await client.query('ROLLBACK');
+      await logFailedLogin(user.id, cleanEmail, 'otp', 'no_active_code', req);
       return res.status(404).json({ error: 'No active code. Request a new one.' });
     }
     if (new Date(otp.expires_at).getTime() < Date.now()) {
       await client.query('ROLLBACK');
+      await logFailedLogin(user.id, cleanEmail, 'otp', 'code_expired', req);
       return res.status(410).json({ error: 'Code has expired. Request a new one.' });
     }
     if (Number(otp.attempts) >= 5) {
       await client.query('ROLLBACK');
+      await logFailedLogin(user.id, cleanEmail, 'otp', 'too_many_attempts', req);
       return res.status(429).json({ error: 'Too many attempts. Request a new code.' });
     }
 
@@ -426,6 +772,7 @@ router.post('/login/verify-otp', async (req, res, next) => {
     if (!ok) {
       await client.query('UPDATE email_otps SET attempts = attempts + 1 WHERE id = $1', [otp.id]);
       await client.query('COMMIT');
+      await logFailedLogin(user.id, cleanEmail, 'otp', 'wrong_code', req);
       return res.status(400).json({ error: 'Incorrect code' });
     }
 
@@ -573,6 +920,7 @@ router.get('/me', requireAuth, async (req, res, next) => {
       `SELECT id, full_name, email, phone, kyc_tier, phone_verified, eth_address,
               usd_balance, kes_balance, role, email_verified, created_at,
               username, wallet_id_type, avatar_url, notify_push, notify_email,
+              wallet_number, kyc_status, kyc_reject_reason, region_code,
               (pin_hash IS NOT NULL) AS has_pin,
               (password_hash IS NOT NULL) AS has_password
          FROM users WHERE id = $1`,

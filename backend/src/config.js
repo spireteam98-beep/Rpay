@@ -107,7 +107,11 @@ const config = {
   ).trim(),
   // Sole super-admin account — auto-promoted to role='admin' on every boot
   // (see db.js migrate()) so the Admin Portal is only ever visible to them.
-  adminEmail: (process.env.ADMIN_EMAIL || 'reysdaaud@gmail.com').trim().toLowerCase(),
+  adminEmail: (process.env.ADMIN_EMAIL || 'wirenext8@gmail.com').trim().toLowerCase(),
+  // Test accounts that get an ACTIVE business automatically (POS testing).
+  // Set TEST_MERCHANT_EMAILS="" in production to switch this off.
+  testMerchantEmails: (process.env.TEST_MERCHANT_EMAILS ?? 'wirenext8@gmail.com')
+    .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
 
   // Wayaki Mobile Agent — the "brain" behind the dedicated-phone
   // automation app in ../RQ. Not required for the wallet API to run; the
@@ -124,6 +128,15 @@ const config = {
   // disabled rather than a hard boot failure, since the rest of the API
   // works fine without it.
   telegramBotToken: (process.env.TELEGRAM_BOT_TOKEN || '').trim(),
+
+  // Firebase Authentication (POST /auth/firebase — Google sign-in). Only the
+  // project ID is needed: ID tokens are verified against Google's public
+  // signing certs, no service-account key. The .env.example placeholder is
+  // treated as unset so a half-configured env fails clearly.
+  firebaseProjectId: (() => {
+    const v = (process.env.FIREBASE_PROJECT_ID || '').trim();
+    return v && v !== 'your-firebase-project-id' ? v : '';
+  })(),
 
   // Public GCS bucket for profile avatars (see services/storage.js). Uses
   // Application Default Credentials — Cloud Run's runtime service account

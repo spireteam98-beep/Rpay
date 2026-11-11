@@ -1,11 +1,14 @@
 const express = require('express');
 const { pool } = require('../db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireStaff, STAFF_ROLES } = require('../middleware/auth');
+const { resolveUserByIdentifier } = require('../services/users');
+const notify = require('../services/notify');
 const config = require('../config');
 const ledger = require('../services/ledger');
 const exchange = require('../services/exchange');
 const compliance = require('../services/compliance');
 const { creditAgentCommission } = require('../services/commission');
+const { mountKycReview } = require('./kycReviewRoutes');
 const { payoutToMpesa, payoutToTill } = require('../services/paystackTransfers');
 
 // Flat commissions for onboarding events that aren't sized by transaction
@@ -15,7 +18,77 @@ const { payoutToMpesa, payoutToTill } = require('../services/paystackTransfers')
 const MERCHANT_ONBOARDING_COMMISSION_USD = 5;
 
 const router = express.Router();
-router.use(requireAuth, requireAdmin);
+
+/**
+ * What each staff role may reach. The super-admin ('admin') reaches
+ * everything; staff are default-deny — anything not matched here (money
+ * reversals, payouts, platform balance, commissions, exchange, role grants,
+ * Trustee assignment) stays super-admin only.
+ */
+const STAFF_PERMISSIONS = [
+  // Everyone on staff: dashboards and read-only views of people/activity.
+  { methods: ['GET'], path: /^\/(overview|users|activity|sessions|otp-deliveries|me)$/, roles: STAFF_ROLES },
+  { methods: ['GET'], path: /^\/reports\/(onboarding|failed-logins)$/, roles: STAFF_ROLES },
+  // Operations: agents and businesses (approve, reject, tier, capabilities).
+  { methods: ['GET', 'POST'], path: /^\/agents(\/|$)/, roles: ['operations'] },
+  { methods: ['GET', 'POST'], path: /^\/merchants(\/[^/]+\/(approve|deactivate))?$/, roles: ['operations'] },
+  // KYC review: operations + compliance.
+  { methods: ['GET', 'POST'], path: /^\/kyc\//, roles: ['operations', 'compliance'] },
+  // Compliance: AML, suspensions, every transaction.
+  { methods: ['GET', 'POST'], path: /^\/aml-cases(\/|$)/, roles: ['compliance'] },
+  { methods: ['POST'], path: /^\/users\/[^/]+\/(suspend|reactivate)$/, roles: ['compliance'] },
+  {
+    methods: ['GET'],
+    path: /^\/(transactions|p2p-transfers|merchant-payments|remittances|virtual-accounts|mobile-money)$/,
+    roles: ['compliance'],
+  },
+  // Support: messages to Fareenn and issue reports.
+  { methods: ['GET', 'POST'], path: /^\/support\//, roles: ['support'] },
+];
+
+function staffAllowed(role, method, path) {
+  if (role === 'admin') return true;
+  return STAFF_PERMISSIONS.some(
+    (p) => p.methods.includes(method) && p.path.test(path) && p.roles.includes(role),
+  );
+}
+
+router.use(requireAuth, requireStaff, (req, res, next) => {
+  if (!staffAllowed(req.userRole, req.method, req.path)) {
+    return res.status(403).json({ error: 'Your staff role does not have access to this' });
+  }
+  next();
+});
+
+function adminOnly(req, res) {
+  if (req.userRole === 'admin') return false;
+  res.status(403).json({ error: 'Only the super-admin can do this' });
+  return true;
+}
+
+/** GET /admin/me — the caller's staff role + what the portal should show them. */
+router.get('/me', (req, res) => {
+  const role = req.userRole;
+  const can = (method, path) => staffAllowed(role, method, path);
+  res.json({
+    role,
+    permissions: {
+      approveAgents: can('POST', '/agents/x/approve'),
+      approveBusinesses: can('POST', '/merchants/x/approve'),
+      reviewKyc: can('POST', '/kyc/x/approve'),
+      amlAndSuspensions: can('POST', '/users/x/suspend'),
+      allTransactions: can('GET', '/transactions'),
+      support: can('GET', '/support/tickets'),
+      reports: can('GET', '/reports/onboarding'),
+      manageStaff: role === 'admin',
+      assignTrustees: role === 'admin',
+      moneyActions: role === 'admin',
+    },
+  });
+});
+
+// Fareenn HQ reviews customers who joined without an agent.
+mountKycReview(router, async () => null);
 
 router.get('/exchange/status', async (_req, res, next) => {
   try {
@@ -86,6 +159,7 @@ router.get('/sessions', async (req, res, next) => {
         `WITH latest AS (
            SELECT DISTINCT ON (user_id) user_id, event_type, method, created_at
              FROM login_events
+            WHERE event_type IN ('login','logout')
             ORDER BY user_id, created_at DESC
          )
          SELECT l.user_id, l.method, l.created_at AS since, u.full_name, u.email
@@ -152,8 +226,10 @@ router.get('/activity', async (req, res, next) => {
                    status, 'KES'::text AS currency, amount_kes AS amount, rail AS detail
               FROM mobile_money_movements)
            UNION ALL
-           (SELECT id, created_at, 'login_' || event_type AS type, user_id,
-                   event_type AS status, NULL::text AS currency, NULL::numeric AS amount, method AS detail
+           (SELECT id, created_at,
+                   CASE WHEN event_type = 'login_failed' THEN 'login_failed' ELSE 'login_' || event_type END AS type,
+                   user_id, event_type AS status, NULL::text AS currency, NULL::numeric AS amount,
+                   COALESCE(failure_reason, method) AS detail
               FROM login_events)
          ) f
          LEFT JOIN users u ON u.id = f.user_id
@@ -171,12 +247,13 @@ router.get('/users', async (req, res, next) => {
     const q = String(req.query.q || '').trim().toLowerCase();
     const params = q ? [`%${q}%`] : [];
     const where = q
-      ? `WHERE LOWER(full_name) LIKE $1 OR LOWER(email) LIKE $1 OR phone LIKE $1`
+      ? `WHERE LOWER(full_name) LIKE $1 OR LOWER(email) LIKE $1 OR phone LIKE $1
+            OR LOWER(username) LIKE $1 OR wallet_number LIKE $1`
       : '';
     const rows = await pool.query(
       `SELECT id, full_name, email, phone, kyc_tier, phone_verified, role,
               usd_balance, kes_balance, status, suspended_at, suspension_reason,
-              created_at
+              username, wallet_number, kyc_status, created_at
          FROM users
          ${where}
         ORDER BY created_at DESC
@@ -206,6 +283,9 @@ router.post('/users/:id/suspend', async (req, res, next) => {
     if (!target) return res.status(404).json({ error: 'User not found' });
     if (target.role === 'admin') {
       return res.status(400).json({ error: 'Cannot suspend an admin account' });
+    }
+    if (STAFF_ROLES.includes(target.role) && req.userRole !== 'admin') {
+      return res.status(403).json({ error: 'Only the super-admin can suspend staff' });
     }
 
     const rows = await pool.query(
@@ -310,16 +390,9 @@ async function uniqueTillNumber(client) {
   throw new Error('Could not generate a unique till number — try again');
 }
 
+// Email, phone, @username or Fareenn ID.
 async function findUserByIdentifier(identifier) {
-  const value = String(identifier || '').trim();
-  if (!value) return null;
-  const rows = await pool.query(
-    `SELECT id, full_name, email, phone FROM users
-      WHERE LOWER(email) = LOWER($1) OR phone = $1
-      LIMIT 1`,
-    [value],
-  );
-  return rows.rows[0] || null;
+  return resolveUserByIdentifier(pool, identifier, 'id, full_name, email, phone, role');
 }
 
 const { TIER_ORDER: AGENT_TIERS, TIER_LIMITS_USD, isValidParentTier } = require('../services/agentTiers');
@@ -338,17 +411,20 @@ router.post('/agents', async (req, res, next) => {
     const region = String(req.body?.region || '').trim() || null;
     const city = String(req.body?.city || '').trim() || null;
     if (!businessName) return res.status(400).json({ error: 'Business name is required' });
-    if (!['COUNTRY_AGENT', 'SUPER_AGENT', 'AGENT'].includes(tier)) {
-      return res.status(400).json({ error: 'tier must be COUNTRY_AGENT, SUPER_AGENT or AGENT' });
+    if (!['COUNTRY_AGENT', 'SUPER_AGENT', 'AGENT', 'TRUSTEE_AGENT'].includes(tier)) {
+      return res.status(400).json({ error: 'tier must be COUNTRY_AGENT, SUPER_AGENT, AGENT or TRUSTEE_AGENT' });
     }
+    // Trustees are appointed by the super-admin only, and sit outside the
+    // recruit ladder (no parent, no recruits).
+    if (tier === 'TRUSTEE_AGENT' && adminOnly(req, res)) return;
     if (['COUNTRY_AGENT', 'SUPER_AGENT'].includes(tier) && !/^[A-Z]{2}$/.test(countryCode || '')) {
       return res.status(400).json({ error: 'A valid 2-letter countryCode is required for this tier' });
     }
 
     let parent = null;
     if (parentAgentId) {
-      if (tier === 'COUNTRY_AGENT') {
-        return res.status(400).json({ error: 'A Country Agent cannot have a parent' });
+      if (tier === 'COUNTRY_AGENT' || tier === 'TRUSTEE_AGENT') {
+        return res.status(400).json({ error: `A ${tier === 'COUNTRY_AGENT' ? 'Country Agent' : 'Trustee'} cannot have a parent` });
       }
       parent = (await pool.query('SELECT * FROM agents WHERE id = $1', [parentAgentId])).rows[0];
       if (!parent || !isValidParentTier(parent.tier, tier)) {
@@ -357,7 +433,7 @@ router.post('/agents', async (req, res, next) => {
     }
 
     const user = await findUserByIdentifier(req.body?.identifier);
-    if (!user) return res.status(404).json({ error: 'No user found with that email or phone' });
+    if (!user) return res.status(404).json({ error: 'No user found with that email, phone, @username or Fareenn ID' });
 
     const existing = await pool.query('SELECT id FROM agents WHERE user_id = $1', [user.id]);
     if (existing.rows.length) {
@@ -386,6 +462,13 @@ router.post('/agents', async (req, res, next) => {
           canProvideKes, canProvideUsd,
         ],
       );
+      if (tier === 'TRUSTEE_AGENT') {
+        notify.notifyUser(user.id, {
+          kind: 'role',
+          title: 'You are now a Fareenn Trustee',
+          body: 'Fareenn has appointed you as a Trustee Agent. You can now review and approve customers.',
+        });
+      }
       res.status(201).json({ agent: inserted.rows[0] });
     } catch (err) {
       if (err.code === '23505') {
@@ -435,11 +518,16 @@ router.post('/agents/:id/tier', async (req, res, next) => {
   try {
     const tier = String(req.body?.tier || '').toUpperCase();
     const parentAgentId = String(req.body?.parentAgentId || '').trim() || null;
-    if (!AGENT_TIERS.includes(tier)) {
-      return res.status(400).json({ error: `tier must be one of ${AGENT_TIERS.join(', ')}` });
+    const allowedTiers = [...AGENT_TIERS, 'TRUSTEE_AGENT'];
+    if (!allowedTiers.includes(tier)) {
+      return res.status(400).json({ error: `tier must be one of ${allowedTiers.join(', ')}` });
     }
-    if (tier === 'COUNTRY_AGENT' && parentAgentId) {
-      return res.status(400).json({ error: 'A Country Agent cannot have a parent' });
+    const current = (await pool.query('SELECT tier, user_id FROM agents WHERE id = $1', [req.params.id])).rows[0];
+    if (!current) return res.status(404).json({ error: 'Agent not found' });
+    // Making — or unmaking — a Trustee is the super-admin's call only.
+    if ((tier === 'TRUSTEE_AGENT' || current.tier === 'TRUSTEE_AGENT') && adminOnly(req, res)) return;
+    if ((tier === 'COUNTRY_AGENT' || tier === 'TRUSTEE_AGENT') && parentAgentId) {
+      return res.status(400).json({ error: 'A Country Agent or Trustee cannot have a parent' });
     }
     if (parentAgentId === req.params.id) {
       return res.status(400).json({ error: 'An agent cannot be its own parent' });
@@ -457,6 +545,13 @@ router.post('/agents/:id/tier', async (req, res, next) => {
       [tier, parentAgentId, req.params.id],
     );
     if (rows.rows.length === 0) return res.status(404).json({ error: 'Agent not found' });
+    if (tier === 'TRUSTEE_AGENT' && current.tier !== 'TRUSTEE_AGENT') {
+      notify.notifyUser(current.user_id, {
+        kind: 'role',
+        title: 'You are now a Fareenn Trustee',
+        body: 'Fareenn has appointed you as a Trustee Agent. You can now review and approve customers.',
+      });
+    }
     res.json({ agent: rows.rows[0] });
   } catch (err) {
     next(err);
@@ -540,6 +635,8 @@ router.post('/agents/:id/reject', async (req, res, next) => {
 
 router.post('/agents/:id/deactivate', async (req, res, next) => {
   try {
+    const current = (await pool.query('SELECT tier FROM agents WHERE id = $1', [req.params.id])).rows[0];
+    if (current?.tier === 'TRUSTEE_AGENT' && adminOnly(req, res)) return;
     const rows = await pool.query(
       `UPDATE agents SET status = 'SUSPENDED' WHERE id = $1 RETURNING *`,
       [req.params.id],
@@ -1230,6 +1327,334 @@ router.post('/mobile-money/:id/cancel', async (req, res, next) => {
     next(err);
   } finally {
     client.release();
+  }
+});
+
+// ── Staff roles (super-admin only — not in STAFF_PERMISSIONS) ─────────────
+
+/** GET /admin/staff — everyone holding the admin role or a staff role. */
+router.get('/staff', async (_req, res, next) => {
+  try {
+    const rows = await pool.query(
+      `SELECT id, full_name, email, phone, username, wallet_number, role, status, created_at
+         FROM users
+        WHERE role = 'admin' OR role = ANY($1)
+        ORDER BY (role = 'admin') DESC, role, full_name`,
+      [STAFF_ROLES],
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /admin/users/:id/role { role } — grant or remove a staff role.
+ * role: 'operations' | 'support' | 'compliance' | 'customer' (removes it).
+ * 'admin' can't be granted here; it's pinned to config.adminEmail.
+ */
+router.post('/users/:id/role', async (req, res, next) => {
+  try {
+    if (adminOnly(req, res)) return;
+    const role = String(req.body?.role || '').trim().toLowerCase();
+    if (![...STAFF_ROLES, 'customer'].includes(role)) {
+      return res.status(400).json({ error: `role must be one of ${[...STAFF_ROLES, 'customer'].join(', ')}` });
+    }
+    const target = (await pool.query('SELECT id, role FROM users WHERE id = $1', [req.params.id])).rows[0];
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target.role === 'admin') {
+      return res.status(400).json({ error: "The super-admin's role can't be changed here" });
+    }
+    const rows = await pool.query(
+      `UPDATE users SET role = $1 WHERE id = $2
+        RETURNING id, full_name, email, username, wallet_number, role`,
+      [role, req.params.id],
+    );
+    if (role !== 'customer' && target.role !== role) {
+      notify.notifyUser(req.params.id, {
+        kind: 'role',
+        title: 'New Fareenn staff role',
+        body: `You have been given the ${role} role. Open the Admin Portal from your profile.`,
+      });
+    }
+    res.json({ user: rows.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── Reports ───────────────────────────────────────────────────────────────
+
+function windowDays(value, fallback, max = 365) {
+  const n = Number.parseInt(value, 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, max) : fallback;
+}
+
+/**
+ * GET /admin/reports/onboarding?days=30 — signup funnel, daily signups and
+ * the people who got stuck or failed: OTP never delivered, KYC rejected,
+ * profile never completed (24h+), or KYC never submitted (72h+).
+ */
+router.get('/reports/onboarding', async (req, res, next) => {
+  try {
+    const days = windowDays(req.query.days, 30);
+    const [funnel, daily, failures] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::int AS signed_up,
+                COUNT(*) FILTER (WHERE email_verified)::int AS email_verified,
+                COUNT(*) FILTER (WHERE phone_verified)::int AS phone_verified,
+                COUNT(*) FILTER (WHERE profile_completed_at IS NOT NULL)::int AS profile_completed,
+                COUNT(*) FILTER (WHERE kyc_submitted_at IS NOT NULL)::int AS kyc_submitted,
+                COUNT(*) FILTER (WHERE kyc_status = 'PENDING_REVIEW')::int AS kyc_pending,
+                COUNT(*) FILTER (WHERE kyc_status = 'APPROVED')::int AS kyc_approved,
+                COUNT(*) FILTER (WHERE kyc_status = 'REJECTED')::int AS kyc_rejected
+           FROM users
+          WHERE created_at >= now() - make_interval(days => $1)`,
+        [days],
+      ),
+      pool.query(
+        `SELECT date_trunc('day', created_at)::date AS day,
+                COUNT(*)::int AS signups,
+                COUNT(*) FILTER (WHERE profile_completed_at IS NOT NULL)::int AS completed
+           FROM users
+          WHERE created_at >= now() - make_interval(days => $1)
+          GROUP BY 1 ORDER BY 1`,
+        [days],
+      ),
+      pool.query(
+        `SELECT * FROM (
+           (SELECT u.id AS user_id, u.full_name, COALESCE(u.email, o.email) AS email, u.phone,
+                   'otp_delivery_failed'::text AS reason, o.failure_reason AS detail, o.created_at AS at
+              FROM email_otps o
+              LEFT JOIN users u ON u.id = o.user_id
+             WHERE o.delivery_status = 'failed' AND o.created_at >= now() - make_interval(days => $1))
+           UNION ALL
+           (SELECT id, full_name, email, phone, 'kyc_rejected', kyc_reject_reason, COALESCE(kyc_reviewed_at, created_at)
+              FROM users
+             WHERE kyc_status = 'REJECTED' AND COALESCE(kyc_reviewed_at, created_at) >= now() - make_interval(days => $1))
+           UNION ALL
+           (SELECT id, full_name, email, phone, 'profile_incomplete', NULL, created_at
+              FROM users
+             WHERE profile_completed_at IS NULL AND deletion_requested_at IS NULL
+               AND created_at < now() - interval '24 hours'
+               AND created_at >= now() - make_interval(days => $1))
+           UNION ALL
+           (SELECT id, full_name, email, phone, 'kyc_not_submitted', NULL, profile_completed_at
+              FROM users
+             WHERE profile_completed_at IS NOT NULL AND kyc_submitted_at IS NULL
+               AND deletion_requested_at IS NULL
+               AND profile_completed_at < now() - interval '72 hours'
+               AND created_at >= now() - make_interval(days => $1))
+         ) f
+         ORDER BY at DESC
+         LIMIT 300`,
+        [days],
+      ),
+    ]);
+    const counts = {};
+    for (const row of failures.rows) counts[row.reason] = (counts[row.reason] || 0) + 1;
+    res.json({ days, funnel: funnel.rows[0], daily: daily.rows, failureCounts: counts, failures: failures.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** GET /admin/reports/failed-logins?days=7 — failed sign-ins, by reason and repeat offenders. */
+router.get('/reports/failed-logins', async (req, res, next) => {
+  try {
+    const days = windowDays(req.query.days, 7, 90);
+    const [events, byReason, repeated] = await Promise.all([
+      pool.query(
+        `SELECT e.id, e.user_id, e.identifier, e.method, e.failure_reason, e.ip_address,
+                e.user_agent, e.created_at, u.full_name, u.email
+           FROM login_events e
+           LEFT JOIN users u ON u.id = e.user_id
+          WHERE e.event_type = 'login_failed' AND e.created_at >= now() - make_interval(days => $1)
+          ORDER BY e.created_at DESC
+          LIMIT 300`,
+        [days],
+      ),
+      pool.query(
+        `SELECT COALESCE(failure_reason, 'unknown') AS reason, COUNT(*)::int AS count
+           FROM login_events
+          WHERE event_type = 'login_failed' AND created_at >= now() - make_interval(days => $1)
+          GROUP BY 1 ORDER BY 2 DESC`,
+        [days],
+      ),
+      pool.query(
+        `SELECT COALESCE(identifier, ip_address, 'unknown') AS who, COUNT(*)::int AS count,
+                MAX(created_at) AS last_at
+           FROM login_events
+          WHERE event_type = 'login_failed' AND created_at >= now() - make_interval(days => $1)
+          GROUP BY 1 HAVING COUNT(*) >= 3
+          ORDER BY 2 DESC
+          LIMIT 50`,
+        [days],
+      ),
+    ]);
+    res.json({
+      days,
+      total: byReason.rows.reduce((sum, r) => sum + r.count, 0),
+      byReason: byReason.rows,
+      repeated: repeated.rows,
+      events: events.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * GET /admin/transactions?q=&rail=&status=&days=30 — every posted money
+ * movement on the platform (the double-entry ledger records them all),
+ * newest first, with the customer and USD amount.
+ */
+router.get('/transactions', async (req, res, next) => {
+  try {
+    const days = windowDays(req.query.days, 30);
+    const params = [days];
+    const conditions = [`t.posted_at >= now() - make_interval(days => $1)`];
+    const q = String(req.query.q || '').trim().toLowerCase();
+    if (q) {
+      params.push(`%${q}%`);
+      const i = params.length;
+      conditions.push(`(LOWER(u.full_name) LIKE $${i} OR LOWER(u.email) LIKE $${i}
+                        OR u.wallet_number LIKE $${i} OR LOWER(t.title) LIKE $${i})`);
+    }
+    for (const field of ['rail', 'status']) {
+      const value = String(req.query[field] || '').trim();
+      if (value) {
+        params.push(value);
+        conditions.push(`t.${field} = $${params.length}`);
+      }
+    }
+    const rows = await pool.query(
+      `SELECT t.id, t.title, t.rail, t.status, t.posted_at, t.user_id,
+              u.full_name, u.email, u.wallet_number,
+              COALESCE(SUM(e.amount_usd) FILTER (WHERE e.direction = 'debit'), 0)::numeric(18,2) AS amount_usd
+         FROM ledger_transactions t
+         JOIN users u ON u.id = t.user_id
+         LEFT JOIN ledger_entries e ON e.transaction_id = t.id
+        WHERE ${conditions.join(' AND ')}
+        GROUP BY t.id, u.id
+        ORDER BY t.posted_at DESC
+        LIMIT 300`,
+      params,
+    );
+    const volumeUsd = rows.rows.reduce((sum, r) => sum + Number(r.amount_usd), 0);
+    res.json({ days, count: rows.rows.length, volumeUsd: Number(volumeUsd.toFixed(2)), transactions: rows.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── Support: messages to Fareenn and issue reports ────────────────────────
+
+router.get('/support/tickets', async (req, res, next) => {
+  try {
+    const status = String(req.query.status || '').trim().toUpperCase();
+    const params = [];
+    let where = '';
+    if (status) {
+      params.push(status);
+      where = 'WHERE t.status = $1';
+    }
+    const rows = await pool.query(
+      `SELECT t.*, u.full_name, u.email, u.wallet_number,
+              (SELECT body FROM support_ticket_messages m WHERE m.ticket_id = t.id
+                ORDER BY created_at DESC LIMIT 1) AS last_message
+         FROM support_tickets t
+         JOIN users u ON u.id = t.user_id
+         ${where}
+        ORDER BY (t.status = 'OPEN') DESC, t.updated_at DESC
+        LIMIT 200`,
+      params,
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/support/tickets/:id', async (req, res, next) => {
+  try {
+    const ticket = (
+      await pool.query(
+        `SELECT t.*, u.full_name, u.email, u.phone, u.wallet_number
+           FROM support_tickets t JOIN users u ON u.id = t.user_id
+          WHERE t.id = $1`,
+        [req.params.id],
+      )
+    ).rows[0];
+    if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+    const messages = await pool.query(
+      `SELECT m.id, m.body, m.from_staff, m.created_at, s.full_name AS sender_name
+         FROM support_ticket_messages m JOIN users s ON s.id = m.sender_id
+        WHERE m.ticket_id = $1 ORDER BY m.created_at`,
+      [req.params.id],
+    );
+    res.json({ ticket, messages: messages.rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** POST /admin/support/tickets/:id/reply { body } — answers as "Fareenn". */
+router.post('/support/tickets/:id/reply', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const body = String(req.body?.body || '').trim();
+    if (!body || body.length > 4000) return res.status(400).json({ error: 'Reply must be 1-4000 characters' });
+    await client.query('BEGIN');
+    const ticket = (
+      await client.query(
+        `UPDATE support_tickets SET status = 'ANSWERED', updated_at = now(),
+                assigned_to = COALESCE(assigned_to, $2)
+          WHERE id = $1 RETURNING *`,
+        [req.params.id, req.userId],
+      )
+    ).rows[0];
+    if (!ticket) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+    const message = (
+      await client.query(
+        `INSERT INTO support_ticket_messages (ticket_id, sender_id, from_staff, body)
+         VALUES ($1,$2,TRUE,$3) RETURNING *`,
+        [ticket.id, req.userId, body],
+      )
+    ).rows[0];
+    await client.query('COMMIT');
+    notify.notifyUser(ticket.user_id, {
+      kind: 'support',
+      title: 'Fareenn replied',
+      body: body.length > 140 ? `${body.slice(0, 137)}...` : body,
+      data: { ticketId: ticket.id },
+    });
+    res.status(201).json({ message });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/support/tickets/:id/status', async (req, res, next) => {
+  try {
+    const status = String(req.body?.status || '').trim().toUpperCase();
+    if (!['OPEN', 'ANSWERED', 'CLOSED'].includes(status)) {
+      return res.status(400).json({ error: 'status must be OPEN, ANSWERED or CLOSED' });
+    }
+    const rows = await pool.query(
+      `UPDATE support_tickets SET status = $1, updated_at = now() WHERE id = $2 RETURNING *`,
+      [status, req.params.id],
+    );
+    if (rows.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' });
+    res.json({ ticket: rows.rows[0] });
+  } catch (err) {
+    next(err);
   }
 });
 

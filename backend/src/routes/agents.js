@@ -8,6 +8,8 @@ const pricing = require('../services/pricing');
 const { creditAgentCommission } = require('../services/commission');
 const { RECRUIT_TIER, CAN_TRANSACT, TIER_LIMITS_USD } = require('../services/agentTiers');
 const notify = require('../services/notify');
+const { mountKycReview } = require('./kycReviewRoutes');
+const { resolveUserByIdentifier } = require('../services/users');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -36,16 +38,9 @@ function agentCode() {
   return `AG${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
+// Email, phone, @username or Fareenn ID — see services/users.js.
 async function findCustomer(client, identifier) {
-  const value = String(identifier || '').trim();
-  if (!value) return null;
-  const rows = await client.query(
-    `SELECT id, full_name, kes_balance, usd_balance FROM users
-      WHERE LOWER(email) = LOWER($1) OR phone = $1
-      LIMIT 1`,
-    [value],
-  );
-  return rows.rows[0] || null;
+  return resolveUserByIdentifier(client, identifier, 'id, full_name, kes_balance, usd_balance');
 }
 
 async function requireOwnAgent(client, userId) {
@@ -109,6 +104,14 @@ async function findSponsorForLocation(client, countryCode, region) {
   );
   return countryAgent.rows[0] || null;
 }
+
+// Agents and Trustee Agents review the customers they onboarded.
+mountKycReview(router, async (req, client) => {
+  const agent = (
+    await client.query("SELECT * FROM agents WHERE user_id = $1 AND status = 'ACTIVE'", [req.userId])
+  ).rows[0];
+  return agent || undefined;
+});
 
 router.get('/me', async (req, res, next) => {
   try {

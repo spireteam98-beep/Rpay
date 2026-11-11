@@ -44,6 +44,8 @@ app.use('/mobile-agent', require('./routes/mobileAgent'));
 app.use('/remittance', require('./routes/remittance'));
 app.use('/banking', require('./routes/banking'));
 app.use('/admin', require('./routes/admin'));
+app.use('/cards', require('./routes/nfcCards'));
+app.use('/social', require('./routes/social'));
 
 // Central error handler — no stack traces to clients.
 app.use((err, _req, res, _next) => {

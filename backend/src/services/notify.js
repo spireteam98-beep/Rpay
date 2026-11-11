@@ -29,7 +29,17 @@ async function sendTelegramMessage(telegramId, text) {
  * Never throws — a notification failure must never affect the transaction
  * or webhook that triggered it.
  */
-async function notifyUser(userId, { title, body }) {
+async function notifyUser(userId, { title, body, kind = 'general', data = null }) {
+  // In-app inbox first: always delivered, regardless of channel prefs, so
+  // every user (found by email, phone, @username or Fareenn ID) gets it.
+  try {
+    await pool.query(
+      `INSERT INTO notifications (user_id, kind, title, body, data) VALUES ($1,$2,$3,$4,$5)`,
+      [userId, kind, String(title || ''), String(body || ''), data ? JSON.stringify(data) : null],
+    );
+  } catch (_) {
+    // ignore — see docstring
+  }
   try {
     const user = (
       await pool.query(

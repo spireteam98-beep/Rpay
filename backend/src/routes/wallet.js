@@ -170,6 +170,78 @@ router.post('/withdraw', async (req, res, next) => {
   }
 });
 
+/**
+ * POST /wallet/convert { from: 'USD'|'KES', to: 'USD'|'KES', amount }
+ * Moves value between the customer's own USD and KES wallets at the fixed
+ * KES_PER_USD rate — the "intentionally convert to USD" bridge between the
+ * two currency accounts. No fee/spread yet; that's a pricing decision for
+ * later, not a technical one.
+ */
+router.post('/convert', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const from = String(req.body?.from || '').toUpperCase();
+    const to = String(req.body?.to || '').toUpperCase();
+    const amount = Number(req.body?.amount);
+
+    if (!['USD', 'KES'].includes(from) || !['USD', 'KES'].includes(to) || from === to) {
+      return res.status(400).json({ error: 'from and to must be USD and KES (in either order)' });
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ error: 'A positive amount is required' });
+    }
+
+    await client.query('BEGIN');
+    const user = (
+      await client.query(
+        'SELECT usd_balance, kes_balance FROM users WHERE id = $1 FOR UPDATE',
+        [req.userId],
+      )
+    ).rows[0];
+    if (!user) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const fromBalance = from === 'USD' ? Number(user.usd_balance) : Number(user.kes_balance);
+    if (fromBalance < amount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Not enough ${from} balance to convert` });
+    }
+
+    const convertedAmount =
+      from === 'USD' && to === 'KES'
+        ? Number((amount * config.kesPerUsd).toFixed(2))
+        : Number((amount / config.kesPerUsd).toFixed(2));
+    const usdEquivalent = from === 'USD' ? amount : Number((amount / config.kesPerUsd).toFixed(2));
+
+    const fromColumn = from === 'USD' ? 'usd_balance' : 'kes_balance';
+    const toColumn = to === 'USD' ? 'usd_balance' : 'kes_balance';
+    await client.query(
+      `UPDATE users SET ${fromColumn} = ${fromColumn} - $1, ${toColumn} = ${toColumn} + $2 WHERE id = $3`,
+      [amount, convertedAmount, req.userId],
+    );
+
+    await ledger.postWithClient(
+      client,
+      req.userId,
+      { title: `Convert ${from} to ${to}`, rail: 'Wayaki FX' },
+      [
+        { accountName: `Customer ${from} wallet`, direction: 'debit', amountUsd: usdEquivalent, memo: `${amount.toFixed(2)} ${from}` },
+        { accountName: `Customer ${to} wallet`, direction: 'credit', amountUsd: usdEquivalent, memo: `${convertedAmount.toFixed(2)} ${to}` },
+      ],
+    );
+
+    await client.query('COMMIT');
+    res.json({ from, to, amount, convertedAmount, kesPerUsd: config.kesPerUsd });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
 /** GET /wallet/withdrawals — history. */
 router.get('/withdrawals', async (req, res, next) => {
   try {

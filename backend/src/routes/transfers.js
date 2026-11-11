@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
 const notify = require('../services/notify');
+const { resolveUserByIdentifier } = require('../services/users');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -48,14 +49,8 @@ router.post('/', async (req, res, next) => {
     }
 
     await client.query('BEGIN');
-    const receiver = (
-      await client.query(
-        `SELECT id, full_name FROM users
-          WHERE LOWER(email) = $1 OR phone = $2 OR LOWER(username) = $1
-          LIMIT 1`,
-        [recipient, req.body?.recipient],
-      )
-    ).rows[0];
+    // Email, phone, @username or Fareenn ID — same lookup as messages/follows.
+    const receiver = await resolveUserByIdentifier(client, req.body?.recipient, 'id, full_name');
     if (!receiver) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Recipient not found' });

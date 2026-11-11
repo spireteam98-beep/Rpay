@@ -17,13 +17,18 @@ const RECRUIT_TIER = {
  * commissions but don't serve walk-in customers directly — mirrors M-Pesa's
  * Dealer model, where Dealers manage liquidity and retail agents handle cash.
  */
-const CAN_TRANSACT = { AGENT: true, SUB_AGENT: true };
+// Trustee Agents are appointed by the super-admin (POST /admin/agents or
+// /admin/agents/:id/tier) and sit outside the recruit ladder above — they
+// can't recruit and have no parent. They serve customers like an Agent and
+// approve KYC with approver digit 2 (see services/kycReview.js).
+const CAN_TRANSACT = { AGENT: true, SUB_AGENT: true, TRUSTEE_AGENT: true };
 
 /** Placeholder float/limit defaults — tune once real usage data exists. */
 const TIER_LIMITS_USD = {
   SUPER_AGENT: { minFloatUsd: 1500, dailyLimitUsd: 15000 },
   AGENT: { minFloatUsd: 750, dailyLimitUsd: 5000 },
   SUB_AGENT: { minFloatUsd: 150, dailyLimitUsd: 1000 },
+  TRUSTEE_AGENT: { minFloatUsd: 750, dailyLimitUsd: 5000 },
 };
 
 function tierRank(tier) {

@@ -1,0 +1,5 @@
+.env
+railway.env
+cloudrun.env.yaml
+node_modules/
+npm-debug.log

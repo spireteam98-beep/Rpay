@@ -3,6 +3,7 @@ const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
+const config = require('../config');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -66,8 +67,30 @@ async function resolveMerchantAccess(client, userId, merchantId) {
   return teller ? { merchant, role: 'TELLER' } : null;
 }
 
+/** Test accounts (config.testMerchantEmails) always have an ACTIVE business. */
+async function ensureTestMerchant(userId) {
+  if (!config.testMerchantEmails.length) return;
+  const user = (await pool.query('SELECT email, full_name FROM users WHERE id = $1', [userId])).rows[0];
+  if (!user || !config.testMerchantEmails.includes(String(user.email || '').toLowerCase())) return;
+  const existing = (await pool.query('SELECT id FROM merchants WHERE owner_id = $1', [userId])).rows;
+  if (existing.length) {
+    await pool.query(
+      `UPDATE merchants SET status = 'ACTIVE', approved_at = COALESCE(approved_at, now())
+        WHERE owner_id = $1 AND status = 'PENDING'`,
+      [userId],
+    );
+    return;
+  }
+  await pool.query(
+    `INSERT INTO merchants (owner_id, name, till_number, business_type, status, approved_at)
+     VALUES ($1, 'Fareenn Test Shop', $2, 'Retail', 'ACTIVE', now())`,
+    [userId, await uniqueTillNumber(pool)],
+  );
+}
+
 router.get('/me', async (req, res, next) => {
   try {
+    await ensureTestMerchant(req.userId);
     const rows = await pool.query(
       `SELECT id, name, till_number, business_type, phone, status, created_at
          FROM merchants WHERE owner_id = $1 ORDER BY created_at DESC`,
