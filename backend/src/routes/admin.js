@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db');
 const { requireAuth, requireStaff, STAFF_ROLES } = require('../middleware/auth');
 const { resolveUserByIdentifier } = require('../services/users');
+const accounts = require('../services/accounts');
 const notify = require('../services/notify');
 const config = require('../config');
 const ledger = require('../services/ledger');
@@ -633,6 +634,53 @@ router.post('/agents/:id/reject', async (req, res, next) => {
   }
 });
 
+/**
+ * POST /admin/agents/:id/fund-float { amount, currency, note } — Fareenn
+ * funds an agent's float directly (e.g. after the agent deposited cash at
+ * HQ). Super-admin only: it puts new e-money on the platform.
+ */
+router.post('/agents/:id/fund-float', async (req, res, next) => {
+  if (adminOnly(req, res)) return;
+  const client = await pool.connect();
+  try {
+    const currency = String(req.body?.currency || '').toUpperCase();
+    if (!accounts.CURRENCIES.includes(currency)) return res.status(400).json({ error: 'currency must be USD or KES' });
+    const amount = accounts.cleanAmount(req.body?.amount);
+    if (!amount) return res.status(400).json({ error: 'Enter an amount' });
+    const note = String(req.body?.note || '').trim().slice(0, 200) || null;
+    await client.query('BEGIN');
+    const agent = (await client.query('SELECT id, user_id, business_name, agent_code FROM agents WHERE id = $1 FOR UPDATE', [req.params.id])).rows[0];
+    if (!agent) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+    await accounts.creditAgentFloat(client, agent.id, currency, amount);
+    await client.query(
+      `INSERT INTO account_transfers (user_id, account, account_ref, direction, currency, amount, note)
+       VALUES ($1,'agent_float',$2,'admin_fund',$3,$4,$5)`,
+      [req.userId, agent.id, currency, amount, note],
+    );
+    const amountUsd = compliance.toUsd(amount, currency);
+    await ledger.postWithClient(client, agent.user_id, { title: 'Agent float funded by Fareenn', rail: 'Agent account' }, [
+      { accountName: 'Fareenn float funding', direction: 'debit', amountUsd, memo: note || agent.agent_code },
+      { accountName: 'Agent float', direction: 'credit', amountUsd, memo: agent.agent_code },
+    ]);
+    const fresh = (await client.query('SELECT float_usd, float_kes FROM agents WHERE id = $1', [agent.id])).rows[0];
+    await client.query('COMMIT');
+    notify.notifyUser(agent.user_id, {
+      kind: 'account',
+      title: 'Agent float funded',
+      body: `Fareenn added ${currency} ${amount.toFixed(2)} to the float of ${agent.business_name}.`,
+    });
+    res.json({ float: { USD: Number(fresh.float_usd), KES: Number(fresh.float_kes) } });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
 router.post('/agents/:id/deactivate', async (req, res, next) => {
   try {
     const current = (await pool.query('SELECT tier FROM agents WHERE id = $1', [req.params.id])).rows[0];
@@ -1036,28 +1084,17 @@ router.post('/merchant-payments/:id/reverse', async (req, res, next) => {
       return res.status(409).json({ error: `Payment is already ${payment.status}` });
     }
 
-    const column = payment.currency === 'KES' ? 'kes_balance' : 'usd_balance';
-    const merchantOwner = (
-      await client.query(`SELECT ${column} AS balance FROM users WHERE id = $1 FOR UPDATE`, [
-        payment.owner_id,
-      ])
-    ).rows[0];
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [payment.payer_id]);
-    if (Number(merchantOwner.balance) < Number(payment.amount)) {
+    // Refunds come out of the Business account the sale was paid into.
+    if (!(await accounts.debitMerchant(client, payment.merchant_id, payment.currency, Number(payment.amount)))) {
+      const bal = (
+        await client.query(`SELECT ${accounts.merchantCol(payment.currency)} AS b FROM merchants WHERE id = $1`, [payment.merchant_id])
+      ).rows[0];
       await client.query('ROLLBACK');
       return res.status(400).json({
-        error: `Merchant only has ${merchantOwner.balance} ${payment.currency} left — not enough to reverse ${payment.amount} ${payment.currency}`,
+        error: `The business account only has ${bal?.b ?? 0} ${payment.currency} — not enough to reverse ${payment.amount} ${payment.currency}`,
       });
     }
-
-    await client.query(`UPDATE users SET ${column} = ${column} - $1 WHERE id = $2`, [
-      payment.amount,
-      payment.owner_id,
-    ]);
-    await client.query(`UPDATE users SET ${column} = ${column} + $1 WHERE id = $2`, [
-      payment.amount,
-      payment.payer_id,
-    ]);
+    await accounts.creditWallet(client, payment.payer_id, payment.currency, Number(payment.amount));
 
     const amountUsd = compliance.toUsd(Number(payment.amount), payment.currency);
     await ledger.postWithClient(

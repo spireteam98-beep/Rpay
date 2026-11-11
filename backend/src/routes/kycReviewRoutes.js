@@ -45,9 +45,16 @@ function mountKycReview(router, getAgent) {
       try {
         const agent = await getAgent(req, client);
         if (agent === undefined) return res.status(403).json({ error: 'Only agents can review customers' });
-        const reason = String(req.body?.reason || '').trim();
+        // "Request changes": the reviewer ticks the issues found (sent as
+        // short labels) and/or writes a message. Both become the reason the
+        // customer sees, and a chat message they can reply to.
+        const issues = Array.isArray(req.body?.issues)
+          ? req.body.issues.map((s) => String(s).trim().slice(0, 80)).filter(Boolean).slice(0, 8)
+          : [];
+        const note = String(req.body?.reason || '').trim().slice(0, 1000);
+        const reason = [issues.join('; '), note].filter(Boolean).join('. ');
         if (action === 'reject' && reason.length < 3) {
-          return res.status(400).json({ error: 'Give the customer a reason so they can fix it' });
+          return res.status(400).json({ error: 'Pick an issue or write a message so the customer can fix it' });
         }
         // Optional: a card the reviewer scanned to hand to this customer.
         const cardUid = action === 'approve' && req.body?.cardUid ? String(req.body.cardUid) : null;
@@ -84,11 +91,27 @@ function mountKycReview(router, getAgent) {
               + (result.card ? ` Your Fareenn card •••• ${result.card.last4} is linked and ready to tap and pay.` : ''),
           });
         } else {
+          // Sent as a chat message from the reviewer, so the customer can
+          // reply and both sides keep talking in Messages.
+          const lines = [
+            'Your identity verification needs changes before it can be approved:',
+            ...issues.map((i) => `• ${i}`),
+            ...(note ? ['', note] : []),
+            '',
+            'Please fix this and submit again. Reply here if you have questions.',
+          ];
+          const body = lines.join('\n').slice(0, 2000);
+          await pool.query(
+            `INSERT INTO direct_messages (sender_id, recipient_id, body) VALUES ($1,$2,$3)`,
+            [req.userId, req.params.userId, body],
+          );
           notify.notifyUser(req.params.userId, {
-            kind: 'account',
-            title: 'Your verification needs attention',
-            body: `Your identity check was not approved: ${reason}. Please fix it and submit again.`,
+            kind: 'message',
+            title: 'Your verification needs changes',
+            body,
+            data: { userId: req.userId, topic: 'kyc' },
           });
+          result.messageSent = true;
         }
         res.json(result);
       } catch (err) {

@@ -10,6 +10,7 @@ const { RECRUIT_TIER, CAN_TRANSACT, TIER_LIMITS_USD } = require('../services/age
 const notify = require('../services/notify');
 const { mountKycReview } = require('./kycReviewRoutes');
 const { resolveUserByIdentifier } = require('../services/users');
+const accounts = require('../services/accounts');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -119,6 +120,107 @@ router.get('/me', async (req, res, next) => {
     res.json({ agent });
   } catch (err) {
     next(err);
+  }
+});
+
+// ── Agent account (separate from the owner's wallet) ──────────────────────
+
+/** GET /agents/account — float (USD/KES), commission (USD) and recent moves. */
+router.get('/account', async (req, res, next) => {
+  try {
+    const agent = await requireOwnAgent(pool, req.userId);
+    if (!agent) return res.status(404).json({ error: 'You are not registered as an agent' });
+    const moves = await pool.query(
+      `SELECT account, direction, currency, amount, note, created_at FROM account_transfers
+        WHERE account_ref = $1 ORDER BY created_at DESC LIMIT 30`,
+      [agent.id],
+    );
+    res.json({
+      agentId: agent.id,
+      businessName: agent.business_name,
+      float: { USD: Number(agent.float_usd), KES: Number(agent.float_kes) },
+      commissionUsd: Number(agent.commission_balance),
+      moves: moves.rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * POST /agents/account/top-up { amount, currency } — wallet → agent float.
+ * POST /agents/account/to-wallet { amount, currency, from: 'float'|'commission' }
+ * Owner only (cashiers transact on the float but can't move it).
+ */
+router.post('/account/:action(top-up|to-wallet)', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const currency = cleanCurrency(req.body?.currency);
+    const amount = accounts.cleanAmount(req.body?.amount);
+    if (!amount) return res.status(400).json({ error: 'Enter an amount' });
+    const toWallet = req.params.action === 'to-wallet';
+    const fromCommission = toWallet && req.body?.from === 'commission';
+    if (fromCommission && currency !== 'USD') {
+      return res.status(400).json({ error: 'Commission is held in USD' });
+    }
+    await client.query('BEGIN');
+    const agent = (await client.query('SELECT * FROM agents WHERE user_id = $1 FOR UPDATE', [req.userId])).rows[0];
+    if (!agent) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'You are not registered as an agent' });
+    }
+    const amountUsd = compliance.toUsd(amount, currency);
+    let ok;
+    if (!toWallet) {
+      ok = await accounts.debitWallet(client, req.userId, currency, amount);
+      if (ok) await accounts.creditAgentFloat(client, agent.id, currency, amount);
+    } else if (fromCommission) {
+      ok = Number(agent.commission_balance) >= amount;
+      if (ok) {
+        await client.query('UPDATE agents SET commission_balance = commission_balance - $1 WHERE id = $2', [amount, agent.id]);
+        await accounts.creditWallet(client, req.userId, 'USD', amount);
+      }
+    } else {
+      ok = await accounts.debitAgentFloat(client, agent.id, currency, amount);
+      if (ok) await accounts.creditWallet(client, req.userId, currency, amount);
+    }
+    if (!ok) {
+      await client.query('ROLLBACK');
+      const where = !toWallet ? 'your wallet' : fromCommission ? 'your commission' : 'your agent float';
+      return res.status(400).json({ error: `Not enough ${currency} in ${where}` });
+    }
+    await client.query(
+      `INSERT INTO account_transfers (user_id, account, account_ref, direction, currency, amount)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [req.userId, fromCommission ? 'agent_commission' : 'agent_float', agent.id, toWallet ? 'to_wallet' : 'from_wallet', currency, amount],
+    );
+    const accountName = fromCommission ? 'Agent commission' : 'Agent float';
+    await ledger.postWithClient(
+      client,
+      req.userId,
+      { title: toWallet ? `From agent account (${accountName.toLowerCase()})` : 'Agent float top-up', rail: 'Agent account' },
+      toWallet
+        ? [
+            { accountName, direction: 'debit', amountUsd, memo: agent.agent_code },
+            { accountName: `Customer ${currency} wallet`, direction: 'credit', amountUsd, memo: agent.agent_code },
+          ]
+        : [
+            { accountName: `Customer ${currency} wallet`, direction: 'debit', amountUsd, memo: agent.agent_code },
+            { accountName, direction: 'credit', amountUsd, memo: agent.agent_code },
+          ],
+    );
+    const fresh = (await client.query('SELECT float_usd, float_kes, commission_balance FROM agents WHERE id = $1', [agent.id])).rows[0];
+    await client.query('COMMIT');
+    res.json({
+      float: { USD: Number(fresh.float_usd), KES: Number(fresh.float_kes) },
+      commissionUsd: Number(fresh.commission_balance),
+    });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    if (err.message === 'currency must be KES or USD') return res.status(400).json({ error: err.message });
+    next(err);
+  } finally {
+    client.release();
   }
 });
 
@@ -499,6 +601,15 @@ router.post('/deposits', async (req, res, next) => {
       return res.status(403).json({ error: 'Deposit requires compliance review' });
     }
 
+    // The e-money the customer receives comes out of the agent's float: the
+    // agent took the same amount in cash.
+    if (!(await accounts.debitAgentFloat(client, agent.id, currency, amount))) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        error: `Insufficient agent float. Top up your ${currency} float to do this cash-in.`,
+        code: 'INSUFFICIENT_FLOAT',
+      });
+    }
     const column = balanceColumn(currency);
     await client.query(`UPDATE users SET ${column} = ${column} + $1 WHERE id = $2`, [
       amount,
@@ -607,6 +718,8 @@ router.post('/withdrawals', async (req, res, next) => {
       totalDebit,
       customer.id,
     ]);
+    // The agent paid out cash, so the same amount of e-money joins their float.
+    await accounts.creditAgentFloat(client, agent.id, currency, amount);
     await ledger.postWithClient(
       client,
       customer.id,
@@ -880,11 +993,10 @@ router.post('/mobile-money-queue/:id/complete', async (req, res, next) => {
     // The customer paid in USD (this marketplace is USD-sourced by
     // design) — that amount becomes the agent-owner's own real balance in
     // exchange for the real KES they just sent.
-    const settlementUsd = Number(movement.amount_kes) / Number(movement.locked_rate_kes_per_usd);
-    await client.query('UPDATE users SET usd_balance = usd_balance + $1 WHERE id = $2', [
-      settlementUsd,
-      acting.agent.user_id,
-    ]);
+    // Settlement is agent business income, so it lands in the Agent
+    // account (USD float), not the owner's personal wallet.
+    const settlementUsd = Math.round((Number(movement.amount_kes) / Number(movement.locked_rate_kes_per_usd)) * 100) / 100;
+    await accounts.creditAgentFloat(client, acting.agent.id, 'USD', settlementUsd);
     await ledger.postWithClient(
       client,
       acting.agent.user_id,

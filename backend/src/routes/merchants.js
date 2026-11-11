@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const ledger = require('../services/ledger');
 const compliance = require('../services/compliance');
 const config = require('../config');
+const accounts = require('../services/accounts');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -92,13 +93,61 @@ router.get('/me', async (req, res, next) => {
   try {
     await ensureTestMerchant(req.userId);
     const rows = await pool.query(
-      `SELECT id, name, till_number, business_type, phone, status, created_at
+      `SELECT id, name, till_number, business_type, phone, status, created_at,
+              balance_usd, balance_kes
          FROM merchants WHERE owner_id = $1 ORDER BY created_at DESC`,
       [req.userId],
     );
     res.json(rows.rows);
   } catch (err) {
     next(err);
+  }
+});
+
+/**
+ * POST /merchants/:merchantId/to-wallet { amount, currency } — owner moves
+ * money from the Business account to their personal wallet. Instant, free.
+ */
+router.post('/:merchantId/to-wallet', async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const currency = cleanCurrency(req.body?.currency);
+    const amount = accounts.cleanAmount(req.body?.amount);
+    if (!amount) return res.status(400).json({ error: 'Enter an amount' });
+    await client.query('BEGIN');
+    const merchant = (
+      await client.query('SELECT id, name, owner_id FROM merchants WHERE id = $1', [req.params.merchantId])
+    ).rows[0];
+    if (!merchant || merchant.owner_id !== req.userId) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Business not found' });
+    }
+    if (!(await accounts.debitMerchant(client, merchant.id, currency, amount))) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Your business account doesn't have ${currency} ${amount.toFixed(2)}` });
+    }
+    await accounts.creditWallet(client, req.userId, currency, amount);
+    await client.query(
+      `INSERT INTO account_transfers (user_id, account, account_ref, direction, currency, amount)
+       VALUES ($1,'business',$2,'to_wallet',$3,$4)`,
+      [req.userId, merchant.id, currency, amount],
+    );
+    const amountUsd = compliance.toUsd(amount, currency);
+    await ledger.postWithClient(client, req.userId, { title: `From business: ${merchant.name}`, rail: 'Business account' }, [
+      { accountName: 'Business account', direction: 'debit', amountUsd, memo: merchant.id },
+      { accountName: `Customer ${currency} wallet`, direction: 'credit', amountUsd, memo: merchant.id },
+    ]);
+    const balances = (
+      await client.query('SELECT balance_usd, balance_kes FROM merchants WHERE id = $1', [merchant.id])
+    ).rows[0];
+    await client.query('COMMIT');
+    res.json({ moved: { amount, currency }, business: balances });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
+    if (err.message === 'currency must be KES or USD') return res.status(400).json({ error: err.message });
+    next(err);
+  } finally {
+    client.release();
   }
 });
 
@@ -295,7 +344,6 @@ router.post('/pay-link/:linkId', async (req, res, next) => {
         req.userId,
       ])
     ).rows[0];
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [link.owner_id]);
     if (Number(payer.balance) < Number(link.amount)) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: `Not enough ${link.currency} balance` });
@@ -305,10 +353,8 @@ router.post('/pay-link/:linkId', async (req, res, next) => {
       link.amount,
       req.userId,
     ]);
-    await client.query(`UPDATE users SET ${column} = ${column} + $1 WHERE id = $2`, [
-      link.amount,
-      link.owner_id,
-    ]);
+    // Sales land in the Business account, not the owner's wallet.
+    await accounts.creditMerchant(client, link.merchant_id, link.currency, Number(link.amount));
     const payment = await client.query(
       `INSERT INTO merchant_payments
         (merchant_id, payer_id, payment_link_id, currency, amount)
@@ -415,7 +461,6 @@ router.post('/pay/:tillNumber', async (req, res, next) => {
         req.userId,
       ])
     ).rows[0];
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [merchant.owner_id]);
     if (Number(payer.balance) < amount) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: `Not enough ${currency} balance` });
@@ -425,10 +470,8 @@ router.post('/pay/:tillNumber', async (req, res, next) => {
       amount,
       req.userId,
     ]);
-    await client.query(`UPDATE users SET ${column} = ${column} + $1 WHERE id = $2`, [
-      amount,
-      merchant.owner_id,
-    ]);
+    // Sales land in the Business account, not the owner's wallet.
+    await accounts.creditMerchant(client, merchant.id, currency, amount);
     const payment = await client.query(
       `INSERT INTO merchant_payments (merchant_id, payer_id, currency, amount)
        VALUES ($1,$2,$3,$4)

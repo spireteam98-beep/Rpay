@@ -7,6 +7,7 @@ const ledger = require('../services/ledger');
 const config = require('../config');
 const compliance = require('../services/compliance');
 const notify = require('../services/notify');
+const accounts = require('../services/accounts');
 
 /**
  * Fareenn closed-loop NFC cards (MIFARE Classic 1K test cards; NTAG also works).
@@ -455,11 +456,11 @@ router.post('/nfc/charge', async (req, res, next) => {
     const payer = (
       await client.query(`SELECT ${column} AS balance FROM users WHERE id = $1 FOR UPDATE`, [holder.id])
     ).rows[0];
-    await client.query('SELECT id FROM users WHERE id = $1 FOR UPDATE', [merchant.owner_id]);
     if (Number(payer.balance) < amount) return decline(`Insufficient ${currency} balance.`, 400);
 
     await client.query(`UPDATE users SET ${column} = ${column} - $1 WHERE id = $2`, [amount, holder.id]);
-    await client.query(`UPDATE users SET ${column} = ${column} + $1 WHERE id = $2`, [amount, merchant.owner_id]);
+    // Sales land in the Business account, not the owner's wallet.
+    await accounts.creditMerchant(client, merchant.id, currency, amount);
     const payment = (
       await client.query(
         `INSERT INTO merchant_payments (merchant_id, payer_id, currency, amount)

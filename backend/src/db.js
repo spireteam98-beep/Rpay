@@ -874,6 +874,34 @@ async function migrate() {
     CREATE INDEX IF NOT EXISTS idx_support_msgs_ticket ON support_ticket_messages(ticket_id, created_at);
   `);
 
+  // Separate accounts (services/accounts.js): a Business account per
+  // merchant and an Agent float per agent, apart from the owner's wallet.
+  // Both start at 0 — past sales stay where they already landed.
+  await pool.query(`
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS balance_usd NUMERIC(18,2) NOT NULL DEFAULT 0;
+    ALTER TABLE merchants ADD COLUMN IF NOT EXISTS balance_kes NUMERIC(18,2) NOT NULL DEFAULT 0;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS float_usd NUMERIC(18,2) NOT NULL DEFAULT 0;
+    ALTER TABLE agents ADD COLUMN IF NOT EXISTS float_kes NUMERIC(18,2) NOT NULL DEFAULT 0;
+    ALTER TABLE merchants DROP CONSTRAINT IF EXISTS merchants_balance_nonneg;
+    ALTER TABLE merchants ADD CONSTRAINT merchants_balance_nonneg CHECK (balance_usd >= 0 AND balance_kes >= 0);
+    ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_float_nonneg;
+    ALTER TABLE agents ADD CONSTRAINT agents_float_nonneg CHECK (float_usd >= 0 AND float_kes >= 0);
+
+    -- Moves between a person's wallet and their Business / Agent account.
+    CREATE TABLE IF NOT EXISTS account_transfers (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id     UUID NOT NULL REFERENCES users(id),
+      account     TEXT NOT NULL CHECK (account IN ('business','agent_float','agent_commission')),
+      account_ref UUID NOT NULL,
+      direction   TEXT NOT NULL CHECK (direction IN ('to_wallet','from_wallet','admin_fund')),
+      currency    TEXT NOT NULL CHECK (currency IN ('USD','KES')),
+      amount      NUMERIC(18,2) NOT NULL CHECK (amount > 0),
+      note        TEXT,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_account_transfers_ref ON account_transfers(account_ref, created_at DESC);
+  `);
+
   // Sole super-admin: keep this the only account with role='admin'. Runs
   // every boot so it's self-healing across environments/DB resets.
   await pool.query(
