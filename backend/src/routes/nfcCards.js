@@ -133,14 +133,25 @@ async function merchantAccess(client, userId, merchantId) {
   return teller ? merchant : null;
 }
 
-/** Finds the card for a tap; null unless UID and token both match. */
+/**
+ * Finds the card for a tap by its serial number (UID).
+ *   - Card carries the Fareenn link: the token must match too  → verified.
+ *   - Card has no link, or a link that doesn't match (serial only, e.g. a
+ *     fresh MIFARE card or a mistyped record) → not verified; the charge
+ *     then requires the cardholder's PIN, because a bare UID can be copied
+ *     onto another card.
+ * Returns null only for a serial that isn't registered.
+ */
 async function cardForTap(client, uid, token, lock) {
   const row = (
     await client.query(`SELECT * FROM nfc_cards WHERE uid = $1 ${lock ? 'FOR UPDATE' : ''}`, [uid])
   ).rows[0];
-  if (!row || !sameToken(row.token, token)) return null;
-  return row;
+  if (!row) return null;
+  return { card: row, verified: Boolean(token) && sameToken(row.token, token) };
 }
+
+const NOT_REGISTERED = 'This card is not registered with Fareenn.';
+const UNREADABLE = 'The card could not be read. Hold it still and tap again.';
 
 /** POST /cards/nfc/prepare — a fresh token to write onto a blank card. */
 router.post('/nfc/prepare', async (_req, res) => {
@@ -290,9 +301,10 @@ router.post('/nfc/lookup', async (req, res, next) => {
     const merchant = await merchantAccess(pool, req.userId, req.body?.merchantId);
     if (!merchant || merchant.status !== 'ACTIVE') return res.status(403).json({ error: 'Merchant not active' });
     const uid = cleanUid(req.body?.uid), token = cleanToken(req.body?.token);
-    if (!uid || !token) return res.status(400).json({ error: 'This is not a Fareenn card.' });
-    const card = await cardForTap(pool, uid, token, false);
-    if (!card || !card.user_id) return res.status(404).json({ error: 'This card is not recognised.' });
+    if (!uid) return res.status(400).json({ error: UNREADABLE });
+    const tap = await cardForTap(pool, uid, token, false);
+    const card = tap?.card;
+    if (!card || !card.user_id) return res.status(404).json({ error: NOT_REGISTERED, code: 'CARD_NOT_REGISTERED' });
     if (card.status !== 'ACTIVE') {
       return res.status(403).json({ error: card.status === 'FROZEN' ? 'This card is frozen.' : 'This card is blocked.' });
     }
@@ -301,7 +313,7 @@ router.post('/nfc/lookup', async (req, res, next) => {
     ).rows[0];
     const first = holder?.first_name || String(holder?.full_name || '').split(' ')[0] || 'Customer';
     const lastInitial = (holder?.last_name || '').slice(0, 1);
-    res.json({ holder: lastInitial ? `${first} ${lastInitial}.` : first, last4: cardLast4(card) });
+    res.json({ holder: lastInitial ? `${first} ${lastInitial}.` : first, last4: cardLast4(card), pinRequired: !tap.verified });
   } catch (err) {
     next(err);
   }
@@ -321,7 +333,7 @@ router.post('/nfc/charge', async (req, res, next) => {
     const amount = Math.round(Number(req.body?.amount) * 100) / 100;
     if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ error: 'Enter an amount' });
     const uid = cleanUid(req.body?.uid), token = cleanToken(req.body?.token);
-    if (!uid || !token) return res.status(400).json({ error: 'This is not a Fareenn card.' });
+    if (!uid) return res.status(400).json({ error: UNREADABLE });
     const pin = String(req.body?.pin || '');
 
     await client.query('BEGIN');
@@ -330,10 +342,11 @@ router.post('/nfc/charge', async (req, res, next) => {
       await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Merchant not active' });
     }
-    const card = await cardForTap(client, uid, token, true);
+    const tap = await cardForTap(client, uid, token, true);
+    const card = tap?.card;
     if (!card || !card.user_id) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'This card is not recognised.' });
+      return res.status(404).json({ error: NOT_REGISTERED, code: 'CARD_NOT_REGISTERED' });
     }
     if (card.status !== 'ACTIVE') {
       await client.query('ROLLBACK');
@@ -349,6 +362,20 @@ router.post('/nfc/charge', async (req, res, next) => {
     ).rows[0];
     const holderFirst = holder?.first_name || String(holder?.full_name || '').split(' ')[0] || 'Customer';
     const holderName = holder?.last_name ? `${holderFirst} ${holder.last_name.slice(0, 1)}.` : holderFirst;
+    // Serial-only tap: the cardholder's PIN is what proves this is really
+    // their card (a UID alone can be cloned), so ask for it before charging.
+    if (!tap.verified && !pin) {
+      await client.query('ROLLBACK');
+      if (!holder?.pin_hash) {
+        return res.status(403).json({ error: 'The cardholder has not set a Fareenn PIN yet.' });
+      }
+      return res.status(428).json({
+        error: 'Customer: enter your Fareenn PIN',
+        code: 'PIN_REQUIRED',
+        holder: holderName,
+        last4: cardLast4(card),
+      });
+    }
     if (pin && (!holder?.pin_hash || !(await bcrypt.compare(pin, holder.pin_hash)))) {
       const failures = card.pin_failures + 1;
       const freeze = failures >= MAX_PIN_FAILURES;
