@@ -166,11 +166,13 @@ function sendReceipts(r, { customerId, merchantOwnerId, cashierId }) {
     kind: 'receipt',
     title: `Receipt: ${money(r.amount, r.currency)} at ${r.merchant}`,
     body: `You paid ${money(r.amount, r.currency)} to ${r.merchant} (till ${r.tillNumber}) with card •••• ${r.last4} on ${when}. Ref ${r.ref}.`,
-    data,
+    data: { ...data, role: 'customer' },
   });
   const merchantBody = `${r.holder} paid ${money(r.amount, r.currency)} with card •••• ${r.last4} on ${when}. Ref ${r.ref}.`;
   for (const id of new Set([merchantOwnerId, cashierId])) {
-    notify.notifyUser(id, { kind: 'receipt', title: `Sale receipt: ${money(r.amount, r.currency)}`, body: merchantBody, data });
+    notify.notifyUser(id, {
+      kind: 'receipt', title: `Sale receipt: ${money(r.amount, r.currency)}`, body: merchantBody, data: { ...data, role: 'merchant' },
+    });
   }
 }
 

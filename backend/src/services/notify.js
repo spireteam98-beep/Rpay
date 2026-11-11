@@ -1,6 +1,7 @@
 const config = require('../config');
 const { pool } = require('../db');
 const email = require('./email');
+const realtime = require('./realtime');
 
 /** Best-effort Telegram push via the bot API — never throws. Requires the
  * user to have opened the bot/Mini App at least once (their telegram_id
@@ -33,10 +34,15 @@ async function notifyUser(userId, { title, body, kind = 'general', data = null }
   // In-app inbox first: always delivered, regardless of channel prefs, so
   // every user (found by email, phone, @username or Fareenn ID) gets it.
   try {
-    await pool.query(
-      `INSERT INTO notifications (user_id, kind, title, body, data) VALUES ($1,$2,$3,$4,$5)`,
-      [userId, kind, String(title || ''), String(body || ''), data ? JSON.stringify(data) : null],
-    );
+    const row = (
+      await pool.query(
+        `INSERT INTO notifications (user_id, kind, title, body, data) VALUES ($1,$2,$3,$4,$5)
+         RETURNING id, kind, title, body, data, read_at, created_at`,
+        [userId, kind, String(title || ''), String(body || ''), data ? JSON.stringify(data) : null],
+      )
+    ).rows[0];
+    // Live push to any open app (GET /social/stream).
+    realtime.publish(userId, 'notification', row);
   } catch (_) {
     // ignore — see docstring
   }

@@ -2,6 +2,7 @@ const express = require('express');
 const { pool } = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const notify = require('../services/notify');
+const realtime = require('../services/realtime');
 const { resolveUserByIdentifier, publicProfile } = require('../services/users');
 
 /**
@@ -402,6 +403,50 @@ router.post('/support/:id/reply', async (req, res, next) => {
   }
 });
 
+// ── Real-time stream ──────────────────────────────────────────────────────
+
+async function unreadCounts(userId) {
+  return (
+    await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM notifications WHERE user_id = $1 AND read_at IS NULL) AS notifications,
+         (SELECT COUNT(*)::int FROM direct_messages WHERE recipient_id = $1 AND read_at IS NULL) AS messages`,
+      [userId],
+    )
+  ).rows[0];
+}
+
+/**
+ * GET /social/stream — Server-Sent Events. Sends `unread` counts on connect,
+ * then a `notification` event (the new row + fresh counts) the moment
+ * notifyUser() fires for this user. A comment ping every 25s keeps proxies
+ * from closing the idle connection; the app reconnects if it drops.
+ */
+router.get('/stream', async (req, res) => {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  try {
+    send('unread', await unreadCounts(req.userId));
+  } catch (_) {/* counts are best-effort */}
+
+  const unsubscribe = realtime.subscribe(req.userId, async ({ event, payload }) => {
+    let unread = null;
+    try { unread = await unreadCounts(req.userId); } catch (_) {/* ignore */}
+    send(event, { item: payload, unread });
+  });
+  const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+  req.on('close', () => {
+    clearInterval(ping);
+    unsubscribe();
+  });
+});
+
 // ── Notification inbox ────────────────────────────────────────────────────
 
 router.get('/notifications', async (req, res, next) => {
@@ -455,6 +500,8 @@ router.post('/notifications/read', async (req, res, next) => {
     } else {
       await pool.query(`UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL`, [req.userId]);
     }
+    // Keep every other open app's badge in sync.
+    realtime.publish(req.userId, 'read', { ids: ids && ids.length ? ids : 'all' });
     res.json({ ok: true });
   } catch (err) {
     next(err);

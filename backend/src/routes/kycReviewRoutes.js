@@ -1,5 +1,7 @@
 const { pool } = require('../db');
 const review = require('../services/kycReview');
+const cards = require('../services/cards');
+const notify = require('../services/notify');
 
 /**
  * Adds the KYC review routes to a router. getAgent(req, client) returns the
@@ -47,6 +49,11 @@ function mountKycReview(router, getAgent) {
         if (action === 'reject' && reason.length < 3) {
           return res.status(400).json({ error: 'Give the customer a reason so they can fix it' });
         }
+        // Optional: a card the reviewer scanned to hand to this customer.
+        const cardUid = action === 'approve' && req.body?.cardUid ? String(req.body.cardUid) : null;
+        if (cardUid && !cards.cleanUid(cardUid)) {
+          return res.status(400).json({ error: 'The card could not be read. Scan it again.' });
+        }
         await client.query('BEGIN');
         const result =
           action === 'approve'
@@ -56,7 +63,33 @@ function mountKycReview(router, getAgent) {
           await client.query('ROLLBACK');
           return res.status(result.error[0]).json({ error: result.error[1] });
         }
+        // Card and approval succeed or fail together, so a card problem
+        // (already linked elsewhere, too many cards) never half-approves.
+        if (cardUid) {
+          const issued = await cards.issueCardToUser(client, {
+            uid: cardUid, userId: req.params.userId, issuedBy: req.userId,
+          });
+          if (issued.error) {
+            await client.query('ROLLBACK');
+            return res.status(issued.error[0]).json({ error: issued.error[1], code: 'CARD_ERROR' });
+          }
+          result.card = { id: issued.card.id, last4: issued.card.uid.slice(-4) };
+        }
         await client.query('COMMIT');
+        if (action === 'approve') {
+          notify.notifyUser(req.params.userId, {
+            kind: 'account',
+            title: 'Your Fareenn account is approved',
+            body: `Your Fareenn ID is ${result.walletNumber}. Share it to receive money.`
+              + (result.card ? ` Your Fareenn card •••• ${result.card.last4} is linked and ready to tap and pay.` : ''),
+          });
+        } else {
+          notify.notifyUser(req.params.userId, {
+            kind: 'account',
+            title: 'Your verification needs attention',
+            body: `Your identity check was not approved: ${reason}. Please fix it and submit again.`,
+          });
+        }
         res.json(result);
       } catch (err) {
         try { await client.query('ROLLBACK'); } catch (_) {/* ignore */}
