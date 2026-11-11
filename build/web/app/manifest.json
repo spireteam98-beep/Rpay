@@ -1,11 +1,11 @@
 {
-    "name": "Wayaki",
-    "short_name": "Wayaki",
+    "name": "Fareenn",
+    "short_name": "Fareenn",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#050506",
-    "theme_color": "#050506",
-    "description": "Wayaki — your crypto wallet, mobile money and virtual bank account in one app.",
+    "background_color": "#E60000",
+    "theme_color": "#0D0D0D",
+    "description": "Fareenn — your crypto wallet, mobile money and virtual bank account in one app.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

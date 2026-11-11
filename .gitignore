@@ -51,3 +51,16 @@ backend/.env
 backend/secrets/
 backend/node_modules/
 .vercel
+
+backend/cloudrun.env.yaml
+backend/railway.env
+
+.env*
+
+# The signed Android APK (~70MB) — too large to push reliably and would
+# bloat the repo on every release. scripts/build_site.* regenerate
+# build/web/fareenn.apk from this local copy at deploy time; it's already
+# live on fareenn.com and was sent to the team directly. Rebuild locally
+# with `flutter build apk --release` if this copy is ever missing.
+landing/downloads/fareenn.apk
+build/web/fareenn.apk

@@ -11,6 +11,10 @@ cd "$(dirname "$0")/.."
 echo "==> Cleaning previous build output…"
 rm -rf build/web build/web-app-tmp
 
+echo "==> flutter clean + pub get (fresh plugin registrations)…"
+flutter clean
+flutter pub get
+
 echo "==> Building Flutter web app (base href /app/)…"
 MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" flutter build web --release --base-href=/app/
 
@@ -31,5 +35,10 @@ cp landing/assets/mpesa.png build/web/assets/mpesa.png
 cp landing/assets/wayaki-icon-180.png build/web/assets/wayaki-icon-180.png
 cp landing/assets/wayaki-icon-192.png build/web/assets/wayaki-icon-192.png
 cp landing/assets/wayaki-icon-512.png build/web/assets/wayaki-icon-512.png
+
+if [ -f landing/downloads/fareenn.apk ]; then
+  echo "==> Copying the Android APK into build/web (direct download link)…"
+  cp landing/downloads/fareenn.apk build/web/fareenn.apk
+fi
 
 echo "==> Done. build/web/index.html is the landing page; build/web/app/ is the Flutter app."

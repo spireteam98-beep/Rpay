@@ -1,462 +1,367 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta
-      name="description"
-      content="Wayaki brings crypto, mobile money and everyday payments together in one secure wallet."
-    />
-    <meta name="theme-color" content="#0a0a0a" />
-    <meta property="og:title" content="Wayaki — All your money. One app." />
-    <meta
-      property="og:description"
-      content="Move money across mobile wallets, crypto and borders from one beautifully simple app."
-    />
-    <meta property="og:image" content="assets/wayaki-logo.png" />
-    <title>Wayaki — All your money. One app.</title>
-    <link rel="icon" type="image/png" sizes="64x64" href="favicon.png" />
-    <link rel="shortcut icon" href="favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/wayaki-icon-180.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="wayaki.css" />
-  </head>
-  <body>
-    <a class="skip-link" href="#main">Skip to content</a>
-    <div class="ambient ambient-one" aria-hidden="true"></div>
-    <div class="ambient ambient-two" aria-hidden="true"></div>
-    <div class="cursor-glow" aria-hidden="true"></div>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fareenn — Friendly Banking</title>
+<meta name="theme-color" content="#E60000">
+<meta name="description" content="Fareenn is a friendly digital wallet for Africa. Send and receive money, pay merchants and bills, top up, and get your Fareenn card — all in one app.">
+<link rel="icon" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@800&text=fareen.&display=swap">
+<style>
+/* Layout: sticky frosted app bar, red header with parallax greeting, dark sheet sliding over it, the 3D card as hero. Single brand look. */
+:root{
+  --red:#E60000; --red-deep:#A30000; --ink:#0D0D0D; --tile:#222222; --line:#2E2E2E;
+  --fg:#FFFFFF; --muted:#B3B3B3; --soft:#FFE5E5; --icon:#FF4D4D;
+  --font:system-ui,-apple-system,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --brand:"Nunito","Arial Rounded MT Bold",var(--font);
+  --ease:cubic-bezier(.2,.8,.2,1); --spring:cubic-bezier(.34,1.56,.64,1);
+  --gut-l:max(20px,env(safe-area-inset-left,0px)); --gut-r:max(20px,env(safe-area-inset-right,0px));
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{background:var(--red);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--fg);font:16px/1.5 var(--font);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--red)}
+a{color:var(--fg)}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+a:focus-visible,button:focus-visible{outline:3px solid #FFFFFF;outline-offset:3px;border-radius:14px}
+.wrap{max-width:1120px;margin:0 auto;padding-left:var(--gut-l);padding-right:var(--gut-r)}
+svg{display:block}
+.press{transition:transform .25s var(--spring),background-color .25s,box-shadow .25s}
+.press:active{transform:scale(.95)}
 
-    <header class="site-header">
-      <nav class="nav shell" aria-label="Main navigation">
-        <a class="wordmark" href="/" aria-label="Wayaki home">
-          <img src="assets/wayaki-logo.png" alt="Wayaki" />
-        </a>
-        <div class="nav-links">
-          <a href="#platform">Product</a>
-          <a href="#technology">Technology</a>
-          <a href="#reach">Corridors</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#company">Company</a>
-        </div>
-        <div class="nav-actions">
-          <a class="button button-ghost" href="/app/?screen=login">Log in</a>
-          <a class="button button-light" href="/app/?screen=signup">Get Wayaki</a>
-        </div>
-        <div class="mobile-auth-actions" aria-label="Account actions">
-          <a class="mobile-login" href="/app/?screen=login">Log in</a>
-          <a class="mobile-signup" href="/app/?screen=signup">Get started</a>
-        </div>
-        <button class="menu-button" type="button" aria-expanded="false" aria-label="Open menu">
-          <span></span><span></span>
-        </button>
-      </nav>
-    </header>
+/* Sticky frosted bar */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--red);transition:background-color .3s,box-shadow .3s}
+.nav.scrolled{background:rgba(230,0,0,.78);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);box-shadow:0 1px 0 rgba(255,255,255,.12)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:12px}
+.logo{font:800 30px/1 var(--brand);letter-spacing:-.5px;text-decoration:none}
+.links{display:flex;gap:28px;font-weight:600;font-size:15px}
+.links a{text-decoration:none;opacity:.9;transition:opacity .2s}.links a:hover{opacity:1}
+.round{width:46px;height:46px;border-radius:50%;border:0;background:rgba(0,0,0,.2);color:var(--fg);display:grid;place-items:center}
+.round:hover{background:rgba(0,0,0,.3)}
+.round.ring{background:transparent;border:2px solid var(--fg)}
+.actions-top{display:flex;gap:10px}
 
-    <main id="main">
-      <section class="hero shell">
-        <div class="hero-copy">
-          <p class="eyebrow">The diaspora's financial platform</p>
-          <h1>Money home.<br /><span>Reimagined.</span></h1>
-          <p class="hero-text">
-            One intelligent financial layer connecting Canada and Europe to
-            Africa through wallet, remittance and mobile-money-native payments.
-          </p>
-          <div class="hero-actions">
-          <a class="button button-lime button-large" href="/app/?screen=signup">Create account</a>
-            <a class="text-link" href="#platform">Explore the platform <span>↘</span></a>
-          </div>
-        </div>
+/* Header */
+.top{background:var(--red) radial-gradient(rgba(255,255,255,.09) 1.4px,transparent 1.6px) 0 0/13px 13px;overflow:hidden}
+.top .wrap{padding-block:18px 96px;display:flex;flex-direction:column;gap:30px}
+.hero{display:flex;flex-direction:column;gap:4px;will-change:transform,opacity}
+h1{margin:0;font-size:clamp(36px,6.4vw,68px);font-weight:800;letter-spacing:-.03em;line-height:1.04;text-wrap:balance}
+.label{color:var(--soft);font-size:16px;margin-top:6px}
+.bal{display:flex;align-items:center;gap:12px;font-size:clamp(36px,5.5vw,56px);font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.textlink{display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-weight:600;font-size:17px;min-height:48px}
+.textlink svg{transition:transform .25s var(--spring)}.textlink:hover svg{transform:translateX(4px)}
+[data-google].busy{opacity:.7;pointer-events:none}
+.btn-out,.btn-white,.google{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn-out{height:52px;padding:0 28px;border-radius:14px;border:2.5px solid var(--fg);background:transparent;color:var(--fg);font-size:17px;font-weight:700}
+.btn-out:hover{background:rgba(255,255,255,.12)}
 
-        <div class="hero-visual" aria-label="Wayaki wallet preview">
-          <div class="spark spark-one">✦</div>
-          <div class="spark spark-two">✦</div>
-          <div class="spark spark-three">●</div>
-          <div class="orbit orbit-one"></div>
-          <div class="orbit orbit-two"></div>
-          <div class="phone">
-            <div class="phone-top"><span>9:41</span><span>● ● ●</span></div>
-            <div class="phone-brand"><span class="mini-mark">W</span> Wayaki</div>
-            <p class="balance-label">Total Assets <span>⌄</span></p>
-            <p class="balance">$2,840.60 <small>USD</small></p>
-            <p class="balance-change">+$183.40 · +6.8% this month</p>
-            <div class="quick-actions">
-              <div><span>↗</span>Send</div>
-              <div><span>↙</span>Cash in</div>
-              <div><span>⌁</span>Swap</div>
-            </div>
-            <div class="activity">
-              <div><b>Recent activity</b><small>See all</small></div>
-              <div class="activity-row">
-                <span class="activity-icon mpesa-icon"><img src="assets/mpesa.png" alt="" /></span>
-                <p><b>M-Pesa cash in</b><small>Today, 10:24</small></p>
-                <strong>+$76.92</strong>
+/* Sheet */
+main{position:relative;margin-top:-34px;border-radius:30px 30px 0 0;background:var(--ink);box-shadow:0 -12px 30px rgba(0,0,0,.25)}
+main .wrap{padding-block:30px 64px;display:flex;flex-direction:column;gap:48px}
+.quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:540px;perspective:700px}
+.tile{display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none;color:#E5E5E5;font-size:14px;font-weight:500;min-height:48px}
+.tile span{width:64px;height:64px;border-radius:20px;background:var(--tile);display:grid;place-items:center;color:var(--icon);transition:transform .35s var(--spring),box-shadow .35s,background-color .35s}
+.tile:hover span{transform:translateY(-5px) rotateX(14deg);background:#2B2B2B;box-shadow:0 14px 22px -8px rgba(230,0,0,.45)}
+.tile:active span{transform:scale(.9)}
+h2{margin:0 0 16px;font-size:clamp(28px,3.6vw,40px);font-weight:800;letter-spacing:-.02em}
+
+/* Card banner */
+.banner{position:relative;overflow:hidden;border-radius:26px;background:var(--red-deep);padding:clamp(24px,5vw,60px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);align-items:center;gap:32px;isolation:isolate}
+.banner::before{content:"";position:absolute;z-index:-1;right:-16%;top:-30%;width:min(720px,110vw);aspect-ratio:1;border-radius:50%;background:var(--red);transform:scale(var(--orb,1));transition:transform .2s linear}
+.pitch{display:flex;flex-direction:column;gap:18px;min-width:0}
+.pitch h3{margin:0;font-size:clamp(28px,4.2vw,50px);line-height:1.08;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+.pitch p{margin:0;color:var(--soft);font-size:17px;max-width:38ch}
+.hint{font-size:14px;color:var(--soft);opacity:.85}
+.btn-white{height:56px;padding:0 30px;border-radius:14px;border:0;background:#FFFFFF;color:var(--red-deep);font-size:17px;font-weight:800;align-self:flex-start;box-shadow:0 10px 24px -10px rgba(0,0,0,.5)}
+.btn-white:hover{box-shadow:0 16px 30px -10px rgba(0,0,0,.6)}
+
+/* 3D card */
+.stage{width:100%;max-width:560px;justify-self:center;perspective:1400px;animation:float 6s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.card{display:block;width:100%;aspect-ratio:856/540;padding:0;border:0;background:none;border-radius:6%/9.5%;touch-action:pan-y}
+.inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transform:rotateZ(-8deg) rotateX(var(--rx,0deg)) rotateY(calc(var(--ry,0deg) + var(--flip,0deg)));transition:transform .8s var(--ease)}
+.card.live .inner{transition:transform .12s ease-out}
+.face{position:absolute;inset:0;border-radius:6%/9.5%;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 34px 50px -18px rgba(30,0,0,.75),0 0 0 1px rgba(255,255,255,.12) inset}
+.face svg{width:100%;height:100%}
+.back{transform:rotateY(180deg)}
+.glare{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at var(--gx,30%) var(--gy,20%),rgba(255,255,255,.42),rgba(255,255,255,0) 46%);mix-blend-mode:soft-light;opacity:.5;transition:opacity .4s}
+.card:hover .glare,.card.live .glare{opacity:1}
+
+/* Sign up */
+.join{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.join .t{font-size:clamp(22px,3vw,30px);font-weight:800;letter-spacing:-.01em}
+.google{width:100%;max-width:420px;height:58px;border-radius:16px;border:0;background:#FFFFFF;color:#1F1F1F;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:12px;box-shadow:0 10px 24px -12px rgba(255,255,255,.35)}
+.google:hover{box-shadow:0 14px 30px -10px rgba(255,255,255,.45)}
+.join small{font-size:15px;color:var(--muted)}
+
+footer{border-top:1px solid var(--line);background:#111111}
+footer .wrap{padding-block:30px calc(30px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px;color:var(--muted);font-size:14px}
+footer nav{display:flex;flex-wrap:wrap;gap:20px}
+footer a{color:var(--muted);text-decoration:none}footer a:hover{color:var(--fg)}
+
+/* Scroll reveal (only below the fold, set by script) */
+.reveal{transition:opacity .9s var(--ease) var(--d,0s),transform 1s var(--ease) var(--d,0s)}
+.pre{opacity:0;transform:perspective(900px) translateY(56px) rotateX(12deg) scale(.96)}
+
+@media (max-width:760px){
+  .links{display:none}
+  .banner{grid-template-columns:1fr}
+  .banner::before{right:-45%;top:auto;bottom:-25%}
+  .stage{max-width:440px;margin-top:6px}
+  .btn-white{align-self:stretch}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before{animation:none!important;transition-duration:.01s!important}
+  .pre{opacity:1;transform:none}
+}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+  <!-- Link previews (WhatsApp, Facebook, X, LinkedIn, Telegram, iMessage) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Fareenn">
+  <meta property="og:title" content="Fareenn — Friendly Banking">
+  <meta property="og:description" content="Fareenn is a friendly digital wallet for Africa. Send and receive money, pay merchants and bills, top up, and get your Fareenn card — all in one app.">
+  <meta property="og:url" content="https://www.fareenn.com/">
+  <meta property="og:image" content="https://www.fareenn.com/app/og-image.jpg">
+  <meta property="og:image:secure_url" content="https://www.fareenn.com/app/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Fareenn logo">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Fareenn — Friendly Banking">
+  <meta name="twitter:description" content="Fareenn is a friendly digital wallet for Africa. Send and receive money, pay merchants and bills, top up, and get your Fareenn card — all in one app.">
+  <meta name="twitter:image" content="https://www.fareenn.com/app/og-image.jpg">
+</head>
+<body>
+
+<div class="nav">
+  <div class="wrap">
+    <a class="logo" href="#top">fareenn.</a>
+    <nav class="links" aria-label="Main"><a href="#card">Cards</a><a href="#personal">Personal</a><a href="#business">Business</a><a href="/fareenn.apk" download>Download</a><a href="#help">Help</a></nav>
+    <div class="actions-top">
+      <button class="round press" aria-label="Notifications"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></button>
+      <a class="round ring press" aria-label="Log in" href="/app/" data-google><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></a>
+    </div>
+  </div>
+</div>
+
+<header class="top" id="top">
+  <div class="wrap">
+    <div class="hero">
+      <h1>Hello, friend</h1>
+      <div class="label">Total balance</div>
+      <div class="bal">$ ••••••
+        <a class="round press" aria-label="Log in to see your balance" href="/app/" data-google><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8z"/><circle cx="12" cy="12" r="3"/></svg></a>
+      </div>
+    </div>
+    <div class="row">
+      <a class="textlink" href="/app/" data-google>Log in to your wallet <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></a>
+      <a class="btn-out press" href="/app/" data-google>Open free account</a>
+      <a class="textlink" href="/fareenn.apk" download>Download for Android <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <nav class="quick" aria-label="Wallet actions">
+      <a class="reveal tile" style="--d:0.00s" href="#send"><span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M8 7h9v9"/></svg></span>Send</a>
+      <a class="reveal tile" style="--d:0.07s" href="#request"><span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 7L7 17"/><path d="M16 17H7V8"/></svg></span>Request</a>
+      <a class="reveal tile" style="--d:0.14s" href="#topup"><span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M12 7v6M9 10h6"/></svg></span>Top up</a>
+      <a class="reveal tile" style="--d:0.21s" href="#bills"><span><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2h14v20l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></span>Pay bills</a>
+    </nav>
+
+    <section id="card" class="reveal" aria-labelledby="fy">
+      <h2 id="fy">For you</h2>
+      <div class="banner">
+        <div class="pitch">
+          <h3>Globally Friend Digital Banking</h3>
+          <p>Your Fareenn card, ready to spend wherever you are.</p>
+          <a class="btn-white press" href="/app/" data-google>Get Your Card</a>
+          <div class="hint">Tap the card to flip it.</div>
+        </div>
+        <div class="stage">
+          <button class="card" aria-label="Fareenn card for Mudan Ali. Flip card" aria-pressed="false">
+            <div class="inner">
+              <div class="face front">
+          <svg viewBox="0 0 856 540" aria-hidden="true">
+            <defs>
+              <pattern id="dots" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="1.6" fill="rgba(255,255,255,.09)"/></pattern>
+              <linearGradient id="gold" x1="0" x2="1"><stop offset="0" stop-color="#B9822A"/><stop offset=".35" stop-color="#E9B949"/><stop offset=".6" stop-color="#F6D576"/><stop offset="1" stop-color="#C8902E"/></linearGradient>
+              <linearGradient id="chip" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F6D98A"/><stop offset=".5" stop-color="#D9A93F"/><stop offset="1" stop-color="#B8862C"/></linearGradient>
+              <filter id="ts" x="-5%" y="-20%" width="110%" height="160%"><feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#5A0000" flood-opacity=".5"/></filter>
+            </defs>
+            <rect width="856" height="540" fill="#E60000"/>
+            <rect width="856" height="540" fill="url(#dots)"/>
+            <g fill="none">
+              <path d="M-20 318C220 262 520 228 880 168" stroke="#E8A33A" stroke-width="2.5" stroke-dasharray="6 5"/>
+              <path d="M-20 330C220 274 520 240 880 180" stroke="rgba(255,255,255,.75)" stroke-width="1.6" stroke-dasharray="3 5"/>
+              <path d="M-20 344C220 288 520 254 880 194" stroke="#141414" stroke-width="2"/>
+              <path d="M-20 392C220 336 520 302 880 242" stroke="url(#gold)" stroke-width="58"/>
+              <path d="M-20 450C220 394 520 360 880 300" stroke="#141414" stroke-width="36"/>
+              <path d="M-20 480C220 424 520 390 880 330" stroke="#F2A93B" stroke-width="2"/>
+              <path d="M-20 492C220 436 520 402 880 342" stroke="rgba(255,255,255,.7)" stroke-width="1.4" stroke-dasharray="3 5"/>
+              <path d="M-20 504C220 448 520 414 880 354" stroke="#D9822B" stroke-width="3"/>
+              <path d="M-20 518C220 462 520 428 880 368" stroke="#E8A33A" stroke-width="1.6" stroke-dasharray="6 4"/>
+              <path d="M-20 536C220 480 520 446 880 386" stroke="#141414" stroke-width="2.4"/>
+            </g>
+            <rect x="578" y="96" width="104" height="80" rx="14" fill="url(#chip)"/>
+            <path d="M578 136h34M648 136h34M612 96v80M648 96v80M612 118h36M612 154h36" stroke="rgba(110,70,10,.45)" stroke-width="2.2" fill="none"/>
+            <path d="M716 118a24 24 0 0 1 0 36M732 108a40 40 0 0 1 0 56M748 98a56 56 0 0 1 0 76" stroke="#FFF" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <g fill="#FFF" filter="url(#ts)">
+              <text x="62" y="176" font-family="Nunito,'Arial Rounded MT Bold',system-ui,sans-serif" font-weight="800" font-size="104" letter-spacing="-2">fareenn</text>
+              <text x="68" y="226" font-family="system-ui,sans-serif" font-weight="700" font-size="20" letter-spacing="3" opacity=".92">FRIENDLY BANKING</text>
+              <text x="64" y="296" font-family="'Courier New',ui-monospace,monospace" font-weight="700" font-size="42" letter-spacing="4">5412 7534 8821 4821</text>
+              <text x="64" y="404" font-family="system-ui,sans-serif" font-weight="700" font-size="12" letter-spacing="2">VALID THRU</text>
+              <text x="64" y="434" font-family="'Courier New',ui-monospace,monospace" font-weight="700" font-size="26" letter-spacing="2">09/30</text>
+              <text x="200" y="404" font-family="system-ui,sans-serif" font-weight="700" font-size="12" letter-spacing="2">CVC</text>
+              <text x="200" y="434" font-family="'Courier New',ui-monospace,monospace" font-weight="700" font-size="26" letter-spacing="2">123</text>
+              <text x="64" y="488" font-family="system-ui,sans-serif" font-weight="800" font-size="26" letter-spacing="2">MUDAN ALI</text>
+            </g>
+            <image href="data:image/webp;base64,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" x="652" y="394" width="150" height="117"/>
+          </svg>
+                <span class="glare"></span>
               </div>
-              <div class="activity-row">
-                <span class="activity-icon dark">₿</span>
-                <p><b>Bitcoin</b><small>Yesterday</small></p>
-                <strong>+$21.04</strong>
+              <div class="face back">
+          <svg viewBox="0 0 856 540" aria-hidden="true">
+            <defs><pattern id="dots2" width="14" height="14" patternUnits="userSpaceOnUse"><circle cx="7" cy="7" r="1.6" fill="rgba(255,255,255,.09)"/></pattern>
+            <linearGradient id="gold2" x1="0" x2="1"><stop offset="0" stop-color="#B9822A"/><stop offset=".5" stop-color="#F6D576"/><stop offset="1" stop-color="#C8902E"/></linearGradient></defs>
+            <rect width="856" height="540" fill="#E60000"/><rect width="856" height="540" fill="url(#dots2)"/>
+            <rect y="52" width="856" height="86" fill="#141414"/>
+            <rect y="138" width="856" height="6" fill="url(#gold2)"/>
+            <rect x="56" y="186" width="520" height="70" rx="8" fill="#F7EEE3"/>
+            <text x="76" y="232" fill="#3A3A3A" font-family="'Brush Script MT','Segoe Script',cursive" font-size="34">Mudan Ali</text>
+            <rect x="596" y="186" width="120" height="70" rx="8" fill="#FFFFFF"/>
+            <text x="656" y="231" text-anchor="middle" fill="#141414" font-family="'Courier New',monospace" font-weight="700" font-size="28">123</text>
+            <text x="56" y="306" fill="#FFF" font-family="system-ui,sans-serif" font-size="18" opacity=".85">Customer care: [YOUR SUPPORT NUMBER]</text>
+            <text x="56" y="336" fill="#FFF" font-family="system-ui,sans-serif" font-size="18" opacity=".85">Issued by [YOUR CARD ISSUER]</text>
+            <text x="56" y="470" fill="#FFF" font-family="Nunito,'Arial Rounded MT Bold',system-ui,sans-serif" font-weight="800" font-size="64" letter-spacing="-1">fareenn</text>
+            <text x="60" y="502" fill="#FFF" font-family="system-ui,sans-serif" font-weight="700" font-size="16" letter-spacing="3" opacity=".9">FRIENDLY BANKING</text>
+          </svg>
+                <span class="glare"></span>
               </div>
             </div>
-          </div>
-          <div class="float-card float-card-one">
-            <span>Payment sent</span><strong>$120.00</strong><small>to Amina</small>
-          </div>
-          <div class="float-card float-card-two">
-            <span>Works with</span><strong>M-Pesa · EVC · Waafi</strong>
-          </div>
-          <div class="float-pill float-pill-one">Instant ✦</div>
-          <div class="float-pill float-pill-two">Secure by design</div>
-        </div>
-      </section>
-
-      <section class="motion-ticker" aria-label="Wayaki capabilities">
-        <div class="ticker-track">
-          <span>ONE WALLET</span><i>✦</i><span>MOBILE MONEY</span><i>✦</i>
-          <span>CRYPTO</span><i>✦</i><span>GLOBAL PAYMENTS</span><i>✦</i>
-          <span>ONE WALLET</span><i>✦</i><span>MOBILE MONEY</span><i>✦</i>
-          <span>CRYPTO</span><i>✦</i><span>GLOBAL PAYMENTS</span><i>✦</i>
-        </div>
-      </section>
-
-      <section class="rails-strip" aria-label="Payment rails Wayaki runs on">
-        <div class="shell rails-inner">
-          <p class="rails-label">Built on the rails you already trust</p>
-          <div class="rails-logos">
-            <span class="rail-badge rail-badge-image"><img src="assets/mpesa.png" alt="" /> M-Pesa</span>
-            <span class="rail-badge">Stripe</span>
-            <span class="rail-badge">Paystack</span>
-            <span class="rail-badge">EVC Plus</span>
-            <span class="rail-badge">Waafi</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="trust-bar" aria-label="Wayaki benefits">
-        <div class="shell trust-grid">
-          <p><span>01</span>One balance</p>
-          <p><span>02</span>Multiple rails</p>
-          <p><span>03</span>Instant settlement</p>
-          <p><span>04</span>Protected by design</p>
-        </div>
-      </section>
-
-      <section class="brand-statement" aria-label="Wayaki vision">
-        <p class="statement-top">BUILT FOR THE DISTANCE BETWEEN</p>
-        <div class="statement-word">HERE<span>✦</span></div>
-        <div class="statement-word statement-word-right"><span>✦</span>HOME</div>
-        <div class="statement-foot shell">
-          <p>Not another money-transfer app.</p>
-          <p>A new financial connection between diaspora communities and the people they support.</p>
-        </div>
-      </section>
-
-      <section class="category-proof shell" aria-label="The remittance opportunity">
-        <article><strong>40M+</strong><span>Africans living in the diaspora</span></article>
-        <article><strong>$100B+</strong><span>Sent home every year</span></article>
-        <article><strong>5–12%</strong><span>Legacy transaction fees</span></article>
-        <article><strong>1–5 days</strong><span>Typical legacy settlement</span></article>
-      </section>
-
-      <section class="manifesto shell" id="mission">
-        <div class="manifesto-kicker">
-          <span>THE LANDSCAPE</span>
-          <i>01</i>
-        </div>
-        <div class="manifesto-copy">
-          <p class="eyebrow">Sending money home is still stuck in the past</p>
-          <h2>A global flow of money trapped in a fragmented experience.</h2>
-          <p>
-            Families wait while senders jump between loading apps, remittance
-            operators and payout services. Fees stay high, visibility stays low,
-            and the recipient is often left with cash instead of financial choice.
-          </p>
-          <div class="friction-grid">
-            <div><span>01</span><strong>Too many disconnected apps</strong></div>
-            <div><span>02</span><strong>Slow, opaque settlement</strong></div>
-            <div><span>03</span><strong>Limited digital payout choice</strong></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="feature-section shell" id="platform">
-        <div class="section-heading">
-          <p class="eyebrow">One app. Three services.</p>
-          <h2>The complete financial layer for the African diaspora.</h2>
-        </div>
-
-        <div class="bento-grid">
-          <article class="feature-card card-lime wide">
-            <div class="card-orb orb-lime" aria-hidden="true"></div>
-            <div>
-              <span class="card-number">01</span>
-              <h3>Mobile money,<br />finally connected.</h3>
-              <p>
-                The Wayaki E-Wallet is designed to load through bank, card or
-                trusted cash agents and move money between users instantly.
-              </p>
-            </div>
-            <div class="rail-cloud" aria-hidden="true">
-              <span>M‑Pesa</span><span>EVC Plus</span><span>Waafi</span>
-              <span>Zaad</span><span>Sahal</span>
-            </div>
-          </article>
-
-          <article class="feature-card card-surface">
-            <div class="card-orb orb-green" aria-hidden="true"></div>
-            <span class="card-number">02</span>
-            <h3>Remittance as fast as a message.</h3>
-            <p>Same-day corridors planned from Canada and the EU to Somalia, Kenya and Ethiopia.</p>
-            <div class="coin-stack remittance-stack" aria-hidden="true"><span>CA</span><span>EU</span><span>EA</span></div>
-          </article>
-
-          <article class="feature-card card-surface card-glow">
-            <div class="card-orb orb-pink" aria-hidden="true"></div>
-            <span class="card-number">03</span>
-            <h3>A card that travels with the money.</h3>
-            <p>A planned Wayaki prepaid card for senders and recipients—designed to work without a traditional bank account.</p>
-            <div class="wayaki-card" aria-label="Planned Wayaki prepaid card preview">
-              <div class="wayaki-card-top">
-                <span class="card-brand"><b>W</b> Wayaki</span>
-                <span class="contactless">)))</span>
-              </div>
-              <div class="card-chip" aria-hidden="true"></div>
-              <div class="card-digits">•••• 4826</div>
-              <div class="wayaki-card-bottom">
-                <span><small>CARDHOLDER</small>AMINA MOHAMED</span>
-                <strong>PREPAID</strong>
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card card-dark wide">
-            <div>
-              <span class="card-number">04</span>
-              <h3>Serious security.<br />Zero drama.</h3>
-            </div>
-            <div class="security-list">
-              <p><span>✓</span> Biometric access</p>
-              <p><span>✓</span> Real-time alerts</p>
-              <p><span>✓</span> Verified recipients</p>
-              <p><span>✓</span> Protected transactions</p>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="steps-section shell" id="get-started-steps">
-        <div class="steps-copy">
-          <h2>Open a Wayaki<br />account in minutes.</h2>
-          <p>Everything happens in the app — no branch visit, no paperwork to mail in.</p>
-            <a class="button button-lime button-large" href="/app/?screen=signup">Create account</a>
-        </div>
-        <ol class="steps-list">
-          <li>
-            <span class="step-num n1">1.</span>
-            <div><strong>Create your account</strong><p>Add your name, phone number and email, and set a password.</p></div>
-          </li>
-          <li>
-            <span class="step-num n2">2.</span>
-            <div><strong>Verify your email</strong><p>Enter the 4-digit code we send you — takes a few seconds.</p></div>
-          </li>
-          <li>
-            <span class="step-num n3">3.</span>
-            <div><strong>Verify your identity</strong><p>Complete KYC to unlock full wallet, remittance and card limits.</p></div>
-          </li>
-        </ol>
-      </section>
-
-      <section class="pricing-section shell" id="pricing">
-        <div class="section-heading">
-          <p class="eyebrow">Simple, honest pricing</p>
-          <h2>Free to start.<br />Pay only for more.</h2>
-        </div>
-        <div class="pricing-grid">
-          <article class="price-card price-free">
-            <div class="price-icon">◆</div>
-            <h3>Wayaki Free</h3>
-            <p class="price-amount">Free<span></span></p>
-            <p class="price-desc">Everything you need to send, receive and hold money.</p>
-            <ul class="price-features">
-              <li><span class="price-check">✓</span>E-wallet in CAD, EUR and crypto</li>
-              <li><span class="price-check">✓</span>Mobile-money cash-in &amp; cash-out</li>
-              <li><span class="price-check">✓</span>Instant P2P transfers to other Wayaki users</li>
-            </ul>
-            <a class="button button-light" href="/app/?screen=signup">Get Wayaki Free</a>
-          </article>
-          <article class="price-card price-premium">
-            <div class="price-icon">◆</div>
-            <h3>Wayaki Premium</h3>
-            <p class="price-amount">CAD $9.99<span>/mo</span></p>
-            <p class="price-desc">For frequent senders who want more from every transfer.</p>
-            <ul class="price-features">
-              <li><span class="price-check">✓</span>Unlimited remittance transfers</li>
-              <li><span class="price-check">✓</span>Lower FX spread on every corridor</li>
-              <li><span class="price-check">✓</span>Priority support &amp; higher wallet limits</li>
-            </ul>
-            <a class="button button-dark" href="/app/?screen=signup">Get Wayaki Premium</a>
-          </article>
-        </div>
-      </section>
-
-      <section class="technology-section" id="technology">
-        <div class="shell technology-heading">
-          <p class="eyebrow">Technology-driven by design</p>
-          <h2>One orchestration layer.<br />Every movement of money.</h2>
-          <p>
-            Wayaki's Corridor OS is being designed to coordinate identity,
-            funding, FX, compliance, settlement and payout through one
-            observable transaction lifecycle.
-          </p>
-        </div>
-        <div class="shell tech-stage">
-          <div class="tech-rail">
-            <span>01</span><strong>Fund</strong><small>Bank · Card · Agent</small>
-          </div>
-          <i>→</i>
-          <div class="tech-rail active">
-            <span>02</span><strong>Orchestrate</strong><small>Ledger · FX · Risk</small>
-          </div>
-          <i>→</i>
-          <div class="tech-rail">
-            <span>03</span><strong>Settle</strong><small>Wallet · Bank · Mobile money</small>
-          </div>
-          <div class="system-console">
-            <div class="console-top"><span>WAYAKI CORRIDOR OS</span><span class="live-dot">● DESIGNED</span></div>
-            <div class="console-flow">
-              <p><span>IDENTITY</span><b>Verified</b></p>
-              <p><span>RISK ENGINE</span><b>Clear</b></p>
-              <p><span>FX QUOTE</span><b>Locked</b></p>
-              <p><span>PAYOUT RAIL</span><b>M-Pesa</b></p>
-            </div>
-            <div class="console-total"><span>Transaction state</span><strong>Ready to settle</strong></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="reach-section" id="reach">
-        <div class="shell reach-layout">
-          <div class="reach-copy">
-            <p class="eyebrow">Phase-one corridors</p>
-            <h2>Canada and Europe to East Africa.</h2>
-            <p>
-              A corridor network planned around how recipients actually use
-              money: EVC Plus and Zaad in Somalia, M-Pesa in Kenya, telebirr in
-              Ethiopia, alongside bank transfer and cash payout partners.
-            </p>
-            <a class="text-link light" href="/app/?screen=signup">Start moving money <span>↗</span></a>
-          </div>
-          <div class="map-card" aria-label="Wayaki supported region illustration">
-            <div class="map-grid"></div>
-            <span class="city city-one">Nairobi<i></i></span>
-            <span class="city city-two">Mogadishu<i></i></span>
-            <span class="city city-three">Hargeisa<i></i></span>
-            <span class="city city-four">London<i></i></span>
-            <div class="route route-one"></div>
-            <div class="route route-two"></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="trust-architecture shell" id="security">
-        <div class="trust-heading">
-          <p class="eyebrow">Trust is infrastructure</p>
-          <h2>Compliance-ready from the first line of code.</h2>
-          <p>
-            The platform architecture is being designed around safeguarded
-            funds, tiered identity, real-time screening and traceable ledger
-            events—ready to adapt across Canadian and European frameworks.
-          </p>
-        </div>
-        <div class="trust-stack">
-          <article><span>01</span><h3>Know every customer</h3><p>Tiered KYC and identity verification designed for corridor-specific limits.</p></article>
-          <article><span>02</span><h3>Screen every movement</h3><p>Sanctions, PEP and transaction-monitoring controls designed into the flow.</p></article>
-          <article><span>03</span><h3>Trace every cent</h3><p>Double-entry ledger architecture and a complete transaction history.</p></article>
-          <article><span>04</span><h3>Protect every balance</h3><p>A safeguarded-funds model designed to ring-fence customer money.</p></article>
-        </div>
-      </section>
-
-      <section class="company-section shell" id="company">
-        <div class="company-quote">
-          <span class="quote-mark">“</span>
-          <blockquote>
-            Sending money to Africa should be as easy, fast and transparent as
-            sending a text message.
-          </blockquote>
-          <p>WAYAKI MISSION</p>
-        </div>
-        <div class="company-story">
-          <p class="eyebrow">Built by operators, not observers</p>
-          <h2>Fintech experience. Regulatory literacy. Diaspora conviction.</h2>
-          <p>
-            Wayaki is led by founders with hands-on experience in digital
-            wallets, software, financial operations, institution building and
-            diaspora communities across Africa, Canada and Europe.
-          </p>
-          <div class="roadmap-row">
-            <div><span>NOW</span><strong>Platform development</strong></div>
-            <div><span>NEXT</span><strong>Canada launch corridor</strong></div>
-            <div><span>THEN</span><strong>Lithuania/EU operations</strong></div>
-            <div><span>SCALE</span><strong>Cards + more African markets</strong></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="cta-section shell" id="get-started">
-        <div class="cta-copy">
-          <p class="eyebrow">Your money is ready</p>
-          <h2>Wayaki is live. Move your first dollar today.</h2>
-          <p>Create a free account in minutes, or reach out about corridor partnerships and investment.</p>
-          <a class="button button-dark button-large" href="/app/?screen=signup" style="margin-top: 30px;">Create your account</a>
-        </div>
-        <form class="signup-form" novalidate>
-          <label for="email">Partnership &amp; investor interest</label>
-          <div class="form-row">
-            <input id="email" name="email" type="email" placeholder="Email address" autocomplete="email" required />
-            <button class="button button-dark" type="submit">Get in touch</button>
-          </div>
-          <p class="form-note" aria-live="polite">No spam. Only launch updates.</p>
-        </form>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <div class="shell footer-top">
-          <a class="wordmark footer-mark" href="/" aria-label="Wayaki home">
-            <img src="assets/wayaki-logo.png" alt="Wayaki" />
-          </a>
-        <p>All your money. One app.</p>
-        <div class="footer-links">
-          <a href="#platform">Product</a>
-          <a href="#technology">Technology</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#security">Security</a>
-          <a href="mailto:support@wayaki.com">Contact</a>
+          </button>
         </div>
       </div>
-      <div class="shell footer-legal">
-        <a href="/app/?screen=login">Log in</a>
-        <a href="/privacy">Privacy Policy</a>
-        <a href="/terms">Terms of Service</a>
-        <a href="/data-deletion">Data &amp; account deletion</a>
-        <a href="/kyc-policy">KYC Policy</a>
-        <a href="/aml-policy">AML Policy</a>
-        <a href="/cookies">Cookie Policy</a>
-        <a href="/refund-policy">Refund Policy</a>
-        <a href="/disclaimer">Risk &amp; Regulatory Disclaimer</a>
-        <a href="/support">Support</a>
-      </div>
-      <div class="shell footer-bottom">
-        <span>© 2026 Wayaki. All rights reserved.</span>
-        <span>Built for Africa and the world.</span>
-      </div>
-    </footer>
+    </section>
 
-    <script src="wayaki.js"></script>
-  </body>
+    <section class="join reveal" aria-label="Sign up">
+      <div class="t">Join Fareenn in seconds</div>
+      <a class="google press" href="/app/" data-google><img src="data:image/webp;base64,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" width="24" height="24" alt="">Sign up with Google</a>
+      <small>Already have an account? <a href="/app/" data-google><b>Log in</b></a></small>
+    </section>
+  </div>
+</main>
+
+<footer class="reveal">
+  <div class="wrap">
+    <div><div style="font:800 24px/1 var(--brand);color:var(--fg)">fareenn.</div><div>Friendly Banking</div></div>
+    <nav aria-label="Footer"><a href="#about">About</a><a href="#security">Security</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/support">Contact</a></nav>
+    <div>© 2026 Fareenn</div>
+  </div>
+</footer>
+<script>
+(function(){
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var nav=document.querySelector('.nav'),hero=document.querySelector('.hero'),banner=document.querySelector('.banner');
+  var ticking=false;
+  function onScroll(){
+    if(ticking)return;ticking=true;
+    requestAnimationFrame(function(){
+      var y=scrollY;
+      nav.classList.toggle('scrolled',y>8);
+      if(!reduce){
+        hero.style.transform='translate3d(0,'+(y*.28)+'px,0)';
+        hero.style.opacity=Math.max(0,1-y/420);
+        var r=banner.getBoundingClientRect(),p=1-Math.min(1,Math.max(0,r.top/innerHeight));
+        banner.style.setProperty('--orb',(.9+p*.18).toFixed(3));
+      }
+      ticking=false;
+    });
+  }
+  addEventListener('scroll',onScroll,{passive:true});onScroll();
+
+  if(!reduce&&'IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.remove('pre');io.unobserve(e.target);}})},{threshold:.12,rootMargin:'0px 0px -6% 0px'});
+    document.querySelectorAll('.reveal').forEach(function(el){
+      if(el.getBoundingClientRect().top>innerHeight*.9){el.classList.add('pre');io.observe(el);}
+    });
+  }
+
+  var card=document.querySelector('.card'),flipped=false,raf=0;
+  function tilt(x,y){
+    var b=card.getBoundingClientRect(),px=(x-b.left)/b.width,py=(y-b.top)/b.height;
+    px=Math.min(1,Math.max(0,px));py=Math.min(1,Math.max(0,py));
+    cancelAnimationFrame(raf);
+    raf=requestAnimationFrame(function(){
+      card.style.setProperty('--ry',((px-.5)*28).toFixed(2)+'deg');
+      card.style.setProperty('--rx',((.5-py)*20).toFixed(2)+'deg');
+      card.style.setProperty('--gx',(px*100).toFixed(1)+'%');
+      card.style.setProperty('--gy',(py*100).toFixed(1)+'%');
+    });
+  }
+  function rest(){card.classList.remove('live');card.style.setProperty('--rx','0deg');card.style.setProperty('--ry','0deg');}
+  if(!reduce){
+    card.addEventListener('pointermove',function(e){card.classList.add('live');tilt(e.clientX,e.clientY);});
+    card.addEventListener('pointerleave',rest);
+    card.addEventListener('pointerup',function(e){if(e.pointerType!=='mouse')rest();});
+    card.addEventListener('pointercancel',rest);
+  }
+  card.addEventListener('click',function(){
+    flipped=!flipped;rest();
+    card.style.setProperty('--flip',flipped?'180deg':'0deg');
+    card.setAttribute('aria-pressed',flipped);
+  });
+})();
+</script>
+<script>
+/* One-tap Google sign-in from the landing page. The Firebase SDK warms up in
+   the background so the popup opens straight from the click; once Google
+   confirms the account, the app finishes signing in on its own. If anything
+   is not ready, the link simply opens the app's sign-in screen. */
+(function(){
+  var FB={apiKey:"AIzaSyDz5KPtY3bDJWvouZ-orCmxcBAnacgo9BA",authDomain:"fareenn-f29f3.firebaseapp.com",projectId:"fareenn-f29f3",appId:"1:1051480531190:web:19ce857d09e0a12361ccd7",messagingSenderId:"1051480531190",storageBucket:"fareenn-f29f3.firebasestorage.app"};
+  var V="11.10.0",base="https://www.gstatic.com/firebasejs/"+V+"/";
+  var loading=null,fa=null,auth=null,provider=null;
+  function warm(){
+    if(loading)return loading;
+    loading=Promise.all([import(base+"firebase-app.js"),import(base+"firebase-auth.js")]).then(function(m){
+      var app=m[0].initializeApp(FB);
+      fa=m[1];auth=fa.getAuth(app);
+      provider=new fa.GoogleAuthProvider();
+      provider.addScope("email");provider.addScope("profile");
+      provider.setCustomParameters({prompt:"select_account"});
+    }).catch(function(e){loading=null;console.warn("Google sign-in preload failed",e);});
+    return loading;
+  }
+  var go=function(){location.href="/app/?from=landing";};
+  // Only warm Firebase once the visitor actually shows intent to sign in
+  // (hover/touch/focus near the button) — not on every page load, so
+  // people who never click "Log in" never pay for this download.
+  ["pointerover","touchstart","focusin"].forEach(function(t){
+    document.addEventListener(t,function(e){if(e.target.closest&&e.target.closest("[data-google]"))warm();},{passive:true});
+  });
+  document.addEventListener("click",function(e){
+    var a=e.target.closest&&e.target.closest("[data-google]");
+    if(!a||!auth)return;
+    e.preventDefault();
+    if(auth.currentUser){go();return;}
+    a.classList.add("busy");
+    fa.signInWithPopup(auth,provider).then(go).catch(function(err){
+      a.classList.remove("busy");
+      var c=err&&err.code||"";
+      if(c==="auth/popup-closed-by-user"||c==="auth/cancelled-popup-request")return;
+      location.href="/app/";
+    });
+  });
+})();
+</script>
+</body>
 </html>

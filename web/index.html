@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Wayaki — your crypto wallet, mobile money and virtual bank account in one app.">
+  <meta name="description" content="Fareenn is a friendly digital wallet for Africa. Send and receive money, pay merchants and bills, top up, and get your Fareenn card — all in one app.">
   <!--
     No viewport meta previously — mobile browsers (and Telegram's in-app
     WebView) default to desktop-page zoom heuristics without it, which reads
@@ -31,27 +31,109 @@
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#E60000">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Wayaki">
+  <meta name="apple-mobile-web-app-title" content="Fareenn">
   <link rel="apple-touch-icon" sizes="192x192" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
   <link rel="shortcut icon" href="favicon.ico">
 
-  <title>Wayaki</title>
+  <title>Fareenn — Friendly Banking</title>
   <link rel="manifest" href="manifest.json">
+  <link rel="preload" as="image" href="fareenn_wordmark.png">
 
-  <!-- Required by flutter_stripe_web to render CardField/Stripe Elements -->
-  <script src="https://js.stripe.com/v3/"></script>
+  <!-- Speed up the first network round-trips (Flutter's CanvasKit + fonts). -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- Required by flutter_stripe_web to render CardField/Stripe Elements.
+       Loaded async: it's only needed at payment time, so it must never hold
+       up the first frame. -->
+  <script src="https://js.stripe.com/v3/" async></script>
 
   <!--
-    Telegram Mini Apps SDK. Always loaded (harmless outside Telegram — it
-    just defines window.Telegram.WebApp with an empty initData) so the same
-    web build works standalone and as a Telegram Mini App.
-    https://core.telegram.org/bots/webapps
+    Telegram Mini Apps SDK — loaded only when the page is actually opened
+    inside Telegram (Telegram adds tgWebApp* launch params to the URL).
+    In a normal browser tab it used to block start-up on a request to
+    telegram.org; lib/services/telegram_service_web.dart already treats a
+    missing SDK as "not in Telegram".
   -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var inTelegram = false;
+      try {
+        inTelegram =
+          /tgWebApp/.test(window.location.hash + window.location.search) ||
+          !!window.TelegramWebviewProxy ||
+          !!sessionStorage.getItem('__telegram__initParams');
+      } catch (e) {}
+      if (inTelegram) {
+        document.write('<script src="https://telegram.org/js/telegram-web-app.js"><\/script>');
+      }
+    })();
+  </script>
+  <!-- Link previews (WhatsApp, Facebook, X, LinkedIn, Telegram, iMessage) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Fareenn">
+  <meta property="og:title" content="Fareenn — Friendly Banking">
+  <meta property="og:description" content="Fareenn is a friendly digital wallet for Africa. Send and receive money, pay merchants and bills, top up, and get your Fareenn card — all in one app.">
+  <meta property="og:url" content="https://www.fareenn.com/">
+  <meta property="og:image" content="https://www.fareenn.com/app/og-image.jpg">
+  <meta property="og:image:secure_url" content="https://www.fareenn.com/app/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Fareenn logo">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Fareenn — Friendly Banking">
+  <meta name="twitter:description" content="Fareenn is a friendly digital wallet for Africa. Send and receive money, pay merchants and bills, top up, and get your Fareenn card — all in one app.">
+  <meta name="twitter:image" content="https://www.fareenn.com/app/og-image.jpg">
+  <!-- Fareenn card taps: thin Promise wrappers around Web NFC (Chrome on
+       Android, HTTPS only). Used by lib/services/nfc_service_web.dart. -->
+  <script>
+    window.fareennNfc = (function () {
+      var ctrl = null;
+      function stop() { if (ctrl) { try { ctrl.abort(); } catch (_) {} ctrl = null; } }
+      function supported() { return 'NDEFReader' in window; }
+      function firstText(message) {
+        var recs = (message && message.records) || [];
+        for (var i = 0; i < recs.length; i++) {
+          var r = recs[i];
+          if (r.recordType === 'url' || r.recordType === 'text' || r.recordType === 'absolute-url') {
+            try { return new TextDecoder(r.encoding || 'utf-8').decode(r.data); } catch (_) {}
+          }
+        }
+        return '';
+      }
+      function read(timeoutMs) {
+        stop();
+        var my = new AbortController(); ctrl = my;
+        var reader = new NDEFReader();
+        return new Promise(function (resolve, reject) {
+          var t = setTimeout(function () { if (ctrl === my) stop(); reject(new Error('timeout')); }, timeoutMs);
+          reader.onreading = function (e) {
+            clearTimeout(t);
+            var out = JSON.stringify({ uid: e.serialNumber || '', data: firstText(e.message) });
+            if (ctrl === my) stop();
+            resolve(out);
+          };
+          reader.onreadingerror = function () { /* keep waiting for a clean read */ };
+          reader.scan({ signal: my.signal }).catch(function (err) { clearTimeout(t); if (ctrl === my) stop(); reject(err); });
+        });
+      }
+      function write(url, timeoutMs) {
+        stop();
+        var my = new AbortController(); ctrl = my;
+        var t = setTimeout(function () { if (ctrl === my) stop(); }, timeoutMs);
+        return new NDEFReader()
+          .write({ records: [{ recordType: 'url', data: url }] }, { overwrite: true, signal: my.signal })
+          .finally(function () { clearTimeout(t); if (ctrl === my) ctrl = null; });
+      }
+      return { supported: supported, read: read, write: write, stop: stop };
+    })();
+  </script>
 </head>
 <body>
   <style>
@@ -60,7 +142,7 @@
        just a webpage", not a native-feeling app. */
     html, body {
       overscroll-behavior: none;
-      background: #050506;
+      background: #0D0D0D;
       /* Make it feel like a native app */
       -webkit-touch-callout: none;
       -webkit-user-select: none;
@@ -70,7 +152,7 @@
 
     /* Flutter's engine (download + parse + first paint) takes a beat,
        especially on a cold mobile connection inside Telegram. Without this,
-       that gap is a blank white flash before Wayaki's own dark UI appears.
+       that gap is a blank white flash before Fareenn's own dark UI appears.
        Removed automatically once Flutter fires 'flutter-first-frame'. */
     #wayaki-boot-splash {
       position: fixed;
@@ -79,19 +161,33 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #050506;
-      transition: opacity 200ms ease;
+      /* Brand red with the logo's faint dot texture. */
+      background-color: #E60000;
+      background-image: radial-gradient(rgba(0, 0, 0, 0.10) 1px, transparent 1.2px);
+      background-size: 9px 9px;
+      transition: opacity 220ms ease;
     }
     #wayaki-boot-splash.wayaki-boot-splash-hidden {
       opacity: 0;
       pointer-events: none;
     }
+    #wayaki-boot-splash .wayaki-boot-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 34px;
+    }
+    #wayaki-boot-splash .wayaki-boot-logo {
+      width: min(62vw, 300px);
+      height: auto;
+      display: block;
+    }
     #wayaki-boot-splash .wayaki-boot-spinner {
-      width: 40px;
-      height: 40px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
-      border: 3px solid rgba(221, 247, 22, 0.18);
-      border-top-color: #DDF716;
+      border: 3px solid rgba(255, 255, 255, 0.28);
+      border-top-color: #FFFFFF;
       animation: wayaki-boot-spin 0.8s linear infinite;
     }
     @keyframes wayaki-boot-spin {
@@ -99,25 +195,9 @@
     }
   </style>
 
-  <div id="wayaki-boot-splash"><div class="wayaki-boot-spinner"></div></div>
+  <div id="wayaki-boot-splash"><div class="wayaki-boot-inner"><img class="wayaki-boot-logo" src="fareenn_wordmark.png" alt="Fareenn"><div class="wayaki-boot-spinner"></div></div></div>
 
   <script>
-    // Older Flutter service workers can keep serving an obsolete payment UI
-    // after a production deployment. This app is network-backed and should
-    // always load the current bundle, so remove legacy workers once and
-    // reload any page that was still controlled by one.
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        const wasControlled = Boolean(navigator.serviceWorker.controller);
-        await Promise.all(registrations.map((registration) => registration.unregister()));
-        if (wasControlled && !sessionStorage.getItem('wayaki-sw-reset-20260725')) {
-          sessionStorage.setItem('wayaki-sw-reset-20260725', '1');
-          window.location.reload();
-        }
-      });
-    }
-
     window.addEventListener('flutter-first-frame', function () {
       var splash = document.getElementById('wayaki-boot-splash');
       if (!splash) return;
